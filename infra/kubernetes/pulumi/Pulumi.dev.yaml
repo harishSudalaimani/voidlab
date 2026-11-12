@@ -9,8 +9,8 @@ config:
   voidlab-kubernetes:ciliumCLIVersion: v0.20.1
   voidlab-kubernetes:sshPrivateKeyPath: /home/harish/.ssh/id_ed25519_voidlab
   voidlab-kubernetes:joinTokenGeneration: "1"
-  voidlab-kubernetes:hypervisorHostKey: ssh-ed25519 HYPERVISOR_KEY_DATA
-  voidlab-kubernetes:cpHostKey: ssh-ed25519 CP_KEY_DATA
-  voidlab-kubernetes:worker1HostKey: ssh-ed25519 WORKER_1_KEY_DATA
-  voidlab-kubernetes:worker2HostKey: ssh-ed25519 WORKER_2_KEY_DATA
-  voidlab-kubernetes:worker3HostKey: ssh-ed25519 WORKER_3_KEY_DATA
+  voidlab-kubernetes:hypervisorHostKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPgR98o2/xYL15lUDKyXZT7W4XGJyuxcZy20Wu/QbkFY
+  voidlab-kubernetes:cpHostKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICIXq7OfS6RrKaWZUB/mfmptcmpJ1GGeu3hvkxaCe/tx
+  voidlab-kubernetes:worker1HostKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIo18z5QgS9qsF8HykS3U/D8r+zYcyRVFrJlXEyVdb62
+  voidlab-kubernetes:worker2HostKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHxMjthKGLkMt3spauczN8wk5aZA3KnuX4BNRoR92IXD
+  voidlab-kubernetes:worker3HostKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKqEWAstsPkG7lfmrFr2JyweS+JwvhUdhWC9WUDxRqr8

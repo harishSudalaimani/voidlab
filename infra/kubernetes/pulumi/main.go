@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -265,7 +267,18 @@ func isSSHKey(value string) bool {
 		return false
 	}
 	keyType := fields[0]
-	return strings.HasPrefix(keyType, "ssh-") || strings.HasPrefix(keyType, "ecdsa-") || strings.HasPrefix(keyType, "sk-")
+	if !strings.HasPrefix(keyType, "ssh-") && !strings.HasPrefix(keyType, "ecdsa-") && !strings.HasPrefix(keyType, "sk-") {
+		return false
+	}
+	blob, err := base64.StdEncoding.DecodeString(fields[1])
+	if err != nil || len(blob) < 4 {
+		return false
+	}
+	typeLength := binary.BigEndian.Uint32(blob[:4])
+	if typeLength == 0 || uint64(typeLength) > uint64(len(blob)-4) {
+		return false
+	}
+	return string(blob[4:4+int(typeLength)]) == keyType
 }
 
 func shellQuote(value string) string {

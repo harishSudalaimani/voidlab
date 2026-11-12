@@ -45,6 +45,8 @@ pulumi stack init snharish85-gmail-com-org/voidlab-kubernetes/dev
 
 Set each verified key, replacing the placeholders with the key type and key data (omit the host/address column):
 
+The `HYPERVISOR_KEY_DATA`, `CP_KEY_DATA`, and `WORKER_*_KEY_DATA` strings below are placeholders and must never be entered literally. Copy the key type and base64 field from the matching `ssh-keyscan` line after verifying its fingerprint. For example, from `192.168.29.52 ssh-ed25519 AAAA...`, use `ssh-ed25519 AAAA...` as the value.
+
 ```bash
 cd /home/harish/Documents/voidlab/infra/kubernetes/pulumi
 pulumi config set voidlab-kubernetes:hypervisorHostKey 'ssh-ed25519 HYPERVISOR_KEY_DATA' --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
