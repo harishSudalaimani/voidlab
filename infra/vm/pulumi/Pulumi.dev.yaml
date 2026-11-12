@@ -1,5 +1,5 @@
 config:
-  libvirt:uri: "qemu+ssh://void@192.168.29.52/system?keyfile=/home/harish/.ssh/id_ed25519_voidlab&knownhosts=/home/harish/.ssh/known_hosts"
+  libvirt:uri: "qemu+sshcmd://void@192.168.29.52/system?keyfile=/home/harish/.ssh/id_ed25519_voidlab&knownhosts=/home/harish/.ssh/known_hosts&proxy=native"
   voidlab-vm:networkName: voidlab-network
   voidlab-vm:networkCIDR: 10.20.0.0/24
   voidlab-vm:gateway: 10.20.0.1
