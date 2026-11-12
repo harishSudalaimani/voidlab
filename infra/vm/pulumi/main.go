@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/netip"
 	"os"
 	"strings"
@@ -135,7 +134,6 @@ func main() {
 			Ips: libvirt.NetworkIpArray{
 				&libvirt.NetworkIpArgs{
 					Address: pulumi.String(cfgSettings.gateway),
-					Netmask: pulumi.String(net.IP(net.CIDRMask(mustPrefixBits(cfgSettings.cidr), 32)).String()),
 					Prefix:  pulumi.Float64(float64(mustPrefixBits(cfgSettings.cidr))),
 					Family:  pulumi.String("ipv4"),
 					Dhcp: &libvirt.NetworkIpDhcpArgs{
