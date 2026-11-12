@@ -1,0 +1,5 @@
+module github.com/harish/voidlab/infra/vm/pulumi
+
+go 1.26.0
+
+require github.com/pulumi/pulumi/sdk/v3 v3.272.0

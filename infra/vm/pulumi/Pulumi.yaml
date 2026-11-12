@@ -1,0 +1,5 @@
+name: voidlab-vm
+runtime: go
+description: VoidLab virtual machine infrastructure
+backend:
+  url: https://api.pulumi.com

@@ -1,0 +1,2 @@
+config:
+  libvirt:uri: "qemu+ssh://void@192.168.29.52/system?keyfile=/home/harish/.ssh/id_ed25519_voidlab&knownhosts=/home/harish/.ssh/known_hosts"

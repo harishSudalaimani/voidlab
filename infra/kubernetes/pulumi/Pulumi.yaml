@@ -1,0 +1,5 @@
+name: voidlab-kubernetes
+runtime: go
+description: VoidLab Kubernetes cluster configuration
+backend:
+  url: https://api.pulumi.com
