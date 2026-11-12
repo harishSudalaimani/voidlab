@@ -1,0 +1,7 @@
+# Pulumi's generated local SDKs and working data.
+**/sdks/
+**/.pulumi/
+
+# Compiled Go binaries.
+/infra/pulumi/voidlab
+/infra/pulumi/voidlab.exe
