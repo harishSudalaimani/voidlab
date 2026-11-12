@@ -16,6 +16,8 @@ const (
 	defaultSSHUser        = "void"
 	defaultSSHKeyPath     = "/home/harish/.ssh/id_ed25519_voidlab"
 	defaultPodCIDR        = "10.244.0.0/16"
+	defaultCiliumVersion  = "1.21.0-pre.4"
+	defaultCiliumCLI      = "v0.20.1"
 )
 
 type node struct {
@@ -32,6 +34,8 @@ type clusterConfig struct {
 	controlPlane        node
 	workers             []node
 	podCIDR             string
+	ciliumVersion       string
+	ciliumCLIVersion    string
 	allowOneCPU         bool
 	joinTokenGeneration string
 }
@@ -74,6 +78,8 @@ func main() {
 				{name: "worker-3", address: configString(cfg, "worker3IP", "10.20.0.13"), hostKey: hostKeys["worker3HostKey"]},
 			},
 			podCIDR:             configString(cfg, "podCIDR", defaultPodCIDR),
+			ciliumVersion:       configString(cfg, "ciliumVersion", defaultCiliumVersion),
+			ciliumCLIVersion:    configString(cfg, "ciliumCLIVersion", defaultCiliumCLI),
 			allowOneCPU:         cfg.GetBool("allowSingleCPUControlPlane"),
 			joinTokenGeneration: configString(cfg, "joinTokenGeneration", "1"),
 		}
@@ -133,12 +139,22 @@ func main() {
 			joinResources = append(joinResources, join)
 		}
 
+		ciliumScript, err := readScript("install-cilium.sh")
+		if err != nil {
+			return err
+		}
+		ciliumInstall, err := runScript(ctx, "install-cilium", cluster, cluster.controlPlane, ciliumScript,
+			[]string{cluster.ciliumVersion, cluster.ciliumCLIVersion}, joinResources, false)
+		if err != nil {
+			return fmt.Errorf("register Cilium installation: %w", err)
+		}
+
 		readyScript, err := readScript("wait-for-nodes.sh")
 		if err != nil {
 			return err
 		}
 		registration, err := runScript(ctx, "confirm-four-nodes", cluster, cluster.controlPlane, readyScript,
-			nil, joinResources, false)
+			nil, []pulumi.Resource{ciliumInstall}, false)
 		if err != nil {
 			return fmt.Errorf("register cluster readiness check: %w", err)
 		}
@@ -162,7 +178,7 @@ func main() {
 		ctx.Export("nodeIPs", addresses)
 		ctx.Export("kubernetesVersion", pulumi.String("1.37"))
 		ctx.Export("podCIDR", pulumi.String(cluster.podCIDR))
-		ctx.Export("cni", pulumi.String("not-installed; planned for Cilium via Argo CD"))
+		ctx.Export("cni", pulumi.String("Cilium "+cluster.ciliumVersion))
 		ctx.Export("sshTunnel", pulumi.String(fmt.Sprintf("k -N -L 16443:%s:6443", cluster.controlPlane.address)))
 		ctx.Export("kubeconfigBase64", kubeconfig.Stdout)
 		return nil

@@ -5,6 +5,8 @@ config:
   voidlab-kubernetes:worker2IP: 10.20.0.12
   voidlab-kubernetes:worker3IP: 10.20.0.13
   voidlab-kubernetes:podCIDR: 10.244.0.0/16
+  voidlab-kubernetes:ciliumVersion: 1.21.0-pre.4
+  voidlab-kubernetes:ciliumCLIVersion: v0.20.1
   voidlab-kubernetes:sshPrivateKeyPath: /home/harish/.ssh/id_ed25519_voidlab
   voidlab-kubernetes:joinTokenGeneration: "1"
   voidlab-kubernetes:hypervisorHostKey: ssh-ed25519 HYPERVISOR_KEY_DATA

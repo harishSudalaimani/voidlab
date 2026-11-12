@@ -15,5 +15,6 @@ if (( node_count < expected_nodes )); then
   exit 1
 fi
 
-# Nodes are expected to remain NotReady until Cilium is installed later.
+kubectl --kubeconfig=/etc/kubernetes/admin.conf wait \
+  --for=condition=Ready nodes --all --timeout=15m
 kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o wide

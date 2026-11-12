@@ -1,5 +1,5 @@
 name: voidlab-kubernetes
 runtime: go
-description: VoidLab Kubernetes 1.37 kubeadm bootstrap on existing libvirt VMs
+description: VoidLab Kubernetes 1.37 kubeadm and Cilium bootstrap on existing libvirt VMs
 backend:
   url: https://api.pulumi.com
