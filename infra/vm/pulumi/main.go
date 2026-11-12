@@ -10,6 +10,7 @@ import (
 
 	"github.com/pulumi/pulumi-terraform-provider/sdks/go/libvirt/libvirt"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
 const (
@@ -44,7 +45,7 @@ type settings struct {
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
-		cfg := pulumi.NewConfig("voidlab-vm")
+		cfg := config.New(ctx, "voidlab-vm")
 		publicKeyPath := configString(cfg, "sshPublicKeyPath", "/home/harish/.ssh/id_ed25519_voidlab.pub")
 		keyBytes, err := os.ReadFile(publicKeyPath)
 		if err != nil {
@@ -272,14 +273,14 @@ func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.V
 	return disk, cloudInitVolume, domain, nil
 }
 
-func configString(cfg *pulumi.Config, key, fallback string) string {
+func configString(cfg *config.Config, key, fallback string) string {
 	if value := cfg.Get(key); value != "" {
 		return value
 	}
 	return fallback
 }
 
-func configInt(cfg *pulumi.Config, key string, fallback int) int {
+func configInt(cfg *config.Config, key string, fallback int) int {
 	if value := cfg.GetInt(key); value != 0 {
 		return value
 	}
