@@ -1,1 +1,14 @@
-config: {}
+config:
+  voidlab-kubernetes:allowSingleCPUControlPlane: "true"
+  voidlab-kubernetes:controlPlaneIP: 10.20.0.10
+  voidlab-kubernetes:worker1IP: 10.20.0.11
+  voidlab-kubernetes:worker2IP: 10.20.0.12
+  voidlab-kubernetes:worker3IP: 10.20.0.13
+  voidlab-kubernetes:podCIDR: 10.244.0.0/16
+  voidlab-kubernetes:sshPrivateKeyPath: /home/harish/.ssh/id_ed25519_voidlab
+  voidlab-kubernetes:joinTokenGeneration: "1"
+  voidlab-kubernetes:hypervisorHostKey: ssh-ed25519 HYPERVISOR_KEY_DATA
+  voidlab-kubernetes:cpHostKey: ssh-ed25519 CP_KEY_DATA
+  voidlab-kubernetes:worker1HostKey: ssh-ed25519 WORKER_1_KEY_DATA
+  voidlab-kubernetes:worker2HostKey: ssh-ed25519 WORKER_2_KEY_DATA
+  voidlab-kubernetes:worker3HostKey: ssh-ed25519 WORKER_3_KEY_DATA
