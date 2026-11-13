@@ -14,7 +14,7 @@ const (
 	defaultChartVersion = "10.18.0"
 	defaultNamespace    = "argocd"
 	defaultNodeName     = "worker-1"
-	chartRepository     = "https://argoproj.github.io/argo-helm"
+	chartOCI            = "oci://ghcr.io/argoproj/argo-helm/argo-cd"
 )
 
 func main() {
@@ -50,15 +50,12 @@ func main() {
 		}
 
 		argocd, err := helm.NewRelease(ctx, "argocd", &helm.ReleaseArgs{
-			Chart:           pulumi.String("argo-cd"),
+			Chart:           pulumi.String(chartOCI),
 			Version:         pulumi.String(chartVersion),
 			Namespace:       pulumi.String(namespaceName),
 			CreateNamespace: pulumi.Bool(false),
-			RepositoryOpts: helm.RepositoryOptsArgs{
-				Repo: pulumi.String(chartRepository),
-			},
-			Values:    values,
-			SkipAwait: pulumi.Bool(false),
+			Values:          values,
+			SkipAwait:       pulumi.Bool(false),
 		}, pulumi.DependsOn([]pulumi.Resource{argocdNamespace}))
 		if err != nil {
 			return fmt.Errorf("install Argo CD Helm release: %w", err)

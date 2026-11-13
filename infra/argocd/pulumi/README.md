@@ -6,23 +6,39 @@ This project does not manage VMs or bootstrap Kubernetes/Cilium. It installs Arg
 
 ## Versions and placement
 
-The project pins Argo Helm chart `10.18.0`, which packages Argo CD `3.6.1` and declares Kubernetes `>=1.25.0`; the existing cluster runs Kubernetes 1.37. The chart is published by the official [`argoproj/argo-helm` project](https://github.com/argoproj/argo-helm/releases). Its `global.nodeSelector` is inherited by the component pods unless overridden, so the configured selector places Argo CD workloads on `worker-1`.
+The project pins Argo Helm chart `10.18.0`, which packages Argo CD `3.6.1` and declares Kubernetes `>=1.25.0`; the existing cluster runs Kubernetes 1.37. It pulls the chart from the official OCI artifact `oci://ghcr.io/argoproj/argo-helm/argo-cd`. This avoids the GitHub release-assets download endpoint that timed out during the first update. Its `global.nodeSelector` is inherited by the component pods unless overridden, so the configured selector places Argo CD workloads on `worker-1`.
 
 This uses the chart's non-HA defaults and a `ClusterIP` service. Keeping every Argo CD component on one node is suitable for this home lab, but Argo CD will be unavailable if `worker-1` is down. The UI and API are not exposed by a LoadBalancer, NodePort, or ingress; use `kubectl port-forward` through the existing SSH API tunnel.
 
-The Kubernetes Pulumi provider reads the local kubeconfig. It does not copy the kubeconfig or cluster credentials into this project's Pulumi configuration. `Pulumi.dev.yaml` selects the kubeconfig context `kubernetes-admin@kubernetes`; the file path is supplied with `KUBECONFIG` when running Pulumi.
+The Kubernetes Pulumi provider reads the local kubeconfig and its current context. It does not copy the kubeconfig or cluster credentials into this project's Pulumi configuration. Set `KUBECONFIG` to the kubeconfig exported by the Kubernetes project when running Pulumi.
 
 ## Files
 
 - `Pulumi.yaml`: project identity `voidlab-argocd` and Pulumi Cloud backend.
-- `Pulumi.dev.yaml`: chart, namespace, node selector, and Kubernetes context for the `dev` stack.
+- `Pulumi.dev.yaml`: chart, namespace, and node selector for the `dev` stack.
 - `main.go`: namespace and Helm release resources, plus stack outputs.
 - `go.mod`: Pulumi Go SDK and Kubernetes provider SDK dependencies.
 - `config/`: reserved for later Argo CD bootstrap configuration; no credentials are stored here.
 
 ## Deploy manually
 
-First, ensure the kubeconfig exported by the Kubernetes project exists at `/home/harish/.kube/voidlab`. Start the Kubernetes API tunnel in one terminal and leave it open:
+First, export a fresh kubeconfig from the successful Kubernetes stack. This writes to a temporary file, verifies that it has a current context, and only then replaces `/home/harish/.kube/voidlab`:
+
+```bash
+cd /home/harish/Documents/voidlab/infra/kubernetes/pulumi
+set -euo pipefail
+umask 077
+mkdir -p /home/harish/.kube
+tmp_config="$(mktemp /home/harish/.kube/voidlab.XXXXXX)"
+trap 'rm -f "$tmp_config"' EXIT
+pulumi stack output kubeconfigBase64 --stack snharish85-gmail-com-org/voidlab-kubernetes/dev --show-secrets | base64 --decode > "$tmp_config"
+test -s "$tmp_config"
+kubectl --kubeconfig "$tmp_config" config current-context
+mv "$tmp_config" /home/harish/.kube/voidlab
+trap - EXIT
+```
+
+Start the Kubernetes API tunnel in one terminal and leave it open:
 
 ```bash
 k -N -L 16443:10.20.0.10:6443
@@ -33,9 +49,10 @@ In a second terminal, select the kubeconfig and prepare the Go project:
 ```bash
 cd /home/harish/Documents/voidlab/infra/argocd/pulumi
 export KUBECONFIG=/home/harish/.kube/voidlab
+kubectl get nodes -o wide
 go mod tidy
 gofmt -w main.go
-go build ./...
+go build -o /tmp/voidlab-argocd-check ./...
 ```
 
 The Pulumi Cloud stack identity is `snharish85-gmail-com-org/voidlab-argocd/dev`. If it already exists, select it. If it does not exist, initialize this independent Argo CD stack once:
@@ -82,7 +99,8 @@ The next step is to point Argo CD at the GitOps repository with a root `Applicat
 
 ## References
 
-- [Official Argo Helm chart releases](https://github.com/argoproj/argo-helm/releases)
+- [Official Argo Helm chart releases and OCI usage](https://github.com/argoproj/argo-helm)
+- [Pulumi Helm Release support for OCI charts](https://www.pulumi.com/dev/tutorials/kubernetes-helm-part-one/)
 - [Pinned chart metadata for 10.18.0](https://github.com/argoproj/argo-helm/blob/argo-cd-10.18.0/charts/argo-cd/Chart.yaml)
 - [Official chart values](https://github.com/argoproj/argo-helm/blob/argo-cd-10.18.0/charts/argo-cd/values.yaml)
 - [Pulumi Kubernetes provider configuration](https://www.pulumi.com/registry/packages/kubernetes/installation-configuration/)
