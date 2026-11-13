@@ -1,0 +1,20 @@
+model
+  schema 1.1
+
+type user
+
+type workspace
+  relations
+    define owner: [user]
+    define editor: [user] or owner
+    define viewer: [user] or editor
+
+type feature
+  relations
+    define entitled: [user]
+
+# Entitlement features currently seeded:
+#   feature:pro          -> paid tier (used by all Pro capabilities)
+#   feature:export       -> data export
+#   feature:collaboration-> inviting workspace members
+#   feature:unlimited    -> removing free-plan item limits
