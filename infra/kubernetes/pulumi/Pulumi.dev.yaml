@@ -8,7 +8,7 @@ config:
   voidlab-kubernetes:ciliumVersion: 1.21.0-pre.4
   voidlab-kubernetes:ciliumCLIVersion: v0.20.1
   voidlab-kubernetes:sshPrivateKeyPath: /home/harish/.ssh/id_ed25519_voidlab
-  voidlab-kubernetes:joinTokenGeneration: "1"
+  voidlab-kubernetes:joinTokenGeneration: "2"
   voidlab-kubernetes:hypervisorHostKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPgR98o2/xYL15lUDKyXZT7W4XGJyuxcZy20Wu/QbkFY
   voidlab-kubernetes:cpHostKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICIXq7OfS6RrKaWZUB/mfmptcmpJ1GGeu3hvkxaCe/tx
   voidlab-kubernetes:worker1HostKey: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIo18z5QgS9qsF8HykS3U/D8r+zYcyRVFrJlXEyVdb62

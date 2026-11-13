@@ -24,6 +24,7 @@ if [[ ! -s /etc/kubernetes/admin.conf ]]; then
     --apiserver-advertise-address "$control_plane_ip"
     --apiserver-cert-extra-sans "$control_plane_ip,127.0.0.1,localhost"
     --pod-network-cidr "$pod_cidr"
+    --skip-phases=addon/kube-proxy
   )
   if [[ "$allow_single_cpu" == "true" ]]; then
     init_args+=(--ignore-preflight-errors=NumCPU)

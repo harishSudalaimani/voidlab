@@ -8,7 +8,9 @@ It does not create or manage VMs. It does not install Argo CD, Kubernetes platfo
 
 The stack pins Cilium `1.21.0-pre.4` and Cilium CLI `v0.20.1` in `Pulumi.dev.yaml`. Cilium 1.21 is a prerelease as of this project setup. Cilium's current development compatibility table includes Kubernetes 1.37, while its current stable documentation is for Cilium 1.20.4 and does not list Kubernetes 1.37. The selected prerelease is therefore an early-access choice for the requested Kubernetes version, not a stable Cilium release. Change `ciliumVersion` after a stable Cilium release documents Kubernetes 1.37 support.
 
-The CNI install runs on `cp` after the worker joins. It uses kubeadm's per-node PodCIDRs (`ipam.mode=kubernetes`), VXLAN tunneling across the VoidLab private VM network, and leaves kube-proxy enabled. The operator is limited to one replica for this small cluster. The Cilium CLI archive is checked against the SHA-256 file published with that CLI release. The deployment waits for Cilium status and all four Kubernetes nodes to become Ready.
+For a fresh cluster, kubeadm skips its kube-proxy phase and Cilium is installed in full kube-proxy replacement mode. Cilium uses kubeadm's per-node PodCIDRs (`ipam.mode=kubernetes`), VXLAN tunneling across the VoidLab private VM network, and the control-plane IP and port for direct API server access. The operator is limited to one replica for this small cluster. The Cilium CLI archive is checked against the SHA-256 file published with that CLI release. The deployment waits for Cilium status and all four Kubernetes nodes to become Ready.
+
+The existing `dev` cluster was initialized with kube-proxy and Cilium configured with `kubeProxyReplacement=false`. The last Pulumi update already reset Kubernetes on all four guests and removed the control plane's local etcd data. It failed before reinitialization because Pulumi did not detect input changes for the existing init and worker-join commands; Cilium then correctly reported that `/etc/kubernetes/admin.conf` was missing. The reset script and its logic have been removed. The VMs and disks remain intact.
 
 Argo CD will later need a deliberate ownership handoff for the existing Cilium Helm release if GitOps is to manage Cilium upgrades and configuration. Avoid configuring Pulumi and Argo CD to independently reconcile the same Cilium release.
 
@@ -69,13 +71,20 @@ go mod tidy
 pulumi preview --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
 ```
 
-Review the preview. It should show only `command:remote:Command` operations for preflight, guest setup, kubeadm init, worker join, Cilium installation, node readiness, and kubeconfig export. It must not show VM, libvirt, network, storage, or Argo CD resources. Then apply only if that is the intended change:
+To finish the rebuild, remove the now-unused reset setting and increment `joinTokenGeneration`. This changes the control-plane init input, which issues a new join token; the new token triggers worker joins. The same generation is passed to the readiness and kubeconfig commands so they run against the new cluster too.
+
+```bash
+pulumi config set voidlab-kubernetes:joinTokenGeneration 2 --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
+pulumi preview --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
+```
+
+The preview should show the four old `reset-kubernetes-*` command resources being removed from Pulumi state, plus updates for `init-control-plane`, the three worker joins, Cilium, node readiness, and kubeconfig export. Removing those command resources from state does not execute commands on the guests. It must not show Libvirt or VM resources. After reviewing that plan, apply:
 
 ```bash
 pulumi up --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
 ```
 
-The first update runs read-only preflights on all nodes. If any preflight fails, no guest package changes start. The remaining update installs Kubernetes 1.37, bootstraps the cluster, installs the configured Cilium prerelease, waits for all nodes to become Ready, and exports the kubeconfig.
+The update reinitializes `cp` without kube-proxy, joins the workers, installs the configured Cilium prerelease in replacement mode, waits for all nodes to become Ready, and exports a fresh kubeconfig. Cilium's kube-proxy-free setup uses the API server address and port directly, as described in its [kubeadm guide](https://docs.cilium.io/en/latest/network/kubernetes/kubeproxy-free/).
 
 ## Connect kubectl
 
@@ -105,5 +114,5 @@ The bootstrap waits until the four nodes report `Ready`; Cilium's agents and ope
 
 - Pulumi remote commands do not have delete commands, so removing a command resource from state will not uninstall packages, reset kubeadm, or delete cluster data.
 - Cilium is installed by a remote command and persists in the cluster. Removing that Pulumi command from state does not uninstall Cilium. Plan any migration of its Helm release to Argo CD before GitOps begins managing it.
-- If a failed or delayed worker join outlives the kubeadm token, increment `joinTokenGeneration` in the stack config to make Pulumi safely re-run the idempotent control-plane step and generate a fresh secret token, then preview and apply again. For example: `pulumi config set voidlab-kubernetes:joinTokenGeneration 2 --stack snharish85-gmail-com-org/voidlab-kubernetes/dev`. Do not paste the token into source or a non-secret Pulumi setting.
+- `joinTokenGeneration` is a deliberate rerun trigger for control-plane init, worker joins, readiness checking, and kubeconfig export. Increment it only when you need to rerun that bootstrap sequence. Do not paste the generated token into source or a non-secret Pulumi setting.
 - Do not rerun `kubeadm init` manually on an initialized control plane. The bootstrap script checks for `/etc/kubernetes/admin.conf` before initializing.

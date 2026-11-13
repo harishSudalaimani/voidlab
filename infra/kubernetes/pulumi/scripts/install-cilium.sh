@@ -3,6 +3,7 @@ set -euo pipefail
 
 cilium_version="$1"
 cilium_cli_version="$2"
+api_server_ip="$3"
 
 if [[ ! "$cilium_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
   echo "Invalid Cilium version: ${cilium_version}" >&2
@@ -40,12 +41,27 @@ if [[ ! -s "$KUBECONFIG" ]]; then
   exit 1
 fi
 
-# Use kubeadm's per-node PodCIDRs, retain kube-proxy, and use VXLAN across the
-# VoidLab VM network. A single operator replica keeps the small cluster light.
+# Do not switch an already-running kube-proxy cluster in one step. Cilium's
+# supported migration is node-by-node and is documented in README.md.
+if kubectl get daemonset cilium -n kube-system >/dev/null 2>&1; then
+  replacement="$(kubectl get configmap cilium-config -n kube-system -o jsonpath='{.data.kube-proxy-replacement}')"
+  if [[ "$replacement" != "true" ]] || kubectl get daemonset kube-proxy -n kube-system >/dev/null 2>&1; then
+    echo "Existing cluster still has kube-proxy or Cilium replacement is disabled; complete the staged migration before applying this bootstrap update" >&2
+    exit 1
+  fi
+  cilium status --wait --wait-duration=15m
+  exit 0
+fi
+
+# Use kubeadm's per-node PodCIDRs and VXLAN across the VoidLab VM network.
+# Explicit API server addressing lets Cilium route services without kube-proxy.
+# One operator replica keeps the small cluster light.
 cilium install \
   --version "$cilium_version" \
   --set ipam.mode=kubernetes \
-  --set kubeProxyReplacement=false \
+  --set kubeProxyReplacement=true \
+  --set "k8sServiceHost=${api_server_ip}" \
+  --set k8sServicePort=6443 \
   --set routingMode=tunnel \
   --set tunnelProtocol=vxlan \
   --set operator.replicas=1

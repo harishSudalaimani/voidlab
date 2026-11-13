@@ -145,8 +145,8 @@ func main() {
 		if err != nil {
 			return err
 		}
-		ciliumInstall, err := runScript(ctx, "install-cilium", cluster, cluster.controlPlane, ciliumScript,
-			[]string{cluster.ciliumVersion, cluster.ciliumCLIVersion}, joinResources, false)
+		ciliumInstall, err := runScriptWithoutPreviousOutputEnv(ctx, "install-cilium", cluster, cluster.controlPlane, ciliumScript,
+			[]string{cluster.ciliumVersion, cluster.ciliumCLIVersion, cluster.controlPlane.address}, joinResources, false)
 		if err != nil {
 			return fmt.Errorf("register Cilium installation: %w", err)
 		}
@@ -156,7 +156,7 @@ func main() {
 			return err
 		}
 		registration, err := runScript(ctx, "confirm-four-nodes", cluster, cluster.controlPlane, readyScript,
-			nil, []pulumi.Resource{ciliumInstall}, false)
+			[]string{cluster.joinTokenGeneration}, []pulumi.Resource{ciliumInstall}, false)
 		if err != nil {
 			return fmt.Errorf("register cluster readiness check: %w", err)
 		}
@@ -166,7 +166,7 @@ func main() {
 			return err
 		}
 		kubeconfig, err := runScript(ctx, "export-kubeconfig", cluster, cluster.controlPlane, kubeconfigScript,
-			[]string{cluster.controlPlane.address}, []pulumi.Resource{registration}, true)
+			[]string{cluster.controlPlane.address, cluster.joinTokenGeneration}, []pulumi.Resource{registration}, true)
 		if err != nil {
 			return fmt.Errorf("register kubeconfig export: %w", err)
 		}
@@ -180,7 +180,7 @@ func main() {
 		ctx.Export("nodeIPs", addresses)
 		ctx.Export("kubernetesVersion", pulumi.String("1.37"))
 		ctx.Export("podCIDR", pulumi.String(cluster.podCIDR))
-		ctx.Export("cni", pulumi.String("Cilium "+cluster.ciliumVersion))
+		ctx.Export("cni", pulumi.String("Cilium "+cluster.ciliumVersion+" with kube-proxy replacement"))
 		ctx.Export("sshTunnel", pulumi.String(fmt.Sprintf("k -N -L 16443:%s:6443", cluster.controlPlane.address)))
 		ctx.Export("kubeconfigBase64", kubeconfig.Stdout)
 		return nil
@@ -192,6 +192,14 @@ func (c clusterConfig) nodes() []node {
 }
 
 func runScript(ctx *pulumi.Context, name string, cluster clusterConfig, target node, script string, args []string, dependencies []pulumi.Resource, secretStdout bool) (*remote.Command, error) {
+	return runScriptWithPreviousOutputEnv(ctx, name, cluster, target, script, args, dependencies, secretStdout, true)
+}
+
+func runScriptWithoutPreviousOutputEnv(ctx *pulumi.Context, name string, cluster clusterConfig, target node, script string, args []string, dependencies []pulumi.Resource, secretStdout bool) (*remote.Command, error) {
+	return runScriptWithPreviousOutputEnv(ctx, name, cluster, target, script, args, dependencies, secretStdout, false)
+}
+
+func runScriptWithPreviousOutputEnv(ctx *pulumi.Context, name string, cluster clusterConfig, target node, script string, args []string, dependencies []pulumi.Resource, secretStdout, addPreviousOutputInEnv bool) (*remote.Command, error) {
 	command := "sudo -n bash -s"
 	if len(args) != 0 {
 		command += " -- "
@@ -208,12 +216,16 @@ func runScript(ctx *pulumi.Context, name string, cluster clusterConfig, target n
 	if len(dependencies) != 0 {
 		options = append(options, pulumi.DependsOn(dependencies))
 	}
-	return remote.NewCommand(ctx, name, &remote.CommandArgs{
+	commandArgs := &remote.CommandArgs{
 		Connection: connection(cluster, target),
 		Create:     pulumi.String(command),
 		Stdin:      pulumi.String(script),
 		Logging:    remote.LoggingNone,
-	}, options...)
+	}
+	if !addPreviousOutputInEnv {
+		commandArgs.AddPreviousOutputInEnv = pulumi.Bool(false)
+	}
+	return remote.NewCommand(ctx, name, commandArgs, options...)
 }
 
 func registerWorkerJoin(ctx *pulumi.Context, cluster clusterConfig, worker node, joinCommand pulumi.StringOutput, dependencies []pulumi.Resource) (*remote.Command, error) {
