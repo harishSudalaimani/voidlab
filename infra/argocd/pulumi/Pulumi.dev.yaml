@@ -1,1 +1,5 @@
-config: {}
+config:
+  kubernetes:context: kubernetes-admin@kubernetes
+  voidlab-argocd:chartVersion: "10.18.0"
+  voidlab-argocd:namespace: argocd
+  voidlab-argocd:nodeName: worker-1

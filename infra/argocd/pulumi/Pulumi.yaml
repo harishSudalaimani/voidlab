@@ -1,5 +1,5 @@
 name: voidlab-argocd
 runtime: go
-description: VoidLab Argo CD bootstrap configuration
+description: VoidLab Argo CD installation on the existing Kubernetes cluster
 backend:
   url: https://api.pulumi.com
