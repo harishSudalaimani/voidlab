@@ -8,9 +8,7 @@ It does not create or manage VMs. It does not install Argo CD, Kubernetes platfo
 
 The stack pins Cilium `1.21.0-pre.4` and Cilium CLI `v0.20.1` in `Pulumi.dev.yaml`. Cilium 1.21 is a prerelease as of this project setup. Cilium's current development compatibility table includes Kubernetes 1.37, while its current stable documentation is for Cilium 1.20.4 and does not list Kubernetes 1.37. The selected prerelease is therefore an early-access choice for the requested Kubernetes version, not a stable Cilium release. Change `ciliumVersion` after a stable Cilium release documents Kubernetes 1.37 support.
 
-For a fresh cluster, kubeadm skips its kube-proxy phase and Cilium is installed in full kube-proxy replacement mode. Cilium uses kubeadm's per-node PodCIDRs (`ipam.mode=kubernetes`), VXLAN tunneling across the VoidLab private VM network, and the control-plane IP and port for direct API server access. The operator is limited to one replica for this small cluster. The Cilium CLI archive is checked against the SHA-256 file published with that CLI release. The deployment waits for Cilium status and all four Kubernetes nodes to become Ready.
-
-The existing `dev` cluster was initialized with kube-proxy and Cilium configured with `kubeProxyReplacement=false`. The last Pulumi update already reset Kubernetes on all four guests and removed the control plane's local etcd data. It failed before reinitialization because Pulumi did not detect input changes for the existing init and worker-join commands; Cilium then correctly reported that `/etc/kubernetes/admin.conf` was missing. The reset script and its logic have been removed. The VMs and disks remain intact.
+The cluster uses kubeadm without its kube-proxy phase, and Cilium runs in full kube-proxy replacement mode. Cilium uses kubeadm's per-node PodCIDRs (`ipam.mode=kubernetes`), VXLAN tunneling across the VoidLab private VM network, and the control-plane IP and port for direct API server access. The operator is limited to one replica for this small cluster. The Cilium CLI archive is checked against that release's SHA-256 file. Pulumi waits for Cilium and all four Kubernetes nodes to become Ready.
 
 Argo CD will later need a deliberate ownership handoff for the existing Cilium Helm release if GitOps is to manage Cilium upgrades and configuration. Avoid configuring Pulumi and Argo CD to independently reconcile the same Cilium release.
 
@@ -67,24 +65,16 @@ Run these commands on the Fedora GUI development machine. The named Pulumi Cloud
 ```bash
 cd /home/harish/Documents/voidlab/infra/kubernetes/pulumi
 gofmt -w main.go
-go mod tidy
 pulumi preview --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
 ```
 
-To finish the rebuild, remove the now-unused reset setting and increment `joinTokenGeneration`. This changes the control-plane init input, which issues a new join token; the new token triggers worker joins. The same generation is passed to the readiness and kubeconfig commands so they run against the new cluster too.
-
-```bash
-pulumi config set voidlab-kubernetes:joinTokenGeneration 2 --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
-pulumi preview --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
-```
-
-The preview should show the four old `reset-kubernetes-*` command resources being removed from Pulumi state, plus updates for `init-control-plane`, the three worker joins, Cilium, node readiness, and kubeconfig export. Removing those command resources from state does not execute commands on the guests. It must not show Libvirt or VM resources. After reviewing that plan, apply:
+After the successful bootstrap, the preview should show no changes unless you intentionally modify configuration or scripts. This project manages only remote Kubernetes setup commands; it must not show Libvirt or VM resources. Apply only a reviewed plan:
 
 ```bash
 pulumi up --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
 ```
 
-The update reinitializes `cp` without kube-proxy, joins the workers, installs the configured Cilium prerelease in replacement mode, waits for all nodes to become Ready, and exports a fresh kubeconfig. Cilium's kube-proxy-free setup uses the API server address and port directly, as described in its [kubeadm guide](https://docs.cilium.io/en/latest/network/kubernetes/kubeproxy-free/).
+An intended bootstrap update initializes `cp` without kube-proxy, joins the workers, installs the configured Cilium prerelease in replacement mode, waits for all nodes to become Ready, and exports a kubeconfig. Cilium's kube-proxy-free setup uses the API server address and port directly, as described in its [kubeadm guide](https://docs.cilium.io/en/latest/network/kubernetes/kubeproxy-free/).
 
 ## Connect kubectl
 
