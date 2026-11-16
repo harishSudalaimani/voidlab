@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireApiContext, requirePro } from "@/lib/api-context";
+import { requireApiContext } from "@/lib/api-context";
 import { setWorkspaceMemberRole } from "@/lib/authz";
 import { query, queryOne } from "@/lib/db";
 import { ApiError, handleApiError, json, parseId, readJson } from "@/lib/http";
@@ -29,7 +29,6 @@ export async function PATCH(
 ) {
   try {
     const context = await requireApiContext("owner");
-    requirePro(context.entitlements, "Collaboration is a Pro feature.");
     const id = parseId((await params).id);
     const membership = await findMembership(id, context.workspace.id);
     if (!membership) throw new ApiError("Member not found", 404);

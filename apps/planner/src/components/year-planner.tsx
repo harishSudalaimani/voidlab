@@ -8,7 +8,6 @@ import {
   Flag,
   Loader2,
   Plus,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import { CategoryChip, GoalStatusBadge } from "@/components/badges";
@@ -30,8 +29,6 @@ interface YearPlannerProps {
   year: number;
   goals: Goal[];
   canEdit: boolean;
-  pro: boolean;
-  goalLimit: number | null;
   workspaceName: string;
 }
 
@@ -39,8 +36,6 @@ export function YearPlanner({
   year,
   goals,
   canEdit,
-  pro,
-  goalLimit,
   workspaceName,
 }: YearPlannerProps) {
   const router = useRouter();
@@ -53,31 +48,8 @@ export function YearPlanner({
     startTransition(() => router.refresh());
   }
 
-  const overLimit = !pro && goalLimit !== null && goals.length >= goalLimit;
-
   return (
     <>
-      {!pro && canEdit && (
-        <div
-          className={cn(
-            "mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-3 text-xs",
-            overLimit
-              ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-              : "border-white/10 bg-white/[0.03] text-mist-400",
-          )}
-        >
-          <span className="flex items-center gap-2">
-            <Sparkles size={14} className="text-accent-300" />
-            {overLimit
-              ? `Free plan limit reached (${goalLimit} goals in ${year}). Upgrade for unlimited goals.`
-              : `${goalLimit} goals included on Free. Pro removes the cap and adds collaboration.`}
-          </span>
-          <a href="/settings#billing" className="font-semibold text-accent-300 hover:text-accent-200">
-            Upgrade to Pro
-          </a>
-        </div>
-      )}
-
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {[1, 2, 3, 4].map((quarter) => {
           const quarterGoals = goals.filter((goal) => goal.quarter === quarter);

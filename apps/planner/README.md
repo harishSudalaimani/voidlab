@@ -1,19 +1,22 @@
-# Northstar planner
+# Planit planner
 
 ## Run locally
 
-From this directory, start the local database, copy the development environment, install dependencies, create the schema and demo accounts, then start Next.js:
+From this directory, install dependencies and start Next.js:
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The homepage opens Planit directly, with no sign-in or sign-up required. Planner tasks and separate whiteboard or blackboard pages save per date; any date can be selected. Study notes and bucket list ideas are saved in this browser. The app includes dark and white themes.
+
+To use the database-backed sections, start Postgres and initialize the schema:
 
 ```bash
 docker compose up -d postgres
 cp -n .env.example .env.local
-npm install
 npm run setup
-npm run dev
 ```
 
-If `.env.local` already exists, keep it and make sure `DATABASE_URL` points to `postgres://planner:planner@localhost:5432/planner` for this local setup.
-
-Open [http://localhost:3000](http://localhost:3000). Sign in with one of the demo accounts shown on the login page. The daily plan and journal currently save in this browser; yearly goals and bucket list items use Postgres.
-
-To stop the database while keeping its data, run `docker compose stop postgres`. To remove the database container and its saved data, run `docker compose down -v`.
+For the local database setup, `.env.local` needs `AUTH_MODE=demo` and `DATABASE_URL=postgres://planner:planner@localhost:5432/planner`.

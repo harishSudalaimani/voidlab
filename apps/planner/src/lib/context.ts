@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getWorkspaceRole, hasProEntitlement, listVisibleWorkspaceIds } from "./authz";
+import { getWorkspaceRole, listVisibleWorkspaceIds } from "./authz";
 import { query } from "./db";
 import { loginPath } from "./session";
 import { provisionUser } from "./provision";
@@ -63,15 +63,11 @@ export async function listWorkspacesFor(user: AppUser): Promise<WorkspaceSummary
   });
 }
 
-export async function getEntitlements(user: AppUser): Promise<Entitlements> {
-  const pro = await hasProEntitlement(user.email, user.tier);
+export async function getEntitlements(_user: AppUser): Promise<Entitlements> {
   return {
-    tier: pro ? "pro" : "free",
-    pro,
-    canCollaborate: pro,
-    canExport: pro,
-    goalLimit: pro ? null : 3,
-    bucketLimit: pro ? null : 10,
+    tier: "free",
+    canCollaborate: true,
+    canExport: true,
   };
 }
 

@@ -69,11 +69,8 @@ export interface WorkspaceMember {
 
 export interface Entitlements {
   tier: Tier;
-  pro: boolean;
   canCollaborate: boolean;
   canExport: boolean;
-  goalLimit: number | null;
-  bucketLimit: number | null;
 }
 
 export interface AppContext {

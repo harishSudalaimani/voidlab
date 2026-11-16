@@ -8,9 +8,10 @@ import { createDemoSession } from "@/lib/session";
 
 const schema = z.object({
   email: z.string().trim().toLowerCase().email(),
+  name: z.string().trim().min(1).max(100).optional(),
 });
 
-interface DemoUserRow {
+interface ExistingUserRow {
   id: string;
   email: string;
   name: string;
@@ -21,21 +22,18 @@ export async function POST(request: NextRequest) {
   try {
     if (isAuth0Mode()) throw new ApiError("Demo sign-in is disabled", 404);
 
-    const { email } = schema.parse(await readJson(request));
-    const user = await queryOne<DemoUserRow>(
-      `SELECT id, email, name, picture
-         FROM users
-        WHERE lower(email) = $1 AND id LIKE 'demo|%'`,
+    const { email, name } = schema.parse(await readJson(request));
+    const existing = await queryOne<ExistingUserRow>(
+      `SELECT id, email, name, picture FROM users WHERE lower(email) = $1`,
       [email],
     );
-    if (!user) throw new ApiError("That demo account does not exist", 404);
-
-    await provisionUser({
-      sub: user.id,
-      email: user.email,
-      name: user.name,
-      picture: user.picture,
-    });
+    const sessionUser = {
+      sub: existing?.id ?? `demo|${email}`,
+      email,
+      name: name ?? existing?.name ?? email.split("@")[0],
+      picture: existing?.picture ?? null,
+    };
+    const user = await provisionUser(sessionUser);
     await createDemoSession({
       sub: user.id,
       email: user.email,

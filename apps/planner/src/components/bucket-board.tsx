@@ -38,8 +38,6 @@ import {
 interface BucketBoardProps {
   items: BucketItem[];
   canEdit: boolean;
-  pro: boolean;
-  bucketLimit: number | null;
 }
 
 const FILTERS: Array<{ key: "all" | BucketStatus; label: string }> = [
@@ -50,7 +48,7 @@ const FILTERS: Array<{ key: "all" | BucketStatus; label: string }> = [
   { key: "done", label: "Done" },
 ];
 
-export function BucketBoard({ items, canEdit, pro, bucketLimit }: BucketBoardProps) {
+export function BucketBoard({ items, canEdit }: BucketBoardProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [filter, setFilter] = useState<"all" | BucketStatus>("all");
@@ -59,8 +57,6 @@ export function BucketBoard({ items, canEdit, pro, bucketLimit }: BucketBoardPro
   const [editing, setEditing] = useState<BucketItem | "new" | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const overLimit = !pro && bucketLimit !== null && items.length >= bucketLimit;
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -181,17 +177,6 @@ export function BucketBoard({ items, canEdit, pro, bucketLimit }: BucketBoardPro
         </div>
       </div>
 
-      {!pro && canEdit && overLimit && (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs text-amber-200">
-          <span>
-            Free plan limit reached ({bucketLimit} items). Upgrade to Pro for an unlimited
-            bucket list.
-          </span>
-          <a href="/settings#billing" className="font-semibold text-accent-300">
-            Upgrade
-          </a>
-        </div>
-      )}
       <ErrorBanner message={error} />
 
       {visible.length === 0 ? (

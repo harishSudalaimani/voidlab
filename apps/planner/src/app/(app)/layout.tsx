@@ -20,7 +20,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ownerEmail: workspace.ownerEmail,
       }))}
       currentWorkspaceId={context.workspace?.id ?? null}
-      pro={context.entitlements.pro}
       authMode={isAuth0Mode() ? "auth0" : "demo"}
     >
       {children}

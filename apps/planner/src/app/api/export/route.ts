@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiContext, requirePro } from "@/lib/api-context";
+import { requireApiContext } from "@/lib/api-context";
 import { ApiError, handleApiError } from "@/lib/http";
 import { bucketToCsv, goalsToCsv } from "@/lib/export";
 import { listBucketItems, listGoals } from "@/lib/planner";
@@ -7,11 +7,6 @@ import { listBucketItems, listGoals } from "@/lib/planner";
 export async function GET(request: NextRequest) {
   try {
     const context = await requireApiContext("viewer");
-    requirePro(
-      context.entitlements,
-      "Data export is a Pro feature. Upgrade to download your planner.",
-    );
-
     const format = request.nextUrl.searchParams.get("format") ?? "json";
     const dataset = request.nextUrl.searchParams.get("dataset") ?? "all";
     if (!["json", "csv"].includes(format)) throw new ApiError("Unsupported format", 400);
@@ -22,7 +17,7 @@ export async function GET(request: NextRequest) {
     const year = new Date().getFullYear();
     const goals = await listGoals(context.workspace.id, year);
     const bucket = await listBucketItems(context.workspace.id);
-    const baseName = `northstar-${context.workspace.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    const baseName = `planit-${context.workspace.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
     if (format === "json") {
       const body = JSON.stringify(

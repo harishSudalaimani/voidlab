@@ -90,8 +90,6 @@ export default async function PlannerPage({
         year={year}
         goals={goals}
         canEdit={canEdit}
-        pro={context.entitlements.pro}
-        goalLimit={context.entitlements.goalLimit}
         workspaceName={workspace.name}
       />
     </div>

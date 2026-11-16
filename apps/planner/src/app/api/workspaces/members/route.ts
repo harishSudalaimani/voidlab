@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireApiContext, requirePro } from "@/lib/api-context";
+import { requireApiContext } from "@/lib/api-context";
 import { setWorkspaceMemberRole } from "@/lib/authz";
 import { query, queryOne } from "@/lib/db";
 import { ApiError, handleApiError, json, readJson } from "@/lib/http";
@@ -30,11 +30,6 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const context = await requireApiContext("owner");
-    requirePro(
-      context.entitlements,
-      "Collaboration is a Pro feature. Upgrade to invite editors and viewers.",
-    );
-
     const input = inviteSchema.parse(await readJson(request));
     if (input.email === context.user.email.toLowerCase()) {
       throw new ApiError("You are already the owner of this workspace", 400);

@@ -19,7 +19,7 @@ export function Logo({
       </span>
       {withWordmark && (
         <span className="text-[15px] font-bold tracking-tight text-mist-100">
-          Northstar
+          Planit
         </span>
       )}
     </span>
@@ -28,7 +28,7 @@ export function Logo({
 
 export function LogoLink() {
   return (
-    <Link href="/" className="inline-flex" aria-label="Northstar home">
+    <Link href="/" className="inline-flex" aria-label="Planit home">
       <Logo />
     </Link>
   );

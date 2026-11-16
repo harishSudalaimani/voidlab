@@ -26,22 +26,6 @@ export async function POST(request: NextRequest) {
     const context = await requireApiContext("editor");
     const input = goalCreateSchema.parse(await readJson(request));
 
-    if (!context.entitlements.pro) {
-      const count = await queryOne<{ count: number }>(
-        `SELECT count(*)::int AS count
-           FROM goals
-          WHERE workspace_id = $1 AND year = $2`,
-        [context.workspace.id, input.year],
-      );
-      if ((count?.count ?? 0) >= (context.entitlements.goalLimit ?? 3)) {
-        throw new ApiError(
-          "The Free plan includes 3 goals per year. Upgrade to Pro for unlimited goals.",
-          402,
-          "upgrade_required",
-        );
-      }
-    }
-
     const goal = await queryOne<{ id: string }>(
       `INSERT INTO goals
          (id, workspace_id, year, quarter, title, description, category, status, progress, created_by)

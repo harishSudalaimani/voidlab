@@ -26,12 +26,3 @@ export async function requireApiContext(minRole: Role = "viewer"): Promise<ApiCo
     entitlements: context.entitlements,
   };
 }
-
-export function requirePro(
-  entitlements: Entitlements,
-  message: string,
-): void {
-  if (!entitlements.pro) {
-    throw new ApiError(message, 402, "upgrade_required");
-  }
-}

@@ -4,22 +4,17 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  CreditCard,
   Download,
   KeyRound,
   Loader2,
-  Lock,
   MailPlus,
-  RefreshCw,
   ShieldCheck,
-  Sparkles,
   Trash2,
   UserRound,
   Users,
 } from "lucide-react";
 import { RoleBadge } from "@/components/badges";
 import { ErrorBanner, Spinner } from "@/components/ui";
-import { cn } from "@/lib/cn";
 import { apiFetch } from "@/lib/client";
 import type { Entitlements, WorkspaceMember } from "@/lib/types";
 
@@ -44,42 +39,15 @@ export function SettingsPanels({
 }: SettingsPanelsProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const [billingBusy, setBillingBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
 
   function refresh() {
     startTransition(() => router.refresh());
   }
 
-  async function changeTier(tier: "free" | "pro") {
-    setBillingBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      await apiFetch("/api/subscription", {
-        method: "POST",
-        body: JSON.stringify({ tier }),
-      });
-      setNotice(tier === "pro" ? "Pro unlocked. Enjoy the full planner." : "Switched to Free.");
-      refresh();
-    } catch (billingError) {
-      setError(
-        billingError instanceof Error ? billingError.message : "Could not change plan",
-      );
-    } finally {
-      setBillingBusy(false);
-    }
-  }
-
   return (
     <div className="space-y-5">
       <ErrorBanner message={error} />
-      {notice && (
-        <p className="rounded-xl border border-accent-400/20 bg-accent-400/10 px-3 py-2 text-sm text-accent-200">
-          {notice}
-        </p>
-      )}
 
       <section className="surface p-5 sm:p-6">
         <div className="flex items-center gap-4">
@@ -99,22 +67,7 @@ export function SettingsPanels({
           <div className="min-w-0">
             <h2 className="flex items-center gap-2 text-lg font-semibold text-mist-100">
               {user.name}
-              <span
-                className={cn(
-                  "chip",
-                  entitlements.pro
-                    ? "bg-accent-400/15 text-accent-300"
-                    : "bg-white/[0.07] text-mist-400",
-                )}
-              >
-                {entitlements.pro ? (
-                  <>
-                    <Sparkles size={10} /> Pro
-                  </>
-                ) : (
-                  "Free"
-                )}
-              </span>
+              <span className="chip bg-white/[0.07] text-mist-300">Free</span>
             </h2>
             <p className="truncate text-sm text-mist-400">{user.email}</p>
             <p className="mt-1 flex items-center gap-1.5 text-[11px] text-mist-500">
@@ -145,96 +98,6 @@ export function SettingsPanels({
         </div>
       </section>
 
-      <section id="billing" className="surface scroll-mt-24 p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-base font-semibold text-mist-100">
-              <CreditCard size={17} className="text-accent-300" /> Plan & billing
-            </h2>
-            <p className="mt-1 text-sm text-mist-400">
-              {entitlements.pro
-                ? "Pro is active: unlimited goals, collaboration and exports."
-                : "You are on the Free plan. Upgrade for unlimited items and collaboration."}
-            </p>
-          </div>
-          <span
-            className={cn(
-              "chip",
-              entitlements.pro
-                ? "bg-accent-400/15 text-accent-300"
-                : "bg-white/[0.07] text-mist-300",
-            )}
-          >
-            {entitlements.pro ? "Pro · $8/mo billed annually" : "Free · $0"}
-          </span>
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <p className="text-sm font-semibold text-mist-100">Included now</p>
-            <ul className="mt-3 space-y-2 text-xs text-mist-300">
-              {(entitlements.pro
-                ? [
-                    "Unlimited goals and bucket items",
-                    "Invite editors and viewers",
-                    "JSON and CSV export",
-                    "OpenFGA roles per workspace",
-                  ]
-                : [
-                    "3 goals per year",
-                    "10 bucket list items",
-                    "Milestones and progress",
-                    "Personal workspace",
-                  ]
-              ).map((item) => (
-                <li key={item} className="flex items-start gap-2">
-                  <Check size={13} className="mt-0.5 shrink-0 text-accent-400" />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="rounded-xl border border-accent-400/20 bg-gradient-to-br from-accent-400/10 to-violet-500/10 p-4">
-            <p className="text-sm font-semibold text-mist-100">
-              {entitlements.pro ? "Manage subscription" : "Unlock Pro"}
-            </p>
-            <p className="mt-1 text-xs text-mist-400">
-              {demoMode
-                ? "Demo mode lets you switch tiers locally. Production billing is handled by your payment provider webhook, which updates the OpenFGA entitlement tuple."
-                : "Billing changes are managed externally. Your subscription webhook updates the Pro entitlement in OpenFGA."}
-            </p>
-            {demoMode ? (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {entitlements.pro ? (
-                  <button
-                    type="button"
-                    onClick={() => changeTier("free")}
-                    className="btn btn-ghost btn-sm"
-                    disabled={billingBusy}
-                  >
-                    {billingBusy ? <Spinner /> : <RefreshCw size={13} />} Downgrade to Free
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => changeTier("pro")}
-                    className="btn btn-primary btn-sm"
-                    disabled={billingBusy}
-                  >
-                    {billingBusy ? <Spinner /> : <Sparkles size={13} />} Activate Pro (demo)
-                  </button>
-                )}
-              </div>
-            ) : (
-              <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-mist-500">
-                <Lock size={12} /> Managed by billing provider
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
       <WorkspaceSection
         workspace={workspace}
         isOwner={isOwner}
@@ -245,7 +108,7 @@ export function SettingsPanels({
       <MembersSection
         members={members}
         isOwner={isOwner}
-        pro={entitlements.pro}
+        canCollaborate={entitlements.canCollaborate}
         onChanged={refresh}
         setError={setError}
       />
@@ -255,26 +118,18 @@ export function SettingsPanels({
           <Download size={17} className="text-accent-300" /> Export your data
         </h2>
         <p className="mt-1 text-sm text-mist-400">
-          Download the yearly planner and bucket list. Exports are a Pro feature.
+          Download a copy of your yearly planner and bucket list.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {entitlements.pro ? (
-            <>
-              <a href="/api/export?format=json" className="btn btn-ghost btn-sm">
-                <Download size={13} /> Everything (JSON)
-              </a>
-              <a href="/api/export?format=csv&dataset=goals" className="btn btn-ghost btn-sm">
-                <Download size={13} /> Goals (CSV)
-              </a>
-              <a href="/api/export?format=csv&dataset=bucket" className="btn btn-ghost btn-sm">
-                <Download size={13} /> Bucket list (CSV)
-              </a>
-            </>
-          ) : (
-            <a href="#billing" className="btn btn-ghost btn-sm text-mist-400">
-              <Lock size={13} /> Upgrade to export
-            </a>
-          )}
+          <a href="/api/export?format=json" className="btn btn-ghost btn-sm">
+            <Download size={13} /> Everything (JSON)
+          </a>
+          <a href="/api/export?format=csv&dataset=goals" className="btn btn-ghost btn-sm">
+            <Download size={13} /> Goals (CSV)
+          </a>
+          <a href="/api/export?format=csv&dataset=bucket" className="btn btn-ghost btn-sm">
+            <Download size={13} /> Bucket list (CSV)
+          </a>
         </div>
       </section>
     </div>
@@ -347,13 +202,13 @@ function WorkspaceSection({
 function MembersSection({
   members,
   isOwner,
-  pro,
+  canCollaborate,
   onChanged,
   setError,
 }: {
   members: WorkspaceMember[];
   isOwner: boolean;
-  pro: boolean;
+  canCollaborate: boolean;
   onChanged: () => void;
   setError: (message: string | null) => void;
 }) {
@@ -492,7 +347,7 @@ function MembersSection({
 
       {isOwner && (
         <div className="mt-4 border-t border-white/10 pt-4">
-          {pro ? (
+          {canCollaborate && (
             <form onSubmit={invite} className="flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
                 <MailPlus
@@ -527,16 +382,6 @@ function MembersSection({
                 Invite
               </button>
             </form>
-          ) : (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-accent-400/20 bg-accent-400/[0.07] px-4 py-3">
-              <p className="flex items-center gap-2 text-xs text-mist-300">
-                <Lock size={13} className="text-accent-300" />
-                Collaboration is a Pro feature.
-              </p>
-              <a href="#billing" className="btn btn-primary btn-sm">
-                <Sparkles size={13} /> Upgrade to invite
-              </a>
-            </div>
           )}
         </div>
       )}

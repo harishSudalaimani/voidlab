@@ -11,7 +11,6 @@ import {
   ListChecks,
   LogOut,
   Settings,
-  Sparkles,
 } from "lucide-react";
 import { RoleBadge } from "@/components/badges";
 import { Logo } from "@/components/logo";
@@ -53,15 +52,15 @@ export function AppShell({
   user,
   workspaces,
   currentWorkspaceId,
-  pro,
   authMode,
+  preview = false,
   children,
 }: {
   user: ShellUser;
   workspaces: ShellWorkspace[];
   currentWorkspaceId: string | null;
-  pro: boolean;
   authMode: "demo" | "auth0";
+  preview?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -69,6 +68,8 @@ export function AppShell({
   const [pending, startTransition] = useTransition();
   const [switching, setSwitching] = useState(false);
   const current = workspaces.find((workspace) => workspace.id === currentWorkspaceId);
+  const navItems = preview ? [{ ...NAV[0], href: "/" }] : NAV;
+  const homeHref = preview ? "/" : "/today";
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -95,7 +96,15 @@ export function AppShell({
       return;
     }
     await fetch("/api/demo/logout", { method: "POST" });
-    window.location.assign("/login");
+    window.location.assign("/");
+  }
+
+  if (preview) {
+    return (
+      <div className="planner-viewport">
+        <main className="planner-main">{children}</main>
+      </div>
+    );
   }
 
   const workspaceSwitcher = (
@@ -136,15 +145,15 @@ export function AppShell({
     <div className="min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-white/5 bg-ink-950/70 px-4 py-5 backdrop-blur-xl lg:flex">
         <div className="px-2">
-          <Link href="/dashboard" aria-label="Northstar dashboard">
+          <Link href={homeHref} aria-label="Planit planner">
             <Logo />
           </Link>
         </div>
 
-        <div className="mt-7">{workspaceSwitcher}</div>
+        {!preview && <div className="mt-7">{workspaceSwitcher}</div>}
 
         <nav className="mt-6 space-y-1">
-          {NAV.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -157,20 +166,6 @@ export function AppShell({
         </nav>
 
         <div className="mt-auto space-y-3 pt-6">
-          {!pro && (
-            <div className="rounded-2xl border border-accent-400/20 bg-gradient-to-br from-accent-400/10 to-violet-500/10 p-4">
-              <p className="flex items-center gap-1.5 text-sm font-semibold text-mist-100">
-                <Sparkles size={14} className="text-accent-300" /> Unlock Pro
-              </p>
-              <p className="mt-1.5 text-xs leading-relaxed text-mist-400">
-                Unlimited goals, collaboration and exports.
-              </p>
-              <Link href="/settings#billing" className="btn btn-primary btn-sm mt-3 w-full">
-                Upgrade
-              </Link>
-            </div>
-          )}
-
           <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-accent-400/25 to-violet-500/25 text-xs font-bold text-mist-100">
               {user.picture ? (
@@ -184,34 +179,38 @@ export function AppShell({
               <p className="truncate text-sm font-semibold text-mist-100">{user.name}</p>
               <p className="truncate text-[11px] text-mist-500">{user.email}</p>
             </div>
-            <button
-              type="button"
-              onClick={logout}
-              aria-label="Sign out"
-              title="Sign out"
-              className="rounded-lg p-2 text-mist-400 transition hover:bg-white/10 hover:text-mist-100"
-            >
-              <LogOut size={15} />
-            </button>
+            {!preview && (
+              <button
+                type="button"
+                onClick={logout}
+                aria-label="Sign out"
+                title="Sign out"
+                className="rounded-lg p-2 text-mist-400 transition hover:bg-white/10 hover:text-mist-100"
+              >
+                <LogOut size={15} />
+              </button>
+            )}
           </div>
         </div>
       </aside>
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/5 bg-ink-950/80 px-4 backdrop-blur-xl sm:px-6 lg:hidden">
-          <Link href="/dashboard" aria-label="Northstar dashboard">
+          <Link href={homeHref} aria-label="Planit planner">
             <Logo size="sm" />
           </Link>
           <div className="flex items-center gap-2">
-            {current && <RoleBadge role={current.role} />}
-            <button
-              type="button"
-              onClick={logout}
-              className="rounded-lg border border-white/10 bg-white/5 p-2 text-mist-300"
-              aria-label="Sign out"
-            >
-              <LogOut size={15} />
-            </button>
+            {!preview && current && <RoleBadge role={current.role} />}
+            {!preview && (
+              <button
+                type="button"
+                onClick={logout}
+                className="rounded-lg border border-white/10 bg-white/5 p-2 text-mist-300"
+                aria-label="Sign out"
+              >
+                <LogOut size={15} />
+              </button>
+            )}
           </div>
         </header>
 
@@ -220,9 +219,9 @@ export function AppShell({
         </main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink-950/90 backdrop-blur-xl lg:hidden">
+      {!preview && <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink-950/90 backdrop-blur-xl lg:hidden">
         <div className="grid grid-cols-5">
-          {NAV.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -236,7 +235,7 @@ export function AppShell({
             </Link>
           ))}
         </div>
-      </nav>
+      </nav>}
     </div>
   );
 }

@@ -21,20 +21,6 @@ export async function POST(request: NextRequest) {
     const context = await requireApiContext("editor");
     const input = bucketCreateSchema.parse(await readJson(request));
 
-    if (!context.entitlements.pro) {
-      const count = await queryOne<{ count: number }>(
-        `SELECT count(*)::int AS count FROM bucket_items WHERE workspace_id = $1`,
-        [context.workspace.id],
-      );
-      if ((count?.count ?? 0) >= (context.entitlements.bucketLimit ?? 10)) {
-        throw new ApiError(
-          "The Free plan includes 10 bucket list items. Upgrade to Pro for an unlimited list.",
-          402,
-          "upgrade_required",
-        );
-      }
-    }
-
     const item = await queryOne<{ id: string }>(
       `INSERT INTO bucket_items
          (id, workspace_id, title, description, category, status, priority,
