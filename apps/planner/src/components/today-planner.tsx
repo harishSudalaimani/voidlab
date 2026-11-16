@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
   CalendarDays,
   Check,
   ChevronLeft,
   ChevronRight,
-  Eraser,
+  Download,
   Lightbulb,
+  Maximize2,
+  Minimize2,
   Moon,
   NotebookPen,
   Plus,
@@ -16,17 +18,16 @@ import {
   Shuffle,
   Sun,
   Trash2,
-  Undo2,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { DrawingNotebook } from "@/components/drawing-notebook";
 
 type DayTask = { id: string; title: string; done: boolean };
-type InkPoint = { x: number; y: number };
-type InkStroke = { points: InkPoint[]; color: string; width: number };
 type Theme = "dark" | "light";
-type BoardKind = "white" | "black";
 type Section = "planner" | "study" | "bucket";
+type StudyView = "note" | "notebook";
+type BucketView = "list" | "notebook";
 type StudyNote = { id: string; title: string; subject: string; body: string; updatedAt: number };
 type BucketItem = {
   id: string;
@@ -35,12 +36,12 @@ type BucketItem = {
   done: boolean;
   createdAt: number;
 };
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
 
 const START_DATE = "2026-12-01";
-const BOARD_WIDTH = 1000;
-const BOARD_HEIGHT = 650;
-const WHITE_INKS = ["#17191f", "#2563eb", "#dc2626", "#059669", "#7c3aed", "#ea580c"];
-const CHALK_INKS = ["#f8fafc", "#fde047", "#f9a8d4", "#67e8f9", "#86efac", "#fdba74"];
 const BUCKET_CATEGORIES: BucketItem["category"][] = ["Places", "Skills", "Experiences", "Other"];
 
 function dateKey(date: Date) {
@@ -59,12 +60,6 @@ function startOfWeek(date: Date) {
   const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
   monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
   return monday;
-}
-
-function strokePath(points: InkPoint[]) {
-  const path = points.map((point, index) => `${index === 0 ? "M" : "L"}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
-  if (points.length === 1) return `${path} L${(points[0].x + 0.1).toFixed(1)},${points[0].y.toFixed(1)}`;
-  return path;
 }
 
 function readArray<T>(key: string, legacyKey?: string): T[] {
@@ -91,34 +86,32 @@ export function TodayPlanner({
   const [tasks, setTasks] = useState<DayTask[]>([]);
   const [loadedTaskKey, setLoadedTaskKey] = useState<string | null>(null);
   const [newTask, setNewTask] = useState("");
-  const [boardKind, setBoardKind] = useState<BoardKind>("white");
-  const [strokes, setStrokes] = useState<InkStroke[]>([]);
-  const [loadedBoardKey, setLoadedBoardKey] = useState<string | null>(null);
-  const [activeStroke, setActiveStroke] = useState<InkStroke | null>(null);
-  const [tool, setTool] = useState<"pen" | "eraser">("pen");
-  const [penColor, setPenColor] = useState(WHITE_INKS[0]);
-  const [penSize, setPenSize] = useState(3.5);
-  const [eraserSize, setEraserSize] = useState(30);
   const [theme, setTheme] = useState<Theme>("dark");
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
+  const [installHelpOpen, setInstallHelpOpen] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [loadedNotesKey, setLoadedNotesKey] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [studyView, setStudyView] = useState<StudyView>("note");
+  const [studyFullscreen, setStudyFullscreen] = useState(false);
   const [noteSearch, setNoteSearch] = useState("");
   const [bucketItems, setBucketItems] = useState<BucketItem[]>([]);
   const [loadedBucketKey, setLoadedBucketKey] = useState<string | null>(null);
+  const [bucketView, setBucketView] = useState<BucketView>("list");
+  const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
   const [bucketSearch, setBucketSearch] = useState("");
   const [bucketFilter, setBucketFilter] = useState("All");
   const [newBucketTitle, setNewBucketTitle] = useState("");
   const [newBucketCategory, setNewBucketCategory] = useState<BucketItem["category"]>("Experiences");
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
-  const activeStrokeRef = useRef<InkStroke | null>(null);
   const taskStorageKey = `planit-day-v1:${encodeURIComponent(storageScope)}:${selectedKey}`;
-  const boardStorageKey = `planit-board-v2:${encodeURIComponent(storageScope)}:${selectedKey}:${boardKind}`;
   const notesStorageKey = `planit-study-notes-v1:${encodeURIComponent(storageScope)}`;
   const bucketStorageKey = `planit-bucket-v1:${encodeURIComponent(storageScope)}`;
   const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
+  const selectedBucketItem = bucketItems.find((item) => item.id === selectedBucketId) ?? null;
   const fullDate = new Intl.DateTimeFormat("en", {
     weekday: "long",
     month: "long",
@@ -134,6 +127,27 @@ export function TodayPlanner({
   }, []);
 
   useEffect(() => {
+    if ("serviceWorker" in navigator) void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    setIsInstalled(standalone);
+    const onInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+    };
+    const onInstalled = () => {
+      setIsInstalled(true);
+      setInstallHelpOpen(false);
+    };
+    window.addEventListener("beforeinstallprompt", onInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onInstallPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  useEffect(() => {
     setTasks(readArray<DayTask>(taskStorageKey, `northstar-day-v2:${encodeURIComponent(storageScope)}:${selectedKey}`));
     setLoadedTaskKey(taskStorageKey);
   }, [taskStorageKey]);
@@ -141,16 +155,6 @@ export function TodayPlanner({
   useEffect(() => {
     if (loadedTaskKey === taskStorageKey) window.localStorage.setItem(taskStorageKey, JSON.stringify(tasks));
   }, [loadedTaskKey, taskStorageKey, tasks]);
-
-  useEffect(() => {
-    const legacyBoardKey = boardKind === "white" ? `northstar-board-v1:${encodeURIComponent(storageScope)}:${selectedKey}` : undefined;
-    setStrokes(readArray<InkStroke>(boardStorageKey, legacyBoardKey));
-    setLoadedBoardKey(boardStorageKey);
-  }, [boardStorageKey]);
-
-  useEffect(() => {
-    if (loadedBoardKey === boardStorageKey) window.localStorage.setItem(boardStorageKey, JSON.stringify(strokes));
-  }, [boardStorageKey, loadedBoardKey, strokes]);
 
   useEffect(() => {
     setNotes(readArray<StudyNote>(notesStorageKey));
@@ -169,10 +173,6 @@ export function TodayPlanner({
   useEffect(() => {
     if (loadedBucketKey === bucketStorageKey) window.localStorage.setItem(bucketStorageKey, JSON.stringify(bucketItems));
   }, [bucketItems, bucketStorageKey, loadedBucketKey]);
-
-  useEffect(() => {
-    setPenColor(boardKind === "white" ? WHITE_INKS[0] : CHALK_INKS[0]);
-  }, [boardKind]);
 
   const weekDays = useMemo(() => {
     const monday = startOfWeek(selectedDate);
@@ -217,6 +217,17 @@ export function TodayPlanner({
     window.localStorage.setItem("planit-theme", nextTheme);
   }
 
+  async function installPlanit() {
+    if (!installPrompt) {
+      setInstallHelpOpen((open) => !open);
+      return;
+    }
+    await installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    setInstallPrompt(null);
+    if (choice.outcome === "accepted") setInstallHelpOpen(false);
+  }
+
   function addTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const title = newTask.trim();
@@ -225,49 +236,11 @@ export function TodayPlanner({
     setNewTask("");
   }
 
-  function boardPoint(event: React.PointerEvent<SVGSVGElement>): InkPoint {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    return {
-      x: ((event.clientX - bounds.left) / bounds.width) * BOARD_WIDTH,
-      y: ((event.clientY - bounds.top) / bounds.height) * BOARD_HEIGHT,
-    };
-  }
-
-  function startStroke(event: React.PointerEvent<SVGSVGElement>) {
-    if (loadedBoardKey !== boardStorageKey) return;
-    if (event.button !== 0 && event.pointerType !== "pen") return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const stroke: InkStroke = {
-      points: [boardPoint(event)],
-      color: tool === "eraser" ? (boardKind === "white" ? "#ffffff" : "#18231f") : penColor,
-      width: tool === "eraser" ? eraserSize : penSize,
-    };
-    activeStrokeRef.current = stroke;
-    setActiveStroke(stroke);
-  }
-
-  function continueStroke(event: React.PointerEvent<SVGSVGElement>) {
-    const current = activeStrokeRef.current;
-    if (!current) return;
-    event.preventDefault();
-    const next = { ...current, points: [...current.points, boardPoint(event)] };
-    activeStrokeRef.current = next;
-    setActiveStroke(next);
-  }
-
-  function finishStroke() {
-    const current = activeStrokeRef.current;
-    if (!current) return;
-    setStrokes((existing) => [...existing, current]);
-    activeStrokeRef.current = null;
-    setActiveStroke(null);
-  }
-
   function createNote() {
     const note: StudyNote = { id: crypto.randomUUID(), title: "", subject: "", body: "", updatedAt: Date.now() };
     setNotes((current) => [note, ...current]);
     setSelectedNoteId(note.id);
+    setStudyView("note");
   }
 
   function updateSelectedNote(patch: Partial<Pick<StudyNote, "title" | "subject" | "body">>) {
@@ -278,7 +251,10 @@ export function TodayPlanner({
   function deleteNote(id: string) {
     const next = notes.filter((note) => note.id !== id);
     setNotes(next);
-    if (selectedNoteId === id) setSelectedNoteId(next[0]?.id ?? null);
+    if (selectedNoteId === id) {
+      setSelectedNoteId(next[0]?.id ?? null);
+      setStudyView("note");
+    }
   }
 
   function addBucketItem(event: React.FormEvent<HTMLFormElement>) {
@@ -294,9 +270,7 @@ export function TodayPlanner({
     if (available.length) setSpotlightId(available[Math.floor(Math.random() * available.length)].id);
   }
 
-  const visibleStrokes = loadedBoardKey === boardStorageKey ? strokes : [];
   const visibleTasks = loadedTaskKey === taskStorageKey ? tasks : [];
-  const allStrokes = activeStroke && loadedBoardKey === boardStorageKey ? [...visibleStrokes, activeStroke] : visibleStrokes;
 
   return (
     <div className="planit-app">
@@ -306,10 +280,24 @@ export function TodayPlanner({
           <h1>Make space for your plans.</h1>
           <p className="planner-date-range">Your days, study notes, and someday list in one place.</p>
         </div>
-        <button type="button" className="planner-theme-button" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "white" : "dark"} theme`}>
-          {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
-          <span>{theme === "dark" ? "White theme" : "Dark theme"}</span>
-        </button>
+        <div className="planit-header-actions">
+          {!isInstalled && (
+            <div className="planit-install-wrap">
+              <button type="button" className="planit-install-button" onClick={installPlanit}><Download size={16} /><span>Install app</span></button>
+              {installHelpOpen && (
+                <div className="planit-install-help" role="status">
+                  <button type="button" onClick={() => setInstallHelpOpen(false)} aria-label="Close install instructions"><X size={15} /></button>
+                  <strong>Add Planit to your device</strong>
+                  <p>On iPad or iPhone, open this page in Safari, tap Share, then choose “Add to Home Screen.” In other browsers, use the browser menu and choose “Install app” or “Add to Home screen.”</p>
+                </div>
+              )}
+            </div>
+          )}
+          <button type="button" className="planner-theme-button" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "white" : "dark"} theme`}>
+            {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+            <span>{theme === "dark" ? "White theme" : "Dark theme"}</span>
+          </button>
+        </div>
       </header>
 
       <nav className="planit-tabs" role="tablist" aria-label="Planit sections">
@@ -354,64 +342,7 @@ export function TodayPlanner({
           </section>
 
           <div className="planner-workspace">
-            <section className="planner-board-card" aria-label="Dated notebook">
-              <div className="planner-card-heading planner-board-heading">
-                <div>
-                  <h2>{boardKind === "white" ? "Whiteboard" : "Blackboard"}</h2>
-                  <p>Write or sketch with your finger or Apple Pencil.</p>
-                </div>
-                <div className="planner-board-switch" role="group" aria-label="Board color">
-                  <button type="button" className={cn(boardKind === "white" && "is-active")} onClick={() => setBoardKind("white")}>White</button>
-                  <button type="button" className={cn(boardKind === "black" && "is-active")} onClick={() => setBoardKind("black")}>Black</button>
-                </div>
-              </div>
-
-              <div className="planner-toolbar">
-                <div className="planner-tool-pair">
-                  <button type="button" className={cn("planner-tool-button", tool === "pen" && "is-active")} onClick={() => setTool("pen")} aria-pressed={tool === "pen"}>
-                    <NotebookPen size={16} /> Pen
-                  </button>
-                  <button type="button" className={cn("planner-tool-button", tool === "eraser" && "is-active")} onClick={() => setTool("eraser")} aria-pressed={tool === "eraser"}>
-                    <Eraser size={16} /> Eraser
-                  </button>
-                </div>
-                {tool === "pen" ? (
-                  <div className="planner-ink-controls">
-                    <div className="planner-color-palette" role="group" aria-label="Pen color">
-                      {(boardKind === "white" ? WHITE_INKS : CHALK_INKS).map((color) => (
-                        <button key={color} type="button" className={cn("planner-color-swatch", penColor === color && "is-selected")} style={{ "--swatch-color": color } as React.CSSProperties} onClick={() => setPenColor(color)} aria-label={`Pen color ${color}`} aria-pressed={penColor === color} />
-                      ))}
-                    </div>
-                    <label className="planner-size-control"><span>Pen size</span><input type="range" min="1.5" max="11" step="0.5" value={penSize} onChange={(event) => setPenSize(Number(event.target.value))} /><output>{penSize}px</output></label>
-                  </div>
-                ) : (
-                  <label className="planner-size-control planner-eraser-size"><span>Eraser size</span><input type="range" min="10" max="72" step="2" value={eraserSize} onChange={(event) => setEraserSize(Number(event.target.value))} /><output>{eraserSize}px</output></label>
-                )}
-                <div className="planner-board-actions">
-                  <button type="button" className="planner-tool-button planner-action-button" onClick={() => setStrokes((current) => current.slice(0, -1))} disabled={loadedBoardKey !== boardStorageKey || !strokes.length} aria-label="Undo last stroke" title="Undo last stroke"><Undo2 size={17} /></button>
-                  <button type="button" className="planner-tool-button planner-action-button" onClick={() => setStrokes([])} disabled={loadedBoardKey !== boardStorageKey || !strokes.length} aria-label="Clear this dated board" title="Clear this board"><Trash2 size={17} /></button>
-                </div>
-              </div>
-
-              <div className={cn("planner-whiteboard", boardKind === "black" && "is-blackboard")} aria-label={`${boardKind}board drawing area`}>
-                <svg
-                  viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
-                  preserveAspectRatio="none"
-                  className="planner-whiteboard-svg"
-                  onPointerDown={startStroke}
-                  onPointerMove={continueStroke}
-                  onPointerUp={finishStroke}
-                  onPointerCancel={finishStroke}
-                  role="img"
-                  aria-label={`Blank ${boardKind}board. Draw using touch or Apple Pencil.`}
-                >
-                  {allStrokes.map((stroke, index) => (
-                    <path key={index} d={strokePath(stroke.points)} fill="none" stroke={stroke.color} strokeWidth={stroke.width} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                  ))}
-                </svg>
-              </div>
-              <p className="planner-local-note">Each date and board keeps its own page on this device.</p>
-            </section>
+            <DrawingNotebook storageScope={storageScope} bookId={`planner-${selectedKey}`} title="Daily notebook" legacyDateKey={selectedKey} />
 
             <section className="planner-tasks-card" aria-label="Tasks for this date">
               <div className="planner-card-heading">
@@ -456,16 +387,26 @@ export function TodayPlanner({
                 </button>
               )) : <p className="planit-empty">No notes yet. Create one to start your study notebook.</p>}
             </aside>
-            <div className="study-editor">
+            <div className={cn("study-editor", studyFullscreen && studyView === "note" && "is-fullscreen")}>
               {selectedNote ? (
                 <>
                   <div className="study-editor-top">
-                    <span>Autosaves on this device</span>
+                    <div className="study-view-switch" role="group" aria-label="Study note view">
+                      <button type="button" className={cn(studyView === "note" && "is-active")} onClick={() => { setStudyView("note"); setStudyFullscreen(false); }}>Text note</button>
+                      <button type="button" className={cn(studyView === "notebook" && "is-active")} onClick={() => { setStudyView("notebook"); setStudyFullscreen(false); }}><NotebookPen size={15} /> Board pages</button>
+                    </div>
+                    {studyView === "note" && <button type="button" className="study-fullscreen-button" onClick={() => setStudyFullscreen((value) => !value)} aria-label={studyFullscreen ? "Exit full screen note" : "View note full screen"}>{studyFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>}
                     <button type="button" className="planner-tool-button planner-action-button" onClick={() => deleteNote(selectedNote.id)} aria-label="Delete note"><Trash2 size={16} /></button>
                   </div>
-                  <input className="study-title-input" value={selectedNote.title} onChange={(event) => updateSelectedNote({ title: event.target.value })} placeholder="Note title" maxLength={120} />
-                  <input className="study-subject-input" value={selectedNote.subject} onChange={(event) => updateSelectedNote({ subject: event.target.value })} placeholder="Subject or class" maxLength={60} />
-                  <textarea className="study-body-input" value={selectedNote.body} onChange={(event) => updateSelectedNote({ body: event.target.value })} placeholder="Start writing your notes…" />
+                  {studyView === "note" ? (
+                    <>
+                      <input className="study-title-input" value={selectedNote.title} onChange={(event) => updateSelectedNote({ title: event.target.value })} placeholder="Note title" maxLength={120} />
+                      <input className="study-subject-input" value={selectedNote.subject} onChange={(event) => updateSelectedNote({ subject: event.target.value })} placeholder="Subject or class" maxLength={60} />
+                      <textarea className="study-body-input" value={selectedNote.body} onChange={(event) => updateSelectedNote({ body: event.target.value })} placeholder="Start writing your notes…" />
+                    </>
+                  ) : (
+                    <DrawingNotebook storageScope={storageScope} bookId={`study-${selectedNote.id}`} title={`${selectedNote.title || "Study note"} notebook`} />
+                  )}
                 </>
               ) : (
                 <div className="study-empty-editor"><BookOpen size={28} /><p>Select a note or create a new one.</p><button type="button" className="planit-primary-button" onClick={createNote}><Plus size={17} /> New note</button></div>
@@ -477,6 +418,16 @@ export function TodayPlanner({
 
       {section === "bucket" && (
         <section className="planit-section" role="tabpanel" aria-label="Bucket list">
+          {bucketView === "notebook" && selectedBucketItem ? (
+            <>
+              <div className="section-title-row bucket-notebook-header">
+                <div><h2>{selectedBucketItem.title}</h2><p>Idea notebook · add as many pages as you need.</p></div>
+                <button type="button" className="planit-secondary-button" onClick={() => setBucketView("list")}><ChevronLeft size={16} /> Back to list</button>
+              </div>
+              <DrawingNotebook storageScope={storageScope} bookId={`bucket-${selectedBucketItem.id}`} title="Idea notebook" />
+            </>
+          ) : (
+            <>
           <div className="section-title-row">
             <div><h2>Bucket list</h2><p>Save the places, skills, and experiences you want to make time for.</p></div>
             <button type="button" className="planit-secondary-button" onClick={surpriseMe}><Shuffle size={16} /> Surprise me</button>
@@ -505,12 +456,15 @@ export function TodayPlanner({
                   <button type="button" className="planner-task-check" onClick={() => setBucketItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, done: !entry.done } : entry))} aria-label={item.done ? `Reopen ${item.title}` : `Mark ${item.title} done`} aria-pressed={item.done}>{item.done && <Check size={13} />}</button>
                   <span className="bucket-item-title">{item.title}</span>
                   <span className="bucket-category-tag">{item.category}</span>
-                  <button type="button" className="planner-task-delete" onClick={() => setBucketItems((current) => current.filter((entry) => entry.id !== item.id))} aria-label={`Delete ${item.title}`}><Trash2 size={15} /></button>
+                  <button type="button" className="bucket-notebook-button" onClick={() => { setSelectedBucketId(item.id); setBucketView("notebook"); }} aria-label={`Open notebook for ${item.title}`} title="Open idea notebook"><NotebookPen size={16} /></button>
+                  <button type="button" className="planner-task-delete" onClick={() => { setBucketItems((current) => current.filter((entry) => entry.id !== item.id)); if (selectedBucketId === item.id) { setSelectedBucketId(null); setBucketView("list"); } }} aria-label={`Delete ${item.title}`}><Trash2 size={15} /></button>
                 </li>
               ))}
             </ul>
           ) : <p className="planit-empty">Nothing here yet. Add an idea you want to remember.</p>}
           <p className="planner-local-note">Your list stays on this device.</p>
+            </>
+          )}
         </section>
       )}
     </div>

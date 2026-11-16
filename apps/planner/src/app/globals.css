@@ -1169,6 +1169,535 @@ html[data-theme="light"] .planner-viewport {
   text-align: center;
 }
 
+.drawing-notebook {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--planner-border);
+  border-radius: 17px;
+  background: var(--planner-panel);
+}
+
+.drawing-notebook-heading,
+.drawing-notebook-heading-actions,
+.drawing-book-title,
+.drawing-page-strip,
+.drawing-page-tabs,
+.drawing-page-settings,
+.drawing-toolbar,
+.drawing-tool-switch,
+.drawing-color-palette,
+.drawing-size-presets,
+.drawing-toolbar-actions,
+.drawing-page-footer {
+  display: flex;
+  align-items: center;
+}
+
+.drawing-notebook-heading,
+.drawing-page-strip,
+.drawing-page-settings,
+.drawing-toolbar,
+.drawing-page-footer {
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.drawing-notebook-heading {
+  margin-bottom: 12px;
+}
+
+.drawing-book-title {
+  min-width: 0;
+  gap: 9px;
+  color: var(--planner-accent);
+}
+
+.drawing-book-title h3 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--planner-text);
+  font-size: 16px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawing-notebook-heading-actions {
+  flex: 0 0 auto;
+  gap: 9px;
+}
+
+.drawing-page-number,
+.drawing-page-footer {
+  color: var(--planner-subtle);
+  font-size: 11px;
+}
+
+.drawing-fullscreen-button,
+.study-fullscreen-button {
+  display: none;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--planner-border);
+  border-radius: 9px;
+  background: var(--planner-panel-raised);
+  color: var(--planner-text);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.drawing-fullscreen-button:hover,
+.study-fullscreen-button:hover {
+  border-color: var(--planner-accent);
+}
+
+.drawing-page-strip {
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.drawing-page-tabs {
+  min-width: 0;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.drawing-page-tab,
+.drawing-add-page {
+  display: inline-flex;
+  min-height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--planner-border);
+  border-radius: 9px;
+  background: var(--planner-panel-raised);
+  color: var(--planner-muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.drawing-page-tab > span {
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--planner-accent) 14%, transparent);
+  color: var(--planner-accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.drawing-page-tab.is-active {
+  border-color: var(--planner-accent);
+  color: var(--planner-text);
+}
+
+.drawing-add-page {
+  border-style: dashed;
+  color: var(--planner-accent);
+}
+
+.drawing-add-page:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.drawing-page-settings {
+  margin-bottom: 9px;
+}
+
+.drawing-page-name {
+  display: flex;
+  min-width: 80px;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  color: var(--planner-subtle);
+  font-size: 10px;
+}
+
+.drawing-page-name input {
+  width: min(220px, 100%);
+  min-height: 32px;
+  padding: 0 9px;
+  border: 1px solid var(--planner-border);
+  border-radius: 8px;
+  outline: none;
+  background: var(--planner-input);
+  color: var(--planner-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.drawing-page-name input:focus {
+  border-color: var(--planner-accent);
+}
+
+.drawing-board-toggle,
+.drawing-tool-switch,
+.drawing-size-presets {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--planner-border);
+  border-radius: 9px;
+  background: var(--planner-input);
+}
+
+.drawing-board-toggle button,
+.drawing-tool-switch button,
+.drawing-size-presets button {
+  display: inline-flex;
+  min-height: 29px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--planner-muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.drawing-board-toggle button.is-active,
+.drawing-tool-switch button.is-active,
+.drawing-size-presets button.is-active {
+  background: var(--planner-panel-raised);
+  color: var(--planner-text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+}
+
+.drawing-toolbar {
+  flex-wrap: wrap;
+  margin-bottom: 9px;
+  padding: 7px;
+  border: 1px solid var(--planner-border-soft);
+  border-radius: 11px;
+  background: var(--planner-input);
+}
+
+.drawing-color-palette {
+  gap: 6px;
+}
+
+.drawing-color-swatch {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(128, 138, 151, 0.35);
+  border-radius: 50%;
+  background: var(--swatch-color);
+  cursor: pointer;
+}
+
+.drawing-color-swatch.is-selected {
+  outline: 2px solid var(--planner-accent);
+  outline-offset: 2px;
+}
+
+.drawing-size-presets {
+  padding: 2px;
+}
+
+.drawing-size-presets button {
+  gap: 5px;
+  min-height: 27px;
+  padding: 0 6px;
+}
+
+.drawing-size-mark {
+  width: var(--mark-size);
+  height: var(--mark-size);
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.drawing-eraser-mark {
+  width: var(--eraser-size);
+  height: var(--eraser-size);
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.drawing-toolbar-actions {
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.drawing-icon-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--planner-border);
+  border-radius: 8px;
+  background: var(--planner-panel-raised);
+  color: var(--planner-muted);
+  cursor: pointer;
+}
+
+.drawing-icon-button:hover:not(:disabled) {
+  border-color: var(--planner-accent);
+  color: var(--planner-text);
+}
+
+.drawing-icon-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.drawing-canvas {
+  position: relative;
+  height: clamp(390px, 59vh, 700px);
+  overflow: hidden;
+  border: 1px solid #d8dce2;
+  border-radius: 11px;
+  background: #fff;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.drawing-canvas.is-blackboard {
+  border-color: #31413c;
+  background: #18231f;
+}
+
+.drawing-canvas svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  cursor: none;
+  touch-action: none;
+}
+
+.drawing-cursor {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.drawing-cursor.is-pen {
+  width: 14px;
+  height: 18px;
+  transform: translate(-50%, -10%);
+  clip-path: polygon(50% 0, 100% 100%, 50% 76%, 0 100%);
+  background: var(--cursor-color);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.drawing-cursor.is-eraser {
+  width: var(--cursor-size);
+  height: var(--cursor-size);
+  transform: translate(-50%, -50%);
+  border: 2px solid #333b45;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.drawing-canvas.is-blackboard .drawing-cursor.is-eraser {
+  border-color: #f8fafc;
+  background: rgba(248, 250, 252, 0.16);
+}
+
+.drawing-page-footer {
+  justify-content: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.drawing-page-footer .drawing-icon-button {
+  width: 28px;
+  height: 27px;
+}
+
+.drawing-notebook.is-fullscreen {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  border: 0;
+  border-radius: 0;
+  background: var(--planner-bg);
+}
+
+.drawing-notebook.is-fullscreen .drawing-canvas {
+  min-height: 280px;
+  height: calc(100dvh - 270px);
+  max-height: none;
+  flex: 1;
+}
+
+.study-view-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--planner-border);
+  border-radius: 9px;
+  background: var(--planner-input);
+}
+
+.study-view-switch button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--planner-muted);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.study-view-switch button.is-active {
+  background: var(--planner-panel-raised);
+  color: var(--planner-text);
+}
+
+.study-editor.is-fullscreen {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  min-height: 100dvh;
+  overflow: auto;
+  padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+  background: var(--planner-bg);
+}
+
+.study-editor.is-fullscreen .study-body-input {
+  min-height: 60vh;
+}
+
+.planit-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.planit-install-wrap {
+  position: relative;
+}
+
+.planit-install-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--planner-border);
+  border-radius: 11px;
+  background: var(--planner-panel);
+  color: var(--planner-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.planit-install-button:hover {
+  border-color: var(--planner-accent);
+}
+
+.planit-install-button svg {
+  color: var(--planner-accent);
+}
+
+.planit-install-help {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 9px);
+  right: 0;
+  width: min(310px, calc(100vw - 32px));
+  padding: 16px;
+  border: 1px solid var(--planner-border);
+  border-radius: 13px;
+  background: var(--planner-panel-raised);
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.28);
+}
+
+.planit-install-help > button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--planner-muted);
+  cursor: pointer;
+}
+
+.planit-install-help strong {
+  color: var(--planner-text);
+  font-size: 13px;
+}
+
+.planit-install-help p {
+  margin: 8px 0 0;
+  color: var(--planner-muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.bucket-notebook-button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--planner-border);
+  border-radius: 8px;
+  background: var(--planner-panel-raised);
+  color: var(--planner-accent);
+  cursor: pointer;
+}
+
+.bucket-notebook-button:hover {
+  border-color: var(--planner-accent);
+}
+
+.bucket-notebook-header {
+  margin-bottom: 4px;
+}
+
+@media (max-width: 1200px), (pointer: coarse) {
+  .drawing-fullscreen-button,
+  .study-fullscreen-button {
+    display: inline-flex;
+  }
+}
+
 @media (max-width: 800px) {
   .planner-main {
     padding: 24px 16px 36px;
@@ -1425,6 +1954,58 @@ html[data-theme="light"] .planner-viewport {
   }
 
   .bucket-category-tag {
+    display: none;
+  }
+
+  .drawing-notebook {
+    padding: 12px;
+  }
+
+  .drawing-page-number {
+    display: none;
+  }
+
+  .drawing-page-settings {
+    flex-wrap: wrap;
+  }
+
+  .drawing-page-name {
+    flex-basis: 100%;
+  }
+
+  .drawing-toolbar {
+    justify-content: flex-start;
+  }
+
+  .drawing-tool-switch button span {
+    display: inline;
+  }
+
+  .drawing-size-presets button {
+    padding: 0 5px;
+  }
+
+  .drawing-canvas {
+    height: 57vh;
+    min-height: 360px;
+    max-height: 600px;
+  }
+
+  .drawing-notebook.is-fullscreen .drawing-canvas {
+    height: calc(100dvh - 290px);
+    min-height: 240px;
+  }
+
+  .study-editor.is-fullscreen .study-body-input {
+    min-height: 66vh;
+  }
+
+  .planit-install-button {
+    width: 40px;
+    padding: 0;
+  }
+
+  .planit-install-button span {
     display: none;
   }
 }
