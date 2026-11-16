@@ -25,7 +25,7 @@ function toAppUser(row: UserRow): AppUser {
 
 function workspaceNameFor(name: string): string {
   const first = name.trim().split(/\s+/)[0];
-  return first ? `${first}'s Planit` : "My Planit";
+  return first ? `${first}'s Kiroku` : "My Kiroku";
 }
 
 async function ensurePersonalWorkspace(user: UserRow): Promise<string> {

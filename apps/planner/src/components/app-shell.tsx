@@ -145,7 +145,7 @@ export function AppShell({
     <div className="min-h-screen">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-white/5 bg-ink-950/70 px-4 py-5 backdrop-blur-xl lg:flex">
         <div className="px-2">
-          <Link href={homeHref} aria-label="Planit planner">
+          <Link href={homeHref} aria-label="Kiroku planner">
             <Logo />
           </Link>
         </div>
@@ -196,7 +196,7 @@ export function AppShell({
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/5 bg-ink-950/80 px-4 backdrop-blur-xl sm:px-6 lg:hidden">
-          <Link href={homeHref} aria-label="Planit planner">
+          <Link href={homeHref} aria-label="Kiroku planner">
             <Logo size="sm" />
           </Link>
           <div className="flex items-center gap-2">

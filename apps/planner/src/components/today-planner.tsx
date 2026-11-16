@@ -13,19 +13,23 @@ import {
   Minimize2,
   Moon,
   NotebookPen,
+  PenLine,
   Plus,
   Search,
   Shuffle,
   Sun,
   Trash2,
   X,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { DrawingNotebook } from "@/components/drawing-notebook";
+import { FinanceDashboard } from "@/components/finance-dashboard";
+import { PortfolioEditor } from "@/components/portfolio-editor";
 
 type DayTask = { id: string; title: string; done: boolean };
 type Theme = "dark" | "light";
-type Section = "planner" | "study" | "bucket";
+type Section = "planner" | "study" | "bucket" | "finance" | "portfolio";
 type StudyView = "note" | "notebook";
 type BucketView = "list" | "notebook";
 type StudyNote = { id: string; title: string; subject: string; body: string; updatedAt: number };
@@ -217,7 +221,7 @@ export function TodayPlanner({
     window.localStorage.setItem("planit-theme", nextTheme);
   }
 
-  async function installPlanit() {
+  async function installKiroku() {
     if (!installPrompt) {
       setInstallHelpOpen((open) => !open);
       return;
@@ -276,19 +280,19 @@ export function TodayPlanner({
     <div className="planit-app">
       <header className="planit-header">
         <div>
-          <p className="planner-eyebrow">PLANIT</p>
-          <h1>Make space for your plans.</h1>
+          <p className="planner-eyebrow">KIROKU</p>
+          <h1>Make room for what matters.</h1>
           <p className="planner-date-range">Your days, study notes, and someday list in one place.</p>
         </div>
         <div className="planit-header-actions">
           {!isInstalled && (
             <div className="planit-install-wrap">
-              <button type="button" className="planit-install-button" onClick={installPlanit}><Download size={16} /><span>Install app</span></button>
+              <button type="button" className="planit-install-button" onClick={installKiroku}><Download size={16} /><span>Install app</span></button>
               {installHelpOpen && (
                 <div className="planit-install-help" role="status">
                   <button type="button" onClick={() => setInstallHelpOpen(false)} aria-label="Close install instructions"><X size={15} /></button>
-                  <strong>Add Planit to your device</strong>
-                  <p>On iPad or iPhone, open this page in Safari, tap Share, then choose “Add to Home Screen.” In other browsers, use the browser menu and choose “Install app” or “Add to Home screen.”</p>
+                  <strong>Add Kiroku to your device</strong>
+                  <p>Android: in Chrome, tap the menu and choose “Install app” or “Add to Home screen.” iPhone or iPad: in Safari, tap Share, then “Add to Home Screen.” Desktop: use the install icon in Chrome or Edge, or choose “Install app” from the browser menu.</p>
                 </div>
               )}
             </div>
@@ -300,7 +304,7 @@ export function TodayPlanner({
         </div>
       </header>
 
-      <nav className="planit-tabs" role="tablist" aria-label="Planit sections">
+      <nav className="planit-tabs" role="tablist" aria-label="Kiroku sections">
         <button type="button" role="tab" aria-selected={section === "planner"} className={cn("planit-tab", section === "planner" && "is-active")} onClick={() => setSection("planner")}>
           <CalendarDays size={17} /> Planner
         </button>
@@ -309,6 +313,12 @@ export function TodayPlanner({
         </button>
         <button type="button" role="tab" aria-selected={section === "bucket"} className={cn("planit-tab", section === "bucket" && "is-active")} onClick={() => setSection("bucket")}>
           <Lightbulb size={17} /> Bucket list
+        </button>
+        <button type="button" role="tab" aria-selected={section === "finance"} className={cn("planit-tab", section === "finance" && "is-active")} onClick={() => setSection("finance")}>
+          <Wallet size={17} /> Finance
+        </button>
+        <button type="button" role="tab" aria-selected={section === "portfolio"} className={cn("planit-tab", section === "portfolio" && "is-active")} onClick={() => setSection("portfolio")}>
+          <PenLine size={17} /> Portfolio editor
         </button>
       </nav>
 
@@ -467,6 +477,9 @@ export function TodayPlanner({
           )}
         </section>
       )}
+
+      {section === "finance" && <FinanceDashboard storageScope={storageScope} />}
+      {section === "portfolio" && <PortfolioEditor />}
     </div>
   );
 }

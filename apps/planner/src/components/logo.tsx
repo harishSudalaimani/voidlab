@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Compass } from "lucide-react";
+import { NotebookPen } from "lucide-react";
 
 export function Logo({
   size = "md",
@@ -13,13 +13,13 @@ export function Logo({
   return (
     <span className="flex items-center gap-2.5">
       <span
-        className={`${box} relative grid place-items-center rounded-xl bg-gradient-to-br from-accent-400 to-violet-500 text-ink-950 shadow-[0_0_30px_-8px_rgba(52,211,153,0.7)]`}
+        className={`${box} relative grid place-items-center rounded-xl bg-gradient-to-br from-rose-300 via-orange-300 to-yellow-200 text-[#281224] shadow-[0_0_30px_-8px_rgba(255,111,145,0.7)]`}
       >
-        <Compass size={icon} strokeWidth={2.4} />
+        <NotebookPen size={icon} strokeWidth={2.6} />
       </span>
       {withWordmark && (
         <span className="text-[15px] font-bold tracking-tight text-mist-100">
-          Planit
+          Kiroku
         </span>
       )}
     </span>
@@ -28,7 +28,7 @@ export function Logo({
 
 export function LogoLink() {
   return (
-    <Link href="/" className="inline-flex" aria-label="Planit home">
+    <Link href="/" className="inline-flex" aria-label="Kiroku home">
       <Logo />
     </Link>
   );
