@@ -11,8 +11,8 @@ export default function manifest(): MetadataRoute.Manifest {
     display: "standalone",
     display_override: ["standalone", "minimal-ui"],
     orientation: "any",
-    background_color: "#171321",
-    theme_color: "#171321",
+    background_color: "#121612",
+    theme_color: "#121612",
     icons: [
       { src: "/kiroku-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
       { src: "/kiroku-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },

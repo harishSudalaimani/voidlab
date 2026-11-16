@@ -40,7 +40,7 @@ export const DEFAULT_PORTFOLIO_PROFILE: PortfolioProfile = {
 
 export const PORTFOLIO_THEMES: { id: PortfolioThemeId; name: string; description: string; colors: [string, string, string] }[] = [
   { id: "editorial", name: "Sunday Edition", description: "Sunny magazine pages, punchy coral, and expressive serif.", colors: ["#fff6e8", "#1b827b", "#eb5d4f"] },
-  { id: "midnight", name: "After Hours", description: "Neon on ink, soft glass cards, and glowing color.", colors: ["#11121f", "#6dffe0", "#ff76bd"] },
+  { id: "midnight", name: "After Hours", description: "Cool neon on ink, soft glass cards, and glowing color.", colors: ["#11121f", "#6dffe0", "#8aaaff"] },
   { id: "cobalt", name: "Studio Pop", description: "Electric blue, sharp grids, and graphic shapes.", colors: ["#eff3ff", "#315bff", "#ff6a36"] },
   { id: "atelier", name: "Color Atelier", description: "Peach canvas, plum lettering, and artful flourishes.", colors: ["#ffefd9", "#392137", "#d54576"] },
   { id: "paper", name: "Fresh Cut", description: "Crisp mint-white, vivid pink, and clean modern type.", colors: ["#f4fff9", "#087d63", "#ff4678"] },

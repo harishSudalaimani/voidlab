@@ -13,7 +13,7 @@ export function Logo({
   return (
     <span className="flex items-center gap-2.5">
       <span
-        className={`${box} relative grid place-items-center rounded-xl bg-gradient-to-br from-rose-300 via-orange-300 to-yellow-200 text-[#281224] shadow-[0_0_30px_-8px_rgba(255,111,145,0.7)]`}
+        className={`${box} relative grid place-items-center rounded-xl bg-gradient-to-br from-lime-300 via-lime-200 to-amber-200 text-[#1b2611] shadow-[0_0_30px_-8px_rgba(178,231,84,0.65)]`}
       >
         <NotebookPen size={icon} strokeWidth={2.6} />
       </span>

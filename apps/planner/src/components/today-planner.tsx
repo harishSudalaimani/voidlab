@@ -45,7 +45,8 @@ type InstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
-const START_DATE = "2026-12-01";
+const START_DATE = "2027-01-01";
+const END_DATE = "2027-12-31";
 const BUCKET_CATEGORIES: BucketItem["category"][] = ["Places", "Skills", "Experiences", "Other"];
 
 function dateKey(date: Date) {
@@ -86,6 +87,7 @@ export function TodayPlanner({
 }) {
   const [section, setSection] = useState<Section>("planner");
   const [selectedDate, setSelectedDate] = useState(() => dateFromKey(initialDateKey));
+  const [calendarMonth, setCalendarMonth] = useState(() => dateFromKey(START_DATE));
   const selectedKey = dateKey(selectedDate);
   const [tasks, setTasks] = useState<DayTask[]>([]);
   const [loadedTaskKey, setLoadedTaskKey] = useState<string | null>(null);
@@ -178,14 +180,17 @@ export function TodayPlanner({
     if (loadedBucketKey === bucketStorageKey) window.localStorage.setItem(bucketStorageKey, JSON.stringify(bucketItems));
   }, [bucketItems, bucketStorageKey, loadedBucketKey]);
 
-  const weekDays = useMemo(() => {
-    const monday = startOfWeek(selectedDate);
-    return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(monday);
-      date.setDate(monday.getDate() + index);
+  const calendarDays = useMemo(() => {
+    const firstOfMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1, 12);
+    const firstVisibleDay = startOfWeek(firstOfMonth);
+    const daysInMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0).getDate();
+    const cellCount = Math.ceil(((firstOfMonth.getDay() + 6) % 7 + daysInMonth) / 7) * 7;
+    return Array.from({ length: cellCount }, (_, index) => {
+      const date = new Date(firstVisibleDay);
+      date.setDate(firstVisibleDay.getDate() + index);
       return date;
     });
-  }, [selectedDate]);
+  }, [calendarMonth]);
 
   const filteredNotes = useMemo(() => {
     const query = noteSearch.trim().toLowerCase();
@@ -203,15 +208,18 @@ export function TodayPlanner({
   }, [bucketFilter, bucketItems, bucketSearch]);
 
   function selectDate(key: string) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || key < START_DATE || key > END_DATE) return;
     const next = dateFromKey(key);
-    if (dateKey(next) === key) setSelectedDate(next);
+    if (dateKey(next) === key) {
+      setSelectedDate(next);
+      setCalendarMonth(new Date(next.getFullYear(), next.getMonth(), 1, 12));
+    }
   }
 
-  function shiftDate(amount: number) {
-    const next = new Date(selectedDate);
-    next.setDate(next.getDate() + amount);
-    setSelectedDate(next);
+  function shiftCalendarMonth(amount: number) {
+    const next = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + amount, 1, 12);
+    if (next.getFullYear() !== 2027) return;
+    setCalendarMonth(next);
   }
 
   function toggleTheme() {
@@ -282,7 +290,7 @@ export function TodayPlanner({
         <div>
           <p className="planner-eyebrow">KIROKU</p>
           <h1>Make room for what matters.</h1>
-          <p className="planner-date-range">Your days, study notes, and someday list in one place.</p>
+          <p className="planner-date-range">Your 2027 planner · January 1 – December 31</p>
         </div>
         <div className="planit-header-actions">
           {!isInstalled && (
@@ -324,58 +332,70 @@ export function TodayPlanner({
 
       {section === "planner" && (
         <div className="planner-screen" role="tabpanel">
-          <section className="planner-calendar" aria-label="Choose a planner date">
-            <div className="planner-date-controls">
-              <button type="button" className="planner-icon-button" onClick={() => shiftDate(-1)} aria-label="Previous day">
-                <ChevronLeft size={19} />
-              </button>
-              <label className="planner-selected-date">
-                <CalendarDays size={17} />
-                <span>{new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(selectedDate)}</span>
-                <input aria-label="Jump to any date" type="date" value={selectedKey} onChange={(event) => selectDate(event.target.value)} />
-              </label>
-              <button type="button" className="planner-icon-button" onClick={() => shiftDate(1)} aria-label="Next day">
-                <ChevronRight size={19} />
-              </button>
-            </div>
-            <div className="planner-week-strip">
-              {weekDays.map((date) => {
-                const key = dateKey(date);
-                return (
-                  <button key={key} type="button" onClick={() => selectDate(key)} aria-pressed={key === selectedKey} className={cn("planner-day-button", key === selectedKey && "is-selected")}>
-                    <span>{new Intl.DateTimeFormat("en", { weekday: "short" }).format(date)}</span>
-                    <strong>{date.getDate()}</strong>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
           <div className="planner-workspace">
             <DrawingNotebook storageScope={storageScope} bookId={`planner-${selectedKey}`} title="Daily notebook" legacyDateKey={selectedKey} />
 
-            <section className="planner-tasks-card" aria-label="Tasks for this date">
-              <div className="planner-card-heading">
-                <div><h2>Tasks</h2><p>{fullDate}</p></div>
-              </div>
-              <form className="planner-task-form" onSubmit={addTask}>
-                <label className="sr-only" htmlFor="planner-new-task">Add a task</label>
-                <input id="planner-new-task" value={newTask} onChange={(event) => setNewTask(event.target.value)} placeholder="Write a task…" maxLength={180} />
-                <button type="submit" disabled={!newTask.trim()} aria-label="Add task"><Plus size={18} /></button>
-              </form>
-              {visibleTasks.length ? (
-                <ul className="planner-task-list">
-                  {visibleTasks.map((task) => (
-                    <li key={task.id} className={cn("planner-task", task.done && "is-done")}>
-                      <button type="button" className="planner-task-check" onClick={() => setTasks((current) => current.map((item) => item.id === task.id ? { ...item, done: !item.done } : item))} aria-label={task.done ? `Reopen ${task.title}` : `Complete ${task.title}`} aria-pressed={task.done}>{task.done && <Check size={13} />}</button>
-                      <span>{task.title}</span>
-                      <button type="button" className="planner-task-delete" onClick={() => setTasks((current) => current.filter((item) => item.id !== task.id))} aria-label={`Delete ${task.title}`}><Trash2 size={15} /></button>
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="planner-empty-tasks">Add anything you want to remember for this date.</p>}
-              <p className="planner-local-note">Saved on this device</p>
-            </section>
+            <aside className="planner-side-column">
+              <section className="planner-tasks-card" aria-label="Tasks for this date">
+                <div className="planner-card-heading">
+                  <div><h2>Tasks</h2><p>{fullDate}</p></div>
+                </div>
+                <form className="planner-task-form" onSubmit={addTask}>
+                  <label className="sr-only" htmlFor="planner-new-task">Add a task</label>
+                  <input id="planner-new-task" value={newTask} onChange={(event) => setNewTask(event.target.value)} placeholder="Write a task…" maxLength={180} />
+                  <button type="submit" disabled={!newTask.trim()} aria-label="Add task"><Plus size={18} /></button>
+                </form>
+                {visibleTasks.length ? (
+                  <ul className="planner-task-list">
+                    {visibleTasks.map((task) => (
+                      <li key={task.id} className={cn("planner-task", task.done && "is-done")}>
+                        <button type="button" className="planner-task-check" onClick={() => setTasks((current) => current.map((item) => item.id === task.id ? { ...item, done: !item.done } : item))} aria-label={task.done ? `Reopen ${task.title}` : `Complete ${task.title}`} aria-pressed={task.done}>{task.done && <Check size={13} />}</button>
+                        <span>{task.title}</span>
+                        <button type="button" className="planner-task-delete" onClick={() => setTasks((current) => current.filter((item) => item.id !== task.id))} aria-label={`Delete ${task.title}`}><Trash2 size={15} /></button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p className="planner-empty-tasks">Add anything you want to remember for this date.</p>}
+                <p className="planner-local-note">Saved on this device</p>
+              </section>
+
+              <section className="planner-calendar" aria-label="Choose a planner date">
+                <div className="planner-calendar-heading">
+                  <div>
+                    <span className="planner-calendar-kicker">YOUR PLANNER</span>
+                    <h2>{new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(calendarMonth)}</h2>
+                    <p>{fullDate}</p>
+                  </div>
+                  <div className="planner-calendar-actions">
+                    <div className="planner-month-nav" aria-label="Change month">
+                      <button type="button" className="planner-icon-button" onClick={() => shiftCalendarMonth(-1)} aria-label="Previous month" disabled={calendarMonth.getMonth() === 0}>
+                        <ChevronLeft size={17} />
+                      </button>
+                      <button type="button" className="planner-icon-button" onClick={() => shiftCalendarMonth(1)} aria-label="Next month" disabled={calendarMonth.getMonth() === 11}>
+                        <ChevronRight size={17} />
+                      </button>
+                    </div>
+                    <label className="planner-date-jump" aria-label="Jump to a date">
+                      <CalendarDays size={15} />
+                      <span>Go to date</span>
+                      <input aria-label="Jump to any date in 2027" type="date" min={START_DATE} max={END_DATE} value={selectedKey} onChange={(event) => selectDate(event.target.value)} />
+                    </label>
+                  </div>
+                </div>
+                <div className="planner-month-grid" role="group" aria-label={new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(calendarMonth)}>
+                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((weekday) => <span className="planner-weekday-label" key={weekday}>{weekday}</span>)}
+                  {calendarDays.map((date) => {
+                    const key = dateKey(date);
+                    const isCurrentMonth = date.getMonth() === calendarMonth.getMonth();
+                    return (
+                      <button key={key} type="button" onClick={() => selectDate(key)} disabled={key < START_DATE || key > END_DATE} aria-label={new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(date)} aria-pressed={key === selectedKey} className={cn("planner-day-button", !isCurrentMonth && "is-outside-month", key === selectedKey && "is-selected")}>
+                        <span>{date.getDate()}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            </aside>
           </div>
         </div>
       )}

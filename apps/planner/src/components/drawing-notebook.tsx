@@ -5,19 +5,23 @@ import {
   ChevronLeft,
   ChevronRight,
   Eraser,
+  Check,
   Maximize2,
   Minimize2,
   NotebookPen,
   PenLine,
   Plus,
   Trash2,
+  Type,
   Undo2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 
 type BoardKind = "white" | "black";
 type InkPoint = { x: number; y: number };
 type InkStroke = { points: InkPoint[]; color: string; width: number; erase?: boolean };
+type BoardText = { id: string; x: number; y: number; value: string; color: string; size: number };
 type NotebookPage = {
   id: string;
   title: string;
@@ -26,8 +30,12 @@ type NotebookPage = {
   penSize: number;
   eraserSize: number;
   strokes: InkStroke[];
+  texts: BoardText[];
+  textSize: number;
 };
 type ActiveStroke = { pageId: string; stroke: InkStroke };
+type ActiveTextMove = { pageId: string; textId: string; offsetX: number; offsetY: number };
+type TextDraft = { x: number; y: number; value: string; editId?: string };
 type NotebookProps = {
   storageScope: string;
   bookId: string;
@@ -49,6 +57,11 @@ const ERASER_SIZES = [
   { label: "Small", value: 18 },
   { label: "Medium", value: 34 },
   { label: "Large", value: 56 },
+];
+const TEXT_SIZES = [
+  { label: "Small", value: 20 },
+  { label: "Medium", value: 30 },
+  { label: "Large", value: 42 },
 ];
 let databasePromise: Promise<IDBDatabase> | null = null;
 
@@ -94,6 +107,8 @@ function makePage(title: string, boardKind: BoardKind = "white"): NotebookPage {
     penSize: PEN_SIZES[1].value,
     eraserSize: ERASER_SIZES[1].value,
     strokes: [],
+    texts: [],
+    textSize: TEXT_SIZES[1].value,
   };
 }
 
@@ -122,6 +137,24 @@ function validPage(value: unknown): value is NotebookPage {
     && Array.isArray(page.strokes);
 }
 
+function normalizePage(page: NotebookPage): NotebookPage {
+  const candidate = page as NotebookPage & { texts?: unknown; textSize?: unknown };
+  const texts = Array.isArray(candidate.texts) ? candidate.texts.filter((value): value is BoardText => {
+    if (!value || typeof value !== "object") return false;
+    const text = value as Partial<BoardText>;
+    return typeof text.id === "string"
+      && Number.isFinite(text.x)
+      && Number.isFinite(text.y)
+      && typeof text.value === "string"
+      && typeof text.color === "string"
+      && Number.isFinite(text.size);
+  }) : [];
+  const textSize = TEXT_SIZES.some((size) => size.value === candidate.textSize)
+    ? candidate.textSize as number
+    : TEXT_SIZES[1].value;
+  return { ...page, texts, textSize };
+}
+
 function migratedPage(title: string, boardKind: BoardKind, legacy: unknown[]): NotebookPage {
   const background = boardKind === "white" ? "#ffffff" : "#18231f";
   const strokes = legacy.filter((stroke): stroke is InkStroke => {
@@ -138,7 +171,7 @@ function migratedPage(title: string, boardKind: BoardKind, legacy: unknown[]): N
 function loadBook(key: string, scope: string, legacyDateKey: string | undefined, defaultTitle: string): NotebookPage[] {
   const saved = parseArray(window.localStorage.getItem(key));
   if (saved) {
-    const pages = saved.filter(validPage);
+    const pages = saved.filter(validPage).map(normalizePage);
     return pages.length ? pages : [makePage(defaultTitle)];
   }
 
@@ -167,11 +200,19 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
   const [pages, setPages] = useState<NotebookPage[]>([]);
   const [loadedBookKey, setLoadedBookKey] = useState<string | null>(null);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
-  const [tool, setTool] = useState<"pen" | "eraser">("pen");
+  const [tool, setTool] = useState<"pen" | "eraser" | "text">("pen");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [activeStroke, setActiveStroke] = useState<ActiveStroke | null>(null);
+  const [textDraft, setTextDraft] = useState<TextDraft | null>(null);
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
   const activeStrokeRef = useRef<ActiveStroke | null>(null);
+  const activeTextMoveRef = useRef<ActiveTextMove | null>(null);
   const [cursor, setCursor] = useState<{ x: number; y: number; visible: boolean }>({ x: 0, y: 0, visible: false });
+
+  useEffect(() => {
+    if (textDraft) textInputRef.current?.focus();
+  }, [textDraft]);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,7 +220,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
       let nextPages: NotebookPage[];
       try {
         const storedPages = await getStoredBook(storageKey);
-        nextPages = storedPages?.length ? storedPages.filter(validPage) : loadBook(storageKey, storageScope, legacyDateKey, title);
+        nextPages = storedPages?.length ? storedPages.filter(validPage).map(normalizePage) : loadBook(storageKey, storageScope, legacyDateKey, title);
         if (storedPages?.length && !nextPages.length) nextPages = [makePage(title)];
         await saveStoredBook(storageKey, nextPages);
       } catch {
@@ -207,6 +248,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
   const visiblePages = bookIsLoaded ? pages : [];
   const currentIndex = visiblePages.findIndex((page) => page.id === selectedPageId);
   const currentPage = currentIndex >= 0 ? visiblePages[currentIndex] : visiblePages[0];
+  const selectedText = currentPage?.texts.find((item) => item.id === selectedTextId);
   const inks = currentPage?.boardKind === "black" ? CHALK_INKS : WHITE_INKS;
   const background = currentPage?.boardKind === "black" ? "#18231f" : "#ffffff";
   const canvasStrokes = currentPage
@@ -224,11 +266,15 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
     setPages((existing) => [...existing, page]);
     setSelectedPageId(page.id);
     setTool("pen");
+    setTextDraft(null);
+    setSelectedTextId(null);
   }
 
   function deletePage() {
+    setTextDraft(null);
+    setSelectedTextId(null);
     if (!currentPage || pages.length <= 1) {
-      if (currentPage) updatePage(currentPage.id, { title: "Page 1", strokes: [] });
+      if (currentPage) updatePage(currentPage.id, { title: "Page 1", strokes: [], texts: [] });
       return;
     }
     const next = pages.filter((page) => page.id !== currentPage.id);
@@ -246,12 +292,18 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
 
   function showCursor(event: React.PointerEvent<SVGSVGElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
-    setCursor({ x: event.clientX - bounds.left, y: event.clientY - bounds.top, visible: event.pointerType === "mouse" || event.pointerType === "pen" });
+    setCursor({ x: event.clientX - bounds.left, y: event.clientY - bounds.top, visible: tool !== "text" && (event.pointerType === "mouse" || event.pointerType === "pen") });
   }
 
   function startStroke(event: React.PointerEvent<SVGSVGElement>) {
     if (!bookIsLoaded || !currentPage || (event.button !== 0 && event.pointerType !== "pen")) return;
     event.preventDefault();
+    if (tool === "text") {
+      const point = pointFrom(event);
+      setSelectedTextId(null);
+      setTextDraft({ x: point.x, y: point.y, value: "" });
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const erase = tool === "eraser";
     const stroke: InkStroke = {
@@ -268,6 +320,16 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
 
   function continueStroke(event: React.PointerEvent<SVGSVGElement>) {
     showCursor(event);
+    const movingText = activeTextMoveRef.current;
+    if (movingText) {
+      const point = pointFrom(event);
+      setPages((existing) => existing.map((page) => page.id === movingText.pageId
+        ? { ...page, texts: page.texts.map((item) => item.id === movingText.textId
+          ? { ...item, x: point.x - movingText.offsetX, y: point.y - movingText.offsetY }
+          : item) }
+        : page));
+      return;
+    }
     const active = activeStrokeRef.current;
     if (!active) return;
     event.preventDefault();
@@ -277,6 +339,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
   }
 
   function finishStroke() {
+    activeTextMoveRef.current = null;
     const active = activeStrokeRef.current;
     if (!active) return;
     setPages((existing) => existing.map((page) => page.id === active.pageId
@@ -286,9 +349,83 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
     setActiveStroke(null);
   }
 
+  function saveTextDraft() {
+    const draft = textDraft;
+    if (!draft || !currentPage) return;
+    const value = draft.value.trim();
+    if (!value) {
+      setTextDraft(null);
+      return;
+    }
+    const texts = currentPage.texts ?? [];
+    if (draft.editId) {
+      updatePage(currentPage.id, {
+        texts: texts.map((item) => item.id === draft.editId
+          ? { ...item, value, color: currentPage.penColor, size: currentPage.textSize }
+          : item),
+      });
+    } else {
+      updatePage(currentPage.id, {
+        texts: [...texts, { id: crypto.randomUUID(), x: draft.x, y: draft.y, value, color: currentPage.penColor, size: currentPage.textSize }],
+      });
+    }
+    setTextDraft(null);
+  }
+
+  function handlePlacedTextPointerDown(event: React.PointerEvent<SVGTextElement>, item: BoardText) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (tool !== "text" && tool !== "eraser") return;
+    if (!currentPage) return;
+    if (tool === "eraser") {
+      updatePage(currentPage.id, { texts: (currentPage.texts ?? []).filter((text) => text.id !== item.id) });
+      setSelectedTextId(null);
+      setTextDraft(null);
+      return;
+    }
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    const bounds = svg.getBoundingClientRect();
+    const point = {
+      x: ((event.clientX - bounds.left) / bounds.width) * BOARD_WIDTH,
+      y: ((event.clientY - bounds.top) / bounds.height) * BOARD_HEIGHT,
+    };
+    activeTextMoveRef.current = { pageId: currentPage.id, textId: item.id, offsetX: point.x - item.x, offsetY: point.y - item.y };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectedTextId(item.id);
+    setTextDraft(null);
+  }
+
+  function editSelectedText() {
+    if (!selectedText) return;
+    setTextDraft({ x: selectedText.x, y: selectedText.y, value: selectedText.value, editId: selectedText.id });
+  }
+
+  function deleteSelectedText() {
+    if (!currentPage || !selectedText) return;
+    updatePage(currentPage.id, { texts: currentPage.texts.filter((item) => item.id !== selectedText.id) });
+    setSelectedTextId(null);
+    setTextDraft(null);
+  }
+
+  function undoMark() {
+    if (!currentPage) return;
+    if (tool === "text" && currentPage.texts.length) {
+      updatePage(currentPage.id, { texts: currentPage.texts.slice(0, -1) });
+    } else if (currentPage.strokes.length) {
+      updatePage(currentPage.id, { strokes: currentPage.strokes.slice(0, -1) });
+    } else if (currentPage.texts.length) {
+      updatePage(currentPage.id, { texts: currentPage.texts.slice(0, -1) });
+    }
+  }
+
   function movePage(amount: number) {
     const next = visiblePages[currentIndex + amount];
-    if (next) setSelectedPageId(next.id);
+    if (next) {
+      setTextDraft(null);
+      setSelectedTextId(null);
+      setSelectedPageId(next.id);
+    }
   }
 
   return (
@@ -307,7 +444,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
       <div className="drawing-page-strip" aria-label="Notebook pages">
         <div className="drawing-page-tabs">
           {visiblePages.map((page, index) => (
-            <button key={page.id} type="button" className={cn("drawing-page-tab", page.id === currentPage?.id && "is-active")} onClick={() => setSelectedPageId(page.id)} aria-pressed={page.id === currentPage?.id}>
+            <button key={page.id} type="button" className={cn("drawing-page-tab", page.id === currentPage?.id && "is-active")} onClick={() => { setTextDraft(null); setSelectedTextId(null); setSelectedPageId(page.id); }} aria-pressed={page.id === currentPage?.id}>
               <span>{index + 1}</span>{page.title || `Page ${index + 1}`}
             </button>
           ))}
@@ -327,19 +464,26 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
           </div>
 
           <div className="drawing-toolbar">
-            <div className="drawing-tool-switch" role="group" aria-label="Drawing tool">
-              <button type="button" className={cn(tool === "pen" && "is-active")} onClick={() => setTool("pen")} aria-pressed={tool === "pen"}><PenLine size={16} /><span>Pen</span></button>
-              <button type="button" className={cn(tool === "eraser" && "is-active")} onClick={() => setTool("eraser")} aria-pressed={tool === "eraser"}><Eraser size={16} /><span>Eraser</span></button>
+            <div className="drawing-tool-switch" role="group" aria-label="Board tool">
+              <button type="button" className={cn(tool === "pen" && "is-active")} onClick={() => { setTool("pen"); setTextDraft(null); setSelectedTextId(null); }} aria-pressed={tool === "pen"}><PenLine size={16} /><span>Pen</span></button>
+              <button type="button" className={cn(tool === "text" && "is-active")} onClick={() => { setTool("text"); setTextDraft(null); }} aria-pressed={tool === "text"}><Type size={16} /><span>Text</span></button>
+              <button type="button" className={cn(tool === "eraser" && "is-active")} onClick={() => { setTool("eraser"); setTextDraft(null); setSelectedTextId(null); }} aria-pressed={tool === "eraser"}><Eraser size={16} /><span>Eraser</span></button>
             </div>
 
-            {tool === "pen" ? (
+            {tool !== "eraser" ? (
               <>
-                <div className="drawing-color-palette" role="group" aria-label="Pen color">
-                  {inks.map((color) => <button key={color} type="button" className={cn("drawing-color-swatch", currentPage.penColor === color && "is-selected")} style={{ "--swatch-color": color } as React.CSSProperties} onClick={() => updatePage(currentPage.id, { penColor: color })} aria-label={`Choose pen color ${color}`} aria-pressed={currentPage.penColor === color} />)}
+                <div className="drawing-color-palette" role="group" aria-label={tool === "text" ? "Text color" : "Pen color"}>
+                  {inks.map((color) => <button key={color} type="button" className={cn("drawing-color-swatch", currentPage.penColor === color && "is-selected")} style={{ "--swatch-color": color } as React.CSSProperties} onClick={() => updatePage(currentPage.id, { penColor: color })} aria-label={`Choose ${tool === "text" ? "text" : "pen"} color ${color}`} aria-pressed={currentPage.penColor === color} />)}
                 </div>
-                <div className="drawing-size-presets" role="group" aria-label="Pen size">
-                  {PEN_SIZES.map((size) => <button key={size.label} type="button" className={cn(currentPage.penSize === size.value && "is-active")} onClick={() => updatePage(currentPage.id, { penSize: size.value })} aria-pressed={currentPage.penSize === size.value}><span className="drawing-size-mark" style={{ "--mark-size": `${size.value + 3}px` } as React.CSSProperties} />{size.label}</button>)}
-                </div>
+                {tool === "pen" ? (
+                  <div className="drawing-size-presets" role="group" aria-label="Pen size">
+                    {PEN_SIZES.map((size) => <button key={size.label} type="button" className={cn(currentPage.penSize === size.value && "is-active")} onClick={() => updatePage(currentPage.id, { penSize: size.value })} aria-pressed={currentPage.penSize === size.value}><span className="drawing-size-mark" style={{ "--mark-size": `${size.value + 3}px` } as React.CSSProperties} />{size.label}</button>)}
+                  </div>
+                ) : (
+                  <div className="drawing-size-presets" role="group" aria-label="Text size">
+                    {TEXT_SIZES.map((size) => <button key={size.label} type="button" className={cn(currentPage.textSize === size.value && "is-active")} onClick={() => updatePage(currentPage.id, { textSize: size.value })} aria-pressed={currentPage.textSize === size.value}><span className="drawing-text-size-mark" style={{ fontSize: `${Math.max(10, size.value / 2)}px` }}>A</span>{size.label}</button>)}
+                  </div>
+                )}
               </>
             ) : (
               <div className="drawing-size-presets" role="group" aria-label="Eraser size">
@@ -348,24 +492,44 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
             )}
 
             <div className="drawing-toolbar-actions">
-              <button type="button" className="drawing-icon-button" onClick={() => updatePage(currentPage.id, { strokes: currentPage.strokes.slice(0, -1) })} disabled={!currentPage.strokes.length} aria-label="Undo last stroke" title="Undo"><Undo2 size={17} /></button>
-              <button type="button" className="drawing-icon-button" onClick={() => updatePage(currentPage.id, { strokes: [] })} disabled={!currentPage.strokes.length} aria-label="Clear page" title="Clear page"><Trash2 size={16} /></button>
+              {tool === "text" && selectedText && (
+                <>
+                  <span className="drawing-text-selection-hint">Drag to move</span>
+                  <button type="button" className="drawing-icon-button" onClick={editSelectedText} aria-label="Edit selected text" title="Edit text"><PenLine size={15} /></button>
+                  <button type="button" className="drawing-icon-button" onClick={deleteSelectedText} aria-label="Delete selected text" title="Delete text"><Trash2 size={15} /></button>
+                </>
+              )}
+              <button type="button" className="drawing-icon-button" onClick={undoMark} disabled={tool === "text" ? !currentPage.texts.length : !currentPage.strokes.length && !currentPage.texts.length} aria-label={tool === "text" ? "Undo last text" : "Undo last mark"} title="Undo"><Undo2 size={17} /></button>
+              <button type="button" className="drawing-icon-button" onClick={() => { setTextDraft(null); updatePage(currentPage.id, { strokes: [], texts: [] }); }} disabled={!currentPage.strokes.length && !currentPage.texts.length} aria-label="Clear page" title="Clear page"><Trash2 size={16} /></button>
             </div>
           </div>
 
           <div className={cn("drawing-canvas", currentPage.boardKind === "black" && "is-blackboard")}>
-            <svg viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`} preserveAspectRatio="none" onPointerDown={startStroke} onPointerMove={continueStroke} onPointerUp={finishStroke} onPointerCancel={finishStroke} onPointerLeave={() => setCursor((old) => ({ ...old, visible: false }))} role="img" aria-label={`${currentPage.boardKind}board drawing page ${currentIndex + 1}`}>
+            <svg className={cn(tool === "text" && "is-text-tool", tool === "eraser" && "is-eraser-tool")} viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`} preserveAspectRatio="none" onPointerDown={startStroke} onPointerMove={continueStroke} onPointerUp={finishStroke} onPointerCancel={finishStroke} onPointerLeave={() => setCursor((old) => ({ ...old, visible: false }))} role="img" aria-label={`${currentPage.boardKind}board drawing page ${currentIndex + 1}`}>
               {canvasStrokes.map((stroke, index) => (
                 <path key={index} d={strokePath(stroke.points)} fill="none" stroke={stroke.erase ? background : stroke.color} strokeWidth={stroke.width} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
               ))}
+              {currentPage.texts.map((item) => (
+                <g key={item.id}>
+                  {tool === "text" && item.id === selectedTextId && <rect x={item.x - 5} y={item.y - item.size} width={Math.max(item.size * 2, item.value.length * item.size * 0.62 + 10)} height={item.size * 1.45} rx={5} fill="none" stroke="#5686ed" strokeWidth={2} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+                  <text x={item.x} y={item.y} fill={item.color} fontSize={item.size} fontFamily="ui-rounded, system-ui, sans-serif" fontWeight="600" onPointerDown={(event) => handlePlacedTextPointerDown(event, item)}>{item.value}</text>
+                </g>
+              ))}
             </svg>
-            {cursor.visible && (
+            {textDraft && (
+              <form className="drawing-text-entry" style={{ left: `clamp(8px, ${(textDraft.x / BOARD_WIDTH) * 100}%, calc(100% - 240px))`, top: `clamp(8px, ${(textDraft.y / BOARD_HEIGHT) * 100}%, calc(100% - 46px))`, "--text-color": currentPage.penColor } as React.CSSProperties} onSubmit={(event) => { event.preventDefault(); saveTextDraft(); }}>
+                <input ref={textInputRef} value={textDraft.value} onChange={(event) => setTextDraft((draft) => draft ? { ...draft, value: event.target.value } : draft)} onKeyDown={(event) => { if (event.key === "Escape") setTextDraft(null); }} placeholder="Type on your board…" aria-label="Text to place on board" maxLength={120} />
+                <button type="submit" aria-label="Place text"><Check size={15} /></button>
+                <button type="button" onClick={() => setTextDraft(null)} aria-label="Cancel text"><X size={15} /></button>
+              </form>
+            )}
+            {cursor.visible && tool !== "text" && (
               <span className={cn("drawing-cursor", tool === "pen" ? "is-pen" : "is-eraser")} style={{ left: cursor.x, top: cursor.y, "--cursor-color": currentPage.penColor, "--cursor-size": `${currentPage.eraserSize}px` } as React.CSSProperties} />
             )}
           </div>
           <div className="drawing-page-footer">
             <button type="button" className="drawing-icon-button" onClick={() => movePage(-1)} disabled={currentIndex <= 0} aria-label="Previous page"><ChevronLeft size={17} /></button>
-            <span>{currentPage.boardKind === "white" ? "White page" : "Black page"} · {currentPage.strokes.length ? "Saved on this device" : "Blank page"}</span>
+            <span>{currentPage.boardKind === "white" ? "White page" : "Black page"} · {currentPage.strokes.length || currentPage.texts.length ? "Saved on this device" : "Blank page"}</span>
             <button type="button" className="drawing-icon-button" onClick={() => movePage(1)} disabled={currentIndex >= visiblePages.length - 1} aria-label="Next page"><ChevronRight size={17} /></button>
           </div>
         </>

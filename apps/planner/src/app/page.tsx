@@ -11,7 +11,7 @@ export default function HomePage() {
       preview
     >
       <TodayPlanner
-        initialDateKey="2026-12-01"
+        initialDateKey="2027-01-01"
         storageScope="local-preview"
       />
     </AppShell>

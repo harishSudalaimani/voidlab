@@ -1,23 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink-950: #171321;
-  --color-ink-900: #1e192b;
-  --color-ink-850: #261f35;
-  --color-ink-800: #302741;
-  --color-ink-700: #403451;
-  --color-ink-600: #594767;
-  --color-mist-100: #fff7f4;
-  --color-mist-200: #f5e9f0;
-  --color-mist-300: #d6c4d5;
-  --color-mist-400: #b3a0b6;
-  --color-mist-500: #8c7b95;
-  --color-accent-300: #ffb4c4;
-  --color-accent-400: #ff7898;
-  --color-accent-500: #f34c79;
-  --color-violet-300: #d5b5ff;
-  --color-violet-400: #b68bff;
-  --color-violet-500: #925cff;
+  --color-ink-950: #121612;
+  --color-ink-900: #191f18;
+  --color-ink-850: #20281f;
+  --color-ink-800: #2b3629;
+  --color-ink-700: #3d4c39;
+  --color-ink-600: #596a53;
+  --color-mist-100: #f5f7ed;
+  --color-mist-200: #e6ecd8;
+  --color-mist-300: #c8d3b9;
+  --color-mist-400: #a2b093;
+  --color-mist-500: #7e8d70;
+  --color-accent-300: #d1f685;
+  --color-accent-400: #b2e754;
+  --color-accent-500: #8fc934;
+  --color-violet-300: #b4ceff;
+  --color-violet-400: #8aaeff;
+  --color-violet-500: #6289f4;
   --font-sans: ui-rounded, "Avenir Next", "Trebuchet MS", system-ui,
     -apple-system, "Segoe UI", sans-serif;
 }
@@ -31,8 +31,8 @@
   body {
     background-color: var(--color-ink-950);
     background-image:
-      radial-gradient(55rem 38rem at 12% -8%, rgba(255, 91, 139, 0.15), transparent 60%),
-      radial-gradient(45rem 32rem at 95% 2%, rgba(159, 103, 255, 0.17), transparent 55%);
+      radial-gradient(55rem 38rem at 12% -8%, rgba(157, 211, 68, 0.13), transparent 60%),
+      radial-gradient(45rem 32rem at 95% 2%, rgba(246, 174, 69, 0.1), transparent 55%);
     background-attachment: fixed;
     color: var(--color-mist-100);
     font-family: var(--font-sans);
@@ -40,7 +40,7 @@
   }
 
   ::selection {
-    background: rgba(255, 120, 152, 0.4);
+    background: rgba(178, 231, 84, 0.4);
   }
 
   * {
@@ -170,18 +170,18 @@ html[data-theme="light"] .surface-strong {
 }
 
 .planner-viewport {
-  --planner-bg: #171321;
-  --planner-panel: #201a2d;
-  --planner-panel-raised: #2a223a;
-  --planner-border: rgba(255, 216, 238, 0.14);
-  --planner-border-soft: rgba(255, 216, 238, 0.09);
-  --planner-text: #fff7f4;
-  --planner-muted: #c0aec4;
-  --planner-subtle: #97859e;
-  --planner-input: #1b1628;
-  --planner-hover: rgba(255, 180, 205, 0.08);
-  --planner-accent: #ff7898;
-  --planner-accent-contrast: #311523;
+  --planner-bg: #121612;
+  --planner-panel: #1a2119;
+  --planner-panel-raised: #232d20;
+  --planner-border: rgba(216, 235, 190, 0.15);
+  --planner-border-soft: rgba(216, 235, 190, 0.09);
+  --planner-text: #f5f7ed;
+  --planner-muted: #b7c3a6;
+  --planner-subtle: #89977b;
+  --planner-input: #151c14;
+  --planner-hover: rgba(178, 231, 84, 0.09);
+  --planner-accent: #b2e754;
+  --planner-accent-contrast: #1b2611;
   --planner-display-font: ui-rounded, "Avenir Next", "Trebuchet MS", system-ui, sans-serif;
   min-height: 100vh;
   background: var(--planner-bg);
@@ -401,6 +401,13 @@ html[data-theme="light"] .planner-viewport {
   grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
   align-items: start;
   gap: 18px;
+}
+
+.planner-side-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .planner-board-card,
@@ -1432,6 +1439,16 @@ html[data-theme="light"] .planner-viewport {
   background: currentColor;
 }
 
+.drawing-text-size-mark {
+  display: inline-grid;
+  width: 15px;
+  height: 17px;
+  place-items: center;
+  font-family: Georgia, serif;
+  font-weight: 800;
+  line-height: 1;
+}
+
 .drawing-eraser-mark {
   width: var(--eraser-size);
   height: var(--eraser-size);
@@ -1442,6 +1459,13 @@ html[data-theme="light"] .planner-viewport {
 .drawing-toolbar-actions {
   gap: 4px;
   flex: 0 0 auto;
+}
+
+.drawing-text-selection-hint {
+  color: var(--planner-subtle);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .drawing-icon-button {
@@ -1493,6 +1517,18 @@ html[data-theme="light"] .planner-viewport {
   touch-action: none;
 }
 
+.drawing-canvas svg.is-text-tool {
+  cursor: text;
+}
+
+.drawing-canvas svg.is-eraser-tool text {
+  cursor: pointer;
+}
+
+.drawing-canvas svg.is-text-tool text {
+  cursor: text;
+}
+
 .drawing-cursor {
   position: absolute;
   z-index: 2;
@@ -1500,12 +1536,41 @@ html[data-theme="light"] .planner-viewport {
 }
 
 .drawing-cursor.is-pen {
-  width: 14px;
-  height: 18px;
-  transform: translate(-50%, -10%);
-  clip-path: polygon(50% 0, 100% 100%, 50% 76%, 0 100%);
-  background: var(--cursor-color);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  width: 12px;
+  height: 23px;
+  transform: translate(-50%, 22%) rotate(35deg);
+  border: 1px solid rgba(36, 43, 30, 0.55);
+  border-radius: 4px 4px 3px 3px;
+  background: linear-gradient(
+    to bottom,
+    #ffd46b 0 12%,
+    var(--cursor-color) 12% 68%,
+    #fff0a6 68% 78%,
+    var(--cursor-color) 78% 100%
+  );
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 2px 0 rgba(255, 255, 255, 0.38);
+}
+
+.drawing-cursor.is-pen::before {
+  position: absolute;
+  top: -7px;
+  left: 1px;
+  width: 8px;
+  height: 9px;
+  background: linear-gradient(to bottom, #fff0a6, #d6a84d);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  content: "";
+}
+
+.drawing-cursor.is-pen::after {
+  position: absolute;
+  top: -4px;
+  left: 5px;
+  width: 1px;
+  height: 4px;
+  border-radius: 1px;
+  background: #725c37;
+  content: "";
 }
 
 .drawing-cursor.is-eraser {
@@ -1516,6 +1581,78 @@ html[data-theme="light"] .planner-viewport {
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.35);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.drawing-text-entry {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  width: min(240px, calc(100% - 16px));
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(26, 36, 28, 0.22);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.drawing-text-entry input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 7px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-color);
+  font: 600 13px ui-rounded, "Avenir Next", system-ui, sans-serif;
+}
+
+.drawing-text-entry input::placeholder {
+  color: #77806d;
+  font-weight: 500;
+}
+
+.drawing-text-entry button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: #ecf3df;
+  color: #27351d;
+  cursor: pointer;
+}
+
+.drawing-text-entry button[type="submit"] {
+  background: #d8efaa;
+}
+
+.drawing-canvas.is-blackboard .drawing-text-entry {
+  border-color: rgba(221, 236, 198, 0.28);
+  background: rgba(28, 39, 30, 0.97);
+}
+
+.drawing-canvas.is-blackboard .drawing-text-entry input {
+  color: var(--text-color);
+}
+
+.drawing-canvas.is-blackboard .drawing-text-entry input::placeholder {
+  color: #b0bf9f;
+}
+
+.drawing-canvas.is-blackboard .drawing-text-entry button {
+  background: #35452e;
+  color: #eef6e3;
+}
+
+.drawing-canvas.is-blackboard .drawing-text-entry button[type="submit"] {
+  background: #91b948;
+  color: #1a2415;
 }
 
 .drawing-canvas.is-blackboard .drawing-cursor.is-eraser {
@@ -4121,7 +4258,7 @@ html[data-theme="light"] .planit-tab.is-active {
   --portfolio-muted: #b9adc9;
   --portfolio-line: rgba(226, 207, 255, 0.16);
   --portfolio-green: #6dffe0;
-  --portfolio-orange: #ff76bd;
+  --portfolio-orange: #8aaaff;
   font-family: ui-rounded, "Avenir Next", system-ui, sans-serif;
   background-image: radial-gradient(ellipse at 78% 10%, rgba(153, 82, 255, 0.2), transparent 38%), radial-gradient(ellipse at 5% 55%, rgba(28, 212, 192, 0.08), transparent 38%);
 }
@@ -4138,17 +4275,17 @@ html[data-theme="light"] .planit-tab.is-active {
 
 .public-portfolio[data-portfolio-theme="midnight"] .portfolio-hero-art {
   border-radius: 28px;
-  background: radial-gradient(circle at center, rgba(109, 255, 224, 0.25), transparent 26%), repeating-linear-gradient(135deg, rgba(255, 118, 189, 0.08) 0 1px, transparent 1px 18px);
+  background: radial-gradient(circle at center, rgba(109, 255, 224, 0.25), transparent 26%), repeating-linear-gradient(135deg, rgba(138, 170, 255, 0.1) 0 1px, transparent 1px 18px);
   box-shadow: 0 0 90px rgba(122, 71, 255, 0.18), inset 0 0 60px rgba(109, 255, 224, 0.07);
 }
 
 .public-portfolio[data-portfolio-theme="midnight"] .portfolio-art-orbit { border-color: rgba(109, 255, 224, 0.5); }
-.public-portfolio[data-portfolio-theme="midnight"] .portfolio-art-core { border-radius: 26px; background: linear-gradient(145deg, #282044, #192b36); box-shadow: 0 0 38px rgba(109, 255, 224, 0.14); }
-.public-portfolio[data-portfolio-theme="midnight"] .portfolio-contact { border-radius: 26px; background: linear-gradient(120deg, #26203a, #182d37); }
+.public-portfolio[data-portfolio-theme="midnight"] .portfolio-art-core { border-radius: 26px; background: linear-gradient(145deg, #252b47, #192f3b); box-shadow: 0 0 38px rgba(109, 255, 224, 0.14); }
+.public-portfolio[data-portfolio-theme="midnight"] .portfolio-contact { border-radius: 26px; background: linear-gradient(120deg, #222c45, #183640); }
 .public-portfolio[data-portfolio-theme="midnight"] .portfolio-project-card,
 .public-portfolio[data-portfolio-theme="midnight"] .portfolio-info-card { border-radius: 20px; background: rgba(255, 255, 255, 0.045); backdrop-filter: blur(12px); }
 .public-portfolio[data-portfolio-theme="midnight"] .portfolio-project-art { background: linear-gradient(140deg, #302044, #123c41); }
-.public-portfolio[data-portfolio-theme="midnight"] .portfolio-project-art.art-1 { background: linear-gradient(140deg, #3d2040, #282b4c); }
+.public-portfolio[data-portfolio-theme="midnight"] .portfolio-project-art.art-1 { background: linear-gradient(140deg, #263957, #282b4c); }
 .public-portfolio[data-portfolio-theme="midnight"] .portfolio-project-art.art-2 { background: linear-gradient(140deg, #153c3b, #222541); }
 
 .public-portfolio[data-portfolio-theme="cobalt"] {
@@ -4254,7 +4391,7 @@ html[data-theme="light"] .planit-tab.is-active {
 .public-portfolio[data-portfolio-theme="paper"] .portfolio-project-art.art-2 { background: #e4e6ff; }
 
 .theme-preview-editorial { background: linear-gradient(135deg, #fff6e8 0 50%, #167c78 50% 72%, #e6534f 72%) !important; }
-.theme-preview-midnight { background: radial-gradient(circle at 70% 36%, #6dffe0 0 8%, transparent 9%), linear-gradient(135deg, #11121f 0 60%, #7542a2 60% 77%, #ff76bd 77%) !important; }
+.theme-preview-midnight { background: radial-gradient(circle at 70% 36%, #6dffe0 0 8%, transparent 9%), linear-gradient(135deg, #111a2a 0 60%, #315b8c 60% 77%, #8aaaff 77%) !important; }
 .theme-preview-cobalt { background: repeating-linear-gradient(135deg, #eff3ff 0 13px, #d3dcff 13px 17px, #315bff 17px 24px, #ff6a36 24px 30px) !important; }
 .theme-preview-atelier { background: radial-gradient(circle at 70% 42%, #ffca4c 0 15%, transparent 16%), linear-gradient(130deg, #ffefd9 0 54%, #8a3b72 54% 78%, #d54576 78%) !important; }
 .theme-preview-paper { background: linear-gradient(135deg, #f4fff9 0 42%, #b8efdc 42% 62%, #087d63 62% 80%, #ff4678 80%) !important; }
@@ -4268,4 +4405,533 @@ html[data-theme="light"] .planit-tab.is-active {
   }
 
   .portfolio-theme-option:hover { transform: translateY(-2px); }
+}
+
+html:not([data-theme="light"]) .planner-viewport {
+  background:
+    radial-gradient(46rem 28rem at 2% -8%, rgba(167, 221, 72, 0.12), transparent 70%),
+    radial-gradient(38rem 30rem at 100% 0%, rgba(244, 180, 67, 0.09), transparent 65%),
+    var(--planner-bg);
+}
+
+html:not([data-theme="light"]) .planit-header h1 {
+  background: linear-gradient(100deg, var(--planner-text) 14%, #c9f275 62%, #ffd071);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+html:not([data-theme="light"]) .planit-primary-button {
+  background: linear-gradient(115deg, #c5ee62, #9cdb45 62%, #ffd166);
+  box-shadow: 0 8px 22px -13px rgba(166, 211, 69, 0.66);
+  color: #202817;
+}
+
+html:not([data-theme="light"]) .planit-primary-button:hover {
+  background: linear-gradient(115deg, #d7f58e, #b9ee70 62%, #ffdf8a);
+}
+
+.planner-day-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.planner-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: clamp(16px, 2.5vw, 26px);
+  border-radius: 22px;
+}
+
+.planner-calendar-heading,
+.planner-calendar-actions,
+.planner-month-nav {
+  display: flex;
+  align-items: center;
+}
+
+.planner-calendar-heading {
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.planner-calendar-kicker {
+  color: var(--planner-accent);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.16em;
+}
+
+.planner-calendar-heading h2 {
+  margin: 4px 0 0;
+  color: var(--planner-text);
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 850;
+  letter-spacing: -0.055em;
+}
+
+.planner-calendar-heading p {
+  margin: 5px 0 0;
+  color: var(--planner-muted);
+  font-size: 12px;
+}
+
+.planner-calendar-actions {
+  gap: 10px;
+}
+
+.planner-month-nav {
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--planner-border-soft);
+  border-radius: 14px;
+  background: var(--planner-input);
+}
+
+.planner-month-nav .planner-icon-button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.planner-date-jump {
+  position: relative;
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid var(--planner-border);
+  border-radius: 13px;
+  background: var(--planner-panel-raised);
+  color: var(--planner-text);
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.planner-date-jump svg {
+  color: var(--planner-accent);
+}
+
+.planner-date-jump input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.planner-month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: clamp(4px, 1vw, 10px);
+}
+
+.planner-weekday-label {
+  display: grid;
+  min-height: 28px;
+  place-items: center;
+  color: var(--planner-subtle);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.planner-month-grid .planner-day-button {
+  min-width: 0;
+  min-height: clamp(38px, 5vw, 56px);
+  aspect-ratio: 1.3;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: var(--planner-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.planner-month-grid .planner-day-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--planner-accent) 38%, transparent);
+  background: var(--planner-hover);
+  transform: translateY(-1px);
+}
+
+.planner-month-grid .planner-day-button.is-outside-month:not(:disabled) {
+  color: var(--planner-muted);
+  opacity: 0.55;
+}
+
+.planner-month-grid .planner-day-button.is-selected {
+  border-color: var(--planner-accent);
+  background: var(--planner-accent);
+  color: var(--planner-accent-contrast);
+  box-shadow: 0 5px 18px -10px var(--planner-accent);
+}
+
+.planner-month-grid .planner-day-button:disabled {
+  border-color: transparent;
+  background: transparent;
+}
+
+.planner-month-grid .planner-day-button:focus-visible,
+.planner-date-jump:focus-within,
+.planner-month-nav .planner-icon-button:focus-visible {
+  outline: 2px solid var(--planner-accent);
+  outline-offset: 2px;
+}
+
+html:not([data-theme="light"]) .planner-calendar {
+  border-color: rgba(196, 224, 151, 0.17);
+  background: linear-gradient(145deg, #1b2119, #171d16 70%, #202318);
+  box-shadow: 0 20px 65px -45px rgba(0, 0, 0, 0.95), inset 0 1px rgba(255, 255, 255, 0.035);
+}
+
+html:not([data-theme="light"]) .planner-date-jump {
+  border-color: rgba(178, 231, 84, 0.24);
+  background: rgba(178, 231, 84, 0.07);
+}
+
+@media (max-width: 620px) {
+  .planner-calendar-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .planner-calendar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .planner-month-grid {
+    gap: 3px;
+  }
+
+  .planner-month-grid .planner-day-button {
+    min-height: 40px;
+    aspect-ratio: 1;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  .planner-weekday-label {
+    font-size: 9px;
+  }
+}
+
+.planner-side-column .planner-calendar {
+  gap: 10px;
+  padding: 15px;
+  border-radius: 18px;
+}
+
+.planner-side-column .planner-calendar-heading {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.planner-side-column .planner-calendar-heading h2 {
+  font-size: 21px;
+}
+
+.planner-side-column .planner-calendar-heading p {
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+.planner-side-column .planner-calendar-actions {
+  width: 100%;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.planner-side-column .planner-month-nav {
+  gap: 2px;
+  padding: 2px;
+  border-radius: 11px;
+}
+
+.planner-side-column .planner-month-nav .planner-icon-button {
+  width: 31px;
+  height: 31px;
+}
+
+.planner-side-column .planner-date-jump {
+  min-height: 36px;
+  gap: 6px;
+  padding-inline: 9px;
+  border-radius: 10px;
+  font-size: 10px;
+}
+
+.planner-side-column .planner-month-grid {
+  gap: 3px;
+}
+
+.planner-side-column .planner-weekday-label {
+  min-height: 22px;
+  font-size: 8px;
+}
+
+.planner-side-column .planner-month-grid .planner-day-button {
+  min-height: 34px;
+  aspect-ratio: auto;
+  border-radius: 9px;
+  font-size: 11px;
+}
+
+@media (max-width: 800px) {
+  .planner-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Give Kiroku's controls a playful, polished feel in both themes. */
+.planit-tabs {
+  align-self: flex-start;
+  max-width: 100%;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--planner-border-soft);
+  border-radius: 16px;
+  background: var(--planner-input);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.035);
+}
+
+.planit-tab {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 12px;
+  transition: color 160ms ease, background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.planit-tab:hover {
+  border-color: color-mix(in srgb, var(--planner-accent) 20%, transparent);
+  background: color-mix(in srgb, var(--planner-accent) 7%, transparent);
+  transform: translateY(-1px);
+}
+
+.planit-tab.is-active {
+  border-color: color-mix(in srgb, var(--planner-accent) 45%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--planner-accent) 24%, var(--planner-panel)), color-mix(in srgb, var(--planner-accent) 11%, var(--planner-panel)));
+  color: var(--planner-accent);
+  box-shadow: 0 4px 14px -10px var(--planner-accent), inset 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.planner-board-switch,
+.drawing-board-toggle,
+.drawing-tool-switch,
+.drawing-size-presets,
+.study-view-switch {
+  gap: 4px;
+  padding: 4px;
+  border-color: color-mix(in srgb, var(--planner-accent) 15%, var(--planner-border));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--planner-accent) 4%, var(--planner-input));
+}
+
+.planner-board-switch button,
+.drawing-board-toggle button,
+.drawing-tool-switch button,
+.drawing-size-presets button,
+.study-view-switch button {
+  border-radius: 9px;
+  transition: color 150ms ease, background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.planner-board-switch button:hover,
+.drawing-board-toggle button:hover,
+.drawing-tool-switch button:hover,
+.drawing-size-presets button:hover,
+.study-view-switch button:hover {
+  background: color-mix(in srgb, var(--planner-accent) 9%, transparent);
+  color: var(--planner-text);
+}
+
+.planner-board-switch button.is-active,
+.drawing-board-toggle button.is-active,
+.drawing-tool-switch button.is-active,
+.drawing-size-presets button.is-active,
+.study-view-switch button.is-active {
+  background: linear-gradient(140deg, color-mix(in srgb, var(--planner-accent) 88%, white), var(--planner-accent));
+  color: var(--planner-accent-contrast);
+  box-shadow: 0 3px 10px -6px var(--planner-accent), inset 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.planner-theme-button,
+.planit-install-button,
+.planit-primary-button,
+.planit-secondary-button,
+.planner-icon-button,
+.planner-tool-button,
+.drawing-icon-button,
+.drawing-fullscreen-button,
+.study-fullscreen-button,
+.planner-date-jump,
+.bucket-notebook-button,
+.planner-task-form button,
+.planner-task-check,
+.planner-task-delete {
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, filter 160ms ease;
+}
+
+.planner-theme-button {
+  gap: 10px;
+  border-color: color-mix(in srgb, var(--planner-accent) 30%, var(--planner-border));
+  border-radius: 999px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--planner-accent) 9%, var(--planner-panel-raised)), var(--planner-panel));
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.07), 0 6px 18px -14px var(--planner-accent);
+}
+
+.planner-theme-button::after {
+  width: 28px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--planner-accent) 38%, transparent);
+  border-radius: 999px;
+  background: radial-gradient(circle at 8px 50%, var(--planner-accent) 0 4px, transparent 4.5px), color-mix(in srgb, var(--planner-accent) 12%, var(--planner-input));
+  content: "";
+  transition: background 180ms ease;
+}
+
+html[data-theme="light"] .planner-theme-button::after {
+  background: radial-gradient(circle at 20px 50%, var(--planner-accent) 0 4px, transparent 4.5px), color-mix(in srgb, var(--planner-accent) 12%, var(--planner-input));
+}
+
+.planner-theme-button:hover,
+.planit-install-button:hover,
+.planit-secondary-button:hover,
+.planner-date-jump:hover,
+.bucket-notebook-button:hover {
+  border-color: var(--planner-accent);
+  box-shadow: 0 7px 20px -14px var(--planner-accent);
+  transform: translateY(-2px);
+}
+
+.planit-primary-button {
+  border: 1px solid color-mix(in srgb, var(--planner-accent) 70%, transparent);
+  box-shadow: 0 8px 22px -14px var(--planner-accent), inset 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.planit-primary-button:hover:not(:disabled),
+.planner-task-form button:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 10px 24px -13px var(--planner-accent), inset 0 1px rgba(255, 255, 255, 0.45);
+  transform: translateY(-2px);
+}
+
+.planner-task-check {
+  border-radius: 8px;
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.planner-task-check:hover {
+  border-color: var(--planner-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--planner-accent) 13%, transparent);
+  transform: scale(1.08);
+}
+
+.planner-task-check[aria-pressed="true"] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--planner-accent) 17%, transparent), inset 0 1px rgba(255, 255, 255, 0.3);
+}
+
+.bucket-filter {
+  border-color: transparent;
+  transition: color 150ms ease, background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.bucket-filter:hover {
+  border-color: color-mix(in srgb, var(--planner-accent) 28%, transparent);
+  transform: translateY(-1px);
+}
+
+.bucket-filter.is-selected {
+  border-color: color-mix(in srgb, var(--planner-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--planner-accent) 14%, var(--planner-panel));
+  color: var(--planner-accent);
+}
+
+.planner-icon-button:hover:not(:disabled),
+.planner-tool-button:hover:not(:disabled),
+.drawing-icon-button:hover:not(:disabled),
+.drawing-fullscreen-button:hover,
+.study-fullscreen-button:hover {
+  box-shadow: 0 6px 16px -12px var(--planner-accent);
+  transform: translateY(-1px);
+}
+
+.planit-tab:focus-visible,
+.planner-theme-button:focus-visible,
+.planner-icon-button:focus-visible,
+.planner-tool-button:focus-visible,
+.planner-board-switch button:focus-visible,
+.drawing-board-toggle button:focus-visible,
+.drawing-tool-switch button:focus-visible,
+.drawing-size-presets button:focus-visible,
+.study-view-switch button:focus-visible,
+.planit-primary-button:focus-visible,
+.planit-secondary-button:focus-visible,
+.planner-task-form button:focus-visible,
+.planner-task-check:focus-visible,
+.planner-task-delete:focus-visible,
+.planit-install-button:focus-visible,
+.bucket-filter:focus-visible,
+.drawing-icon-button:focus-visible,
+.drawing-fullscreen-button:focus-visible,
+.study-fullscreen-button:focus-visible {
+  outline: 2px solid var(--planner-accent);
+  outline-offset: 3px;
+}
+
+.planner-theme-button:active,
+.planit-primary-button:active:not(:disabled),
+.planit-secondary-button:active,
+.planner-icon-button:active:not(:disabled),
+.planner-tool-button:active:not(:disabled),
+.drawing-icon-button:active:not(:disabled),
+.drawing-fullscreen-button:active,
+.study-fullscreen-button:active {
+  transform: scale(0.97);
+}
+
+.planner-size-control input[type="range"] {
+  height: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--planner-accent) 23%, var(--planner-border));
+  accent-color: var(--planner-accent);
+}
+
+.planner-size-control input[type="range"]::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  border: 3px solid var(--planner-panel);
+  border-radius: 50%;
+  background: var(--planner-accent);
+  box-shadow: 0 0 0 1px var(--planner-accent), 0 3px 10px -4px var(--planner-accent);
+  appearance: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planit-tab,
+  .planner-theme-button::after,
+  .planner-theme-button,
+  .planit-install-button,
+  .planit-primary-button,
+  .planit-secondary-button,
+  .planner-icon-button,
+  .planner-tool-button,
+  .drawing-icon-button,
+  .drawing-fullscreen-button,
+  .study-fullscreen-button {
+    transition-duration: 0.01ms;
+  }
 }
