@@ -13,13 +13,15 @@ function randomBetween(min: number, max: number) {
   return min + Math.random() * (max - min);
 }
 
-export function WelcomeCosmos() {
+export function WelcomeCosmos({ theme = "dark" }: { theme?: "dark" | "light" }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d", { alpha: true });
     if (!canvas || !context) return;
+    const surface = canvas as HTMLCanvasElement;
+    const drawingContext = context as CanvasRenderingContext2D;
 
     let layer: HTMLCanvasElement | null = null;
     let width = 0;
@@ -30,12 +32,12 @@ export function WelcomeCosmos() {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     function createStarLayer() {
-      const bounds = canvas.getBoundingClientRect();
+      const bounds = surface.getBoundingClientRect();
       width = Math.max(1, bounds.width);
       height = Math.max(1, bounds.height);
       pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
-      canvas.width = Math.round(width * pixelRatio);
-      canvas.height = Math.round(height * pixelRatio);
+      surface.width = Math.round(width * pixelRatio);
+      surface.height = Math.round(height * pixelRatio);
 
       layer = document.createElement("canvas");
       layer.width = Math.round((width + EDGE * 2) * pixelRatio);
@@ -48,13 +50,15 @@ export function WelcomeCosmos() {
       const centerY = EDGE + height * 0.5;
       const maxRadius = Math.max(width, height) * 0.78;
       const haze = layerContext.createRadialGradient(centerX, centerY, 0, centerX, centerY, maxRadius);
-      haze.addColorStop(0, "rgba(111, 139, 77, 0.095)");
-      haze.addColorStop(0.38, "rgba(159, 143, 93, 0.045)");
-      haze.addColorStop(1, "rgba(111, 139, 77, 0)");
+      haze.addColorStop(0, theme === "light" ? "rgba(198, 61, 112, 0.12)" : "rgba(178, 231, 84, 0.13)");
+      haze.addColorStop(0.38, theme === "light" ? "rgba(124, 82, 145, 0.06)" : "rgba(222, 192, 123, 0.065)");
+      haze.addColorStop(1, theme === "light" ? "rgba(198, 61, 112, 0)" : "rgba(178, 231, 84, 0)");
       layerContext.fillStyle = haze;
       layerContext.fillRect(0, 0, width + EDGE * 2, height + EDGE * 2);
 
-      const colors = ["#405638", "#806037", "#52677d", "#304432"];
+      const colors = theme === "light"
+        ? ["#b93468", "#76508d", "#467b74", "#d47951"]
+        : ["#c9f47c", "#e6c474", "#8edfc9", "#a8d998"];
       twinkles = [];
       for (let index = 0; index < PARTICLE_COUNT; index += 1) {
         let x: number;
@@ -93,8 +97,8 @@ export function WelcomeCosmos() {
       const offsetY = (Math.cos(time * 0.00022) + 1) * EDGE;
       const sourceX = Math.round(offsetX * pixelRatio);
       const sourceY = Math.round(offsetY * pixelRatio);
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(
+      drawingContext.clearRect(0, 0, surface.width, surface.height);
+      drawingContext.drawImage(
         layer,
         sourceX,
         sourceY,
@@ -102,29 +106,29 @@ export function WelcomeCosmos() {
         Math.round(height * pixelRatio),
         0,
         0,
-        canvas.width,
-        canvas.height,
+        surface.width,
+        surface.height,
       );
 
       if (!reduceMotion) {
-        context.save();
-        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        drawingContext.save();
+        drawingContext.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         for (const star of twinkles) {
           const x = star.x - offsetX;
           const y = star.y - offsetY;
           if (x < 0 || y < 0 || x > width || y > height) continue;
-          context.globalAlpha = 0.2 + (Math.sin(time * star.speed + star.phase) + 1) * 0.28;
-          context.fillStyle = star.color;
-          context.fillRect(x, y, 1, 1);
+          drawingContext.globalAlpha = 0.2 + (Math.sin(time * star.speed + star.phase) + 1) * 0.28;
+          drawingContext.fillStyle = star.color;
+          drawingContext.fillRect(x, y, 1, 1);
         }
-        context.restore();
+        drawingContext.restore();
       }
 
       if (!reduceMotion) animationFrame = window.requestAnimationFrame(draw);
     }
 
     function resize() {
-      const bounds = canvas.getBoundingClientRect();
+      const bounds = surface.getBoundingClientRect();
       const nextWidth = Math.max(1, bounds.width);
       const nextHeight = Math.max(1, bounds.height);
       const nextPixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
@@ -135,7 +139,7 @@ export function WelcomeCosmos() {
     }
 
     const observer = new ResizeObserver(resize);
-    observer.observe(canvas);
+    observer.observe(surface);
     resize();
     const onVisibilityChange = () => {
       if (document.hidden) {
@@ -152,7 +156,7 @@ export function WelcomeCosmos() {
       window.cancelAnimationFrame(animationFrame);
       layer = null;
     };
-  }, []);
+  }, [theme]);
 
   return <canvas ref={canvasRef} className="welcome-cosmos-canvas" aria-hidden="true" />;
 }

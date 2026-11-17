@@ -2,45 +2,38 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   BookOpen,
-  CalendarDays,
   Check,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Download,
+  Heart,
+  Images,
   Lightbulb,
-  Maximize2,
-  Minimize2,
   Moon,
   NotebookPen,
   PenLine,
   Plus,
-  Search,
-  Shuffle,
   Sun,
   Trash2,
   X,
-  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/components/logo";
 import { DrawingNotebook } from "@/components/drawing-notebook";
-import { FinanceDashboard } from "@/components/finance-dashboard";
 import { PortfolioEditor } from "@/components/portfolio-editor";
+import { Gallery } from "@/components/gallery";
+import { ActivityTracker } from "@/components/activity-tracker";
+import { WelcomeCosmos } from "@/components/welcome-cosmos";
+import { CollectionBoard } from "@/components/collection-board";
 
 type DayTask = { id: string; title: string; done: boolean };
 type Theme = "dark" | "light";
-type Section = "planner" | "study" | "bucket" | "finance" | "portfolio";
-type StudyView = "note" | "notebook";
-type BucketView = "list" | "notebook";
-type StudyNote = { id: string; title: string; subject: string; body: string; updatedAt: number };
-type BucketItem = {
-  id: string;
-  title: string;
-  category: "Places" | "Skills" | "Experiences" | "Other";
-  done: boolean;
-  createdAt: number;
-};
+type Section = "planner" | "study" | "bucket" | "wishlist" | "activity" | "portfolio" | "gallery";
+type NotebookStyle = "linen" | "botanical" | "modern" | "midnight";
+type NotebookMeta = { id: string; name: string; style: NotebookStyle; paperColor: string; createdAt: number };
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
@@ -48,7 +41,18 @@ type InstallPromptEvent = Event & {
 
 const START_DATE = "2027-01-01";
 const END_DATE = "2027-12-31";
-const BUCKET_CATEGORIES: BucketItem["category"][] = ["Places", "Skills", "Experiences", "Other"];
+const NOTEBOOK_STYLES: { id: NotebookStyle; name: string; description: string }[] = [
+  { id: "linen", name: "Linen", description: "Quiet cloth texture" },
+  { id: "botanical", name: "Botanical", description: "Soft garden green" },
+  { id: "modern", name: "Modern", description: "Clean graphic cover" },
+  { id: "midnight", name: "Midnight", description: "Deep dark cover" },
+];
+const NOTEBOOK_PAPERS = [
+  { color: "#fffdf5", label: "Ivory" },
+  { color: "#f3e8d4", label: "Cream" },
+  { color: "#e8efe3", label: "Sage" },
+  { color: "#202923", label: "Dark" },
+];
 
 function dateKey(date: Date) {
   return `${String(date.getFullYear()).padStart(4, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -98,27 +102,17 @@ export function TodayPlanner({
   const [installHelpOpen, setInstallHelpOpen] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 
-  const [notes, setNotes] = useState<StudyNote[]>([]);
-  const [loadedNotesKey, setLoadedNotesKey] = useState<string | null>(null);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [studyView, setStudyView] = useState<StudyView>("note");
-  const [studyFullscreen, setStudyFullscreen] = useState(false);
-  const [noteSearch, setNoteSearch] = useState("");
-  const [bucketItems, setBucketItems] = useState<BucketItem[]>([]);
-  const [loadedBucketKey, setLoadedBucketKey] = useState<string | null>(null);
-  const [bucketView, setBucketView] = useState<BucketView>("list");
-  const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
-  const [bucketSearch, setBucketSearch] = useState("");
-  const [bucketFilter, setBucketFilter] = useState("All");
-  const [newBucketTitle, setNewBucketTitle] = useState("");
-  const [newBucketCategory, setNewBucketCategory] = useState<BucketItem["category"]>("Experiences");
-  const [spotlightId, setSpotlightId] = useState<string | null>(null);
+  const [notebooks, setNotebooks] = useState<NotebookMeta[]>([]);
+  const [loadedNotebooksKey, setLoadedNotebooksKey] = useState<string | null>(null);
+  const [activeNotebookId, setActiveNotebookId] = useState<string | null>(null);
+  const [showNotebookForm, setShowNotebookForm] = useState(false);
+  const [newNotebookName, setNewNotebookName] = useState("");
+  const [newNotebookStyle, setNewNotebookStyle] = useState<NotebookStyle>("linen");
+  const [newNotebookPaper, setNewNotebookPaper] = useState(NOTEBOOK_PAPERS[0].color);
 
   const taskStorageKey = `planit-day-v1:${encodeURIComponent(storageScope)}:${selectedKey}`;
-  const notesStorageKey = `planit-study-notes-v1:${encodeURIComponent(storageScope)}`;
-  const bucketStorageKey = `planit-bucket-v1:${encodeURIComponent(storageScope)}`;
-  const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
-  const selectedBucketItem = bucketItems.find((item) => item.id === selectedBucketId) ?? null;
+  const notebooksStorageKey = `planit-notebook-library-v1:${encodeURIComponent(storageScope)}`;
+  const activeNotebook = notebooks.find((notebook) => notebook.id === activeNotebookId) ?? null;
   const fullDate = new Intl.DateTimeFormat("en", {
     weekday: "long",
     month: "long",
@@ -164,22 +158,13 @@ export function TodayPlanner({
   }, [loadedTaskKey, taskStorageKey, tasks]);
 
   useEffect(() => {
-    setNotes(readArray<StudyNote>(notesStorageKey));
-    setLoadedNotesKey(notesStorageKey);
-  }, [notesStorageKey]);
+    setNotebooks(readArray<NotebookMeta>(notebooksStorageKey));
+    setLoadedNotebooksKey(notebooksStorageKey);
+  }, [notebooksStorageKey]);
 
   useEffect(() => {
-    if (loadedNotesKey === notesStorageKey) window.localStorage.setItem(notesStorageKey, JSON.stringify(notes));
-  }, [loadedNotesKey, notesStorageKey, notes]);
-
-  useEffect(() => {
-    setBucketItems(readArray<BucketItem>(bucketStorageKey));
-    setLoadedBucketKey(bucketStorageKey);
-  }, [bucketStorageKey]);
-
-  useEffect(() => {
-    if (loadedBucketKey === bucketStorageKey) window.localStorage.setItem(bucketStorageKey, JSON.stringify(bucketItems));
-  }, [bucketItems, bucketStorageKey, loadedBucketKey]);
+    if (loadedNotebooksKey === notebooksStorageKey) window.localStorage.setItem(notebooksStorageKey, JSON.stringify(notebooks));
+  }, [loadedNotebooksKey, notebooks, notebooksStorageKey]);
 
   const calendarDays = useMemo(() => {
     const firstOfMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1, 12);
@@ -192,21 +177,6 @@ export function TodayPlanner({
       return date;
     });
   }, [calendarMonth]);
-
-  const filteredNotes = useMemo(() => {
-    const query = noteSearch.trim().toLowerCase();
-    return [...notes]
-      .filter((note) => !query || `${note.title} ${note.subject} ${note.body}`.toLowerCase().includes(query))
-      .sort((left, right) => right.updatedAt - left.updatedAt);
-  }, [noteSearch, notes]);
-
-  const filteredBucketItems = useMemo(() => {
-    const query = bucketSearch.trim().toLowerCase();
-    return bucketItems.filter((item) =>
-      (bucketFilter === "All" || item.category === bucketFilter)
-      && (!query || item.title.toLowerCase().includes(query)),
-    );
-  }, [bucketFilter, bucketItems, bucketSearch]);
 
   function selectDate(key: string) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || key < START_DATE || key > END_DATE) return;
@@ -249,44 +219,27 @@ export function TodayPlanner({
     setNewTask("");
   }
 
-  function createNote() {
-    const note: StudyNote = { id: crypto.randomUUID(), title: "", subject: "", body: "", updatedAt: Date.now() };
-    setNotes((current) => [note, ...current]);
-    setSelectedNoteId(note.id);
-    setStudyView("note");
-  }
-
-  function updateSelectedNote(patch: Partial<Pick<StudyNote, "title" | "subject" | "body">>) {
-    if (!selectedNoteId) return;
-    setNotes((current) => current.map((note) => note.id === selectedNoteId ? { ...note, ...patch, updatedAt: Date.now() } : note));
-  }
-
-  function deleteNote(id: string) {
-    const next = notes.filter((note) => note.id !== id);
-    setNotes(next);
-    if (selectedNoteId === id) {
-      setSelectedNoteId(next[0]?.id ?? null);
-      setStudyView("note");
-    }
-  }
-
-  function addBucketItem(event: React.FormEvent<HTMLFormElement>) {
+  function createNotebook(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const title = newBucketTitle.trim();
-    if (!title) return;
-    setBucketItems((current) => [{ id: crypto.randomUUID(), title, category: newBucketCategory, done: false, createdAt: Date.now() }, ...current]);
-    setNewBucketTitle("");
-  }
-
-  function surpriseMe() {
-    const available = bucketItems.filter((item) => !item.done);
-    if (available.length) setSpotlightId(available[Math.floor(Math.random() * available.length)].id);
+    const name = newNotebookName.trim();
+    if (!name) return;
+    const notebook: NotebookMeta = {
+      id: crypto.randomUUID(),
+      name,
+      style: newNotebookStyle,
+      paperColor: newNotebookPaper,
+      createdAt: Date.now(),
+    };
+    setNotebooks((current) => [notebook, ...current]);
+    setShowNotebookForm(false);
+    setNewNotebookName("");
   }
 
   const visibleTasks = loadedTaskKey === taskStorageKey ? tasks : [];
 
   return (
     <div className="planit-app">
+      <div className="workspace-cosmos" aria-hidden="true"><WelcomeCosmos theme={theme} /></div>
       <header className="planit-header">
         <div className="planner-brand-lockup">
           <Logo withWordmark={false} />
@@ -316,23 +269,29 @@ export function TodayPlanner({
           <CalendarDays size={17} /> Planner
         </button>
         <button type="button" role="tab" aria-selected={section === "study"} className={cn("planit-tab", section === "study" && "is-active")} onClick={() => setSection("study")}>
-          <BookOpen size={17} /> Study notes
+          <NotebookPen size={17} /> Notebook
         </button>
         <button type="button" role="tab" aria-selected={section === "bucket"} className={cn("planit-tab", section === "bucket" && "is-active")} onClick={() => setSection("bucket")}>
           <Lightbulb size={17} /> Bucket list
         </button>
-        <button type="button" role="tab" aria-selected={section === "finance"} className={cn("planit-tab", section === "finance" && "is-active")} onClick={() => setSection("finance")}>
-          <Wallet size={17} /> Finance
+        <button type="button" role="tab" aria-selected={section === "wishlist"} className={cn("planit-tab", section === "wishlist" && "is-active")} onClick={() => setSection("wishlist")}>
+          <Heart size={17} /> Wishlist
+        </button>
+        <button type="button" role="tab" aria-selected={section === "activity"} className={cn("planit-tab", section === "activity" && "is-active")} onClick={() => setSection("activity")}>
+          <Activity size={17} /> Activity
         </button>
         <button type="button" role="tab" aria-selected={section === "portfolio"} className={cn("planit-tab", section === "portfolio" && "is-active")} onClick={() => setSection("portfolio")}>
-          <PenLine size={17} /> Portfolio editor
+          <PenLine size={17} /> Persona
+        </button>
+        <button type="button" role="tab" aria-selected={section === "gallery"} className={cn("planit-tab", section === "gallery" && "is-active")} onClick={() => setSection("gallery")}>
+          <Images size={17} /> Gallery
         </button>
       </nav>
 
       {section === "planner" && (
         <div className="planner-screen" role="tabpanel">
           <div className="planner-workspace">
-            <DrawingNotebook storageScope={storageScope} bookId={`planner-${selectedKey}`} title="Daily notebook" legacyDateKey={selectedKey} />
+            <DrawingNotebook storageScope={storageScope} bookId={`planner-${selectedKey}`} title="Planner board" legacyDateKey={selectedKey} compactControls />
 
             <aside className="planner-side-column">
               <section className="planner-tasks-card" aria-label="Tasks for this date">
@@ -392,104 +351,63 @@ export function TodayPlanner({
       )}
 
       {section === "study" && (
-        <section className="planit-section" role="tabpanel" aria-label="Study notes">
-          <div className="section-title-row">
-            <div><h2>Study notes</h2></div>
-            <button type="button" className="planit-primary-button" onClick={createNote}><Plus size={17} /> New note</button>
-          </div>
-          <div className="study-layout">
-            <aside className="study-note-list">
-              <label className="planit-search"><Search size={16} /><input value={noteSearch} onChange={(event) => setNoteSearch(event.target.value)} placeholder="Search your notes" /></label>
-              {filteredNotes.length ? filteredNotes.map((note) => (
-                <button key={note.id} type="button" className={cn("study-note-item", note.id === selectedNoteId && "is-selected")} onClick={() => setSelectedNoteId(note.id)}>
-                  <strong>{note.title || "Untitled note"}</strong>
-                  <span>{note.subject || "No subject"} · {new Date(note.updatedAt).toLocaleDateString()}</span>
-                  <small>{note.body || "Start writing…"}</small>
-                </button>
-              )) : <p className="planit-empty">No notes</p>}
-            </aside>
-            <div className={cn("study-editor", studyFullscreen && studyView === "note" && "is-fullscreen")}>
-              {selectedNote ? (
-                <>
-                  <div className="study-editor-top">
-                    <div className="study-view-switch" role="group" aria-label="Study note view">
-                      <button type="button" className={cn(studyView === "note" && "is-active")} onClick={() => { setStudyView("note"); setStudyFullscreen(false); }}>Text note</button>
-                      <button type="button" className={cn(studyView === "notebook" && "is-active")} onClick={() => { setStudyView("notebook"); setStudyFullscreen(false); }}><NotebookPen size={15} /> Board pages</button>
-                    </div>
-                    {studyView === "note" && <button type="button" className="study-fullscreen-button" onClick={() => setStudyFullscreen((value) => !value)} aria-label={studyFullscreen ? "Exit full screen note" : "View note full screen"}>{studyFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>}
-                    <button type="button" className="planner-tool-button planner-action-button" onClick={() => deleteNote(selectedNote.id)} aria-label="Delete note"><Trash2 size={16} /></button>
-                  </div>
-                  {studyView === "note" ? (
-                    <>
-                      <input className="study-title-input" value={selectedNote.title} onChange={(event) => updateSelectedNote({ title: event.target.value })} placeholder="Note title" maxLength={120} />
-                      <input className="study-subject-input" value={selectedNote.subject} onChange={(event) => updateSelectedNote({ subject: event.target.value })} placeholder="Subject or class" maxLength={60} />
-                      <textarea className="study-body-input" value={selectedNote.body} onChange={(event) => updateSelectedNote({ body: event.target.value })} placeholder="Start writing your notes…" />
-                    </>
-                  ) : (
-                    <DrawingNotebook storageScope={storageScope} bookId={`study-${selectedNote.id}`} title={`${selectedNote.title || "Study note"} notebook`} />
-                  )}
-                </>
-              ) : (
-                <div className="study-empty-editor"><BookOpen size={28} /><button type="button" className="planit-primary-button" onClick={createNote}><Plus size={17} /> New note</button></div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {section === "bucket" && (
-        <section className="planit-section" role="tabpanel" aria-label="Bucket list">
-          {bucketView === "notebook" && selectedBucketItem ? (
+        <section className="planit-section notebook-library" role="tabpanel" aria-label="Notebook">
+          {activeNotebook ? (
             <>
-              <div className="section-title-row bucket-notebook-header">
-                <div><h2>{selectedBucketItem.title}</h2></div>
-                <button type="button" className="planit-secondary-button" onClick={() => setBucketView("list")}><ChevronLeft size={16} /> Back to list</button>
+              <div className="section-title-row notebook-open-heading">
+                <button type="button" className="planit-secondary-button" onClick={() => setActiveNotebookId(null)}><ChevronLeft size={16} /> Notebooks</button>
+                <h2>{activeNotebook.name}</h2>
               </div>
-              <DrawingNotebook storageScope={storageScope} bookId={`bucket-${selectedBucketItem.id}`} title="Idea notebook" />
+              <DrawingNotebook storageScope={storageScope} bookId={`study-${activeNotebook.id}`} title={activeNotebook.name} compactControls notebookMode paperColor={activeNotebook.paperColor} />
             </>
           ) : (
             <>
-          <div className="section-title-row">
-            <div><h2>Bucket list</h2></div>
-            <button type="button" className="planit-secondary-button" onClick={surpriseMe}><Shuffle size={16} /> Surprise me</button>
-          </div>
-          <form className="bucket-add-form" onSubmit={addBucketItem}>
-            <label className="sr-only" htmlFor="bucket-item-title">Add to your bucket list</label>
-            <input id="bucket-item-title" value={newBucketTitle} onChange={(event) => setNewBucketTitle(event.target.value)} placeholder="What would you love to do someday?" maxLength={180} />
-            <select aria-label="Bucket list category" value={newBucketCategory} onChange={(event) => setNewBucketCategory(event.target.value as BucketItem["category"])}>
-              {BUCKET_CATEGORIES.map((category) => <option key={category}>{category}</option>)}
-            </select>
-            <button type="submit" className="planit-primary-button" disabled={!newBucketTitle.trim()}><Plus size={17} /> Add idea</button>
-          </form>
-          <div className="bucket-controls">
-            <label className="planit-search"><Search size={16} /><input value={bucketSearch} onChange={(event) => setBucketSearch(event.target.value)} placeholder="Find an idea" /></label>
-            <div className="bucket-filters" role="group" aria-label="Filter by category">
-              {["All", ...BUCKET_CATEGORIES].map((category) => <button key={category} type="button" className={cn("bucket-filter", bucketFilter === category && "is-selected")} onClick={() => setBucketFilter(category)}>{category}</button>)}
-            </div>
-          </div>
-          {spotlightId && bucketItems.find((item) => item.id === spotlightId) && (
-            <div className="bucket-spotlight"><Lightbulb size={17} /><span>How about: <strong>{bucketItems.find((item) => item.id === spotlightId)?.title}</strong></span><button type="button" onClick={() => setSpotlightId(null)} aria-label="Dismiss suggestion"><X size={16} /></button></div>
-          )}
-          {filteredBucketItems.length ? (
-            <ul className="bucket-list">
-              {filteredBucketItems.map((item) => (
-                <li key={item.id} className={cn("bucket-item", item.done && "is-done", spotlightId === item.id && "is-spotlight")}>
-                  <button type="button" className="planner-task-check" onClick={() => setBucketItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, done: !entry.done } : entry))} aria-label={item.done ? `Reopen ${item.title}` : `Mark ${item.title} done`} aria-pressed={item.done}>{item.done && <Check size={13} />}</button>
-                  <span className="bucket-item-title">{item.title}</span>
-                  <span className="bucket-category-tag">{item.category}</span>
-                  <button type="button" className="bucket-notebook-button" onClick={() => { setSelectedBucketId(item.id); setBucketView("notebook"); }} aria-label={`Open notebook for ${item.title}`} title="Open idea notebook"><NotebookPen size={16} /></button>
-                  <button type="button" className="planner-task-delete" onClick={() => { setBucketItems((current) => current.filter((entry) => entry.id !== item.id)); if (selectedBucketId === item.id) { setSelectedBucketId(null); setBucketView("list"); } }} aria-label={`Delete ${item.title}`}><Trash2 size={15} /></button>
-                </li>
-              ))}
-            </ul>
-          ) : <p className="planit-empty">No ideas</p>}
+              <div className="section-title-row">
+                <div><h2>Notebooks</h2></div>
+                <button type="button" className="planit-primary-button" onClick={() => setShowNotebookForm((visible) => !visible)}><Plus size={17} /> Create notebook</button>
+              </div>
+              {showNotebookForm && (
+                <form className="notebook-create-form" onSubmit={createNotebook}>
+                  <label className="notebook-create-name"><span>Cover name</span><input autoFocus value={newNotebookName} onChange={(event) => setNewNotebookName(event.target.value)} placeholder="For example, Travel journal" maxLength={80} required /></label>
+                  <fieldset className="notebook-choice-group">
+                    <legend>Cover style</legend>
+                    <div className="notebook-style-options">
+                      {NOTEBOOK_STYLES.map((style) => <button key={style.id} type="button" className={cn("notebook-style-option", `notebook-cover-${style.id}`, newNotebookStyle === style.id && "is-selected")} onClick={() => setNewNotebookStyle(style.id)} aria-pressed={newNotebookStyle === style.id}><strong>{style.name}</strong><small>{style.description}</small></button>)}
+                    </div>
+                  </fieldset>
+                  <fieldset className="notebook-choice-group">
+                    <legend>Page color</legend>
+                    <div className="notebook-paper-options">
+                      {NOTEBOOK_PAPERS.map((paper) => <button key={paper.color} type="button" className={cn("notebook-paper-option", newNotebookPaper === paper.color && "is-selected")} onClick={() => setNewNotebookPaper(paper.color)} aria-pressed={newNotebookPaper === paper.color}><span style={{ backgroundColor: paper.color }} />{paper.label}</button>)}
+                    </div>
+                  </fieldset>
+                  <div className="notebook-create-actions"><button type="button" className="planit-secondary-button" onClick={() => setShowNotebookForm(false)}>Cancel</button><button type="submit" className="planit-primary-button" disabled={!newNotebookName.trim()}><BookOpen size={16} /> Create</button></div>
+                </form>
+              )}
+              {notebooks.length ? (
+                <div className="notebook-cover-grid">
+                  {notebooks.map((notebook) => (
+                    <button key={notebook.id} type="button" className={cn("notebook-cover", `notebook-cover-${notebook.style}`)} onClick={() => setActiveNotebookId(notebook.id)}>
+                      <span className="notebook-cover-edge" />
+                      <span className="notebook-cover-stamp"><NotebookPen size={19} /></span>
+                      <strong>{notebook.name}</strong>
+                      <small>{NOTEBOOK_STYLES.find((style) => style.id === notebook.style)?.name ?? "Notebook"}</small>
+                      <span className="notebook-cover-paper"><i style={{ backgroundColor: notebook.paperColor }} /> {NOTEBOOK_PAPERS.find((paper) => paper.color === notebook.paperColor)?.label ?? "Custom paper"}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : !showNotebookForm ? <p className="notebook-library-empty">Create a notebook to start writing and drawing.</p> : null}
             </>
           )}
         </section>
       )}
 
-      {section === "finance" && <FinanceDashboard storageScope={storageScope} />}
+      {section === "bucket" && <CollectionBoard kind="bucket" storageScope={storageScope} />}
+      {section === "wishlist" && <CollectionBoard kind="wishlist" storageScope={storageScope} />}
+
+      {section === "activity" && <ActivityTracker storageScope={storageScope} />}
       {section === "portfolio" && <PortfolioEditor />}
+      {section === "gallery" && <Gallery storageScope={storageScope} />}
     </div>
   );
 }

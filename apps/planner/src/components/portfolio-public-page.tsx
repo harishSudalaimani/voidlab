@@ -77,7 +77,7 @@ export function PortfolioPublicPage({
       <div className="portfolio-grain" aria-hidden="true" />
       <header className="portfolio-nav">
         <a className="portfolio-mark" href="#top" aria-label={`${profile.name} home`}><span>{profile.name.slice(0, 1) || "P"}</span><strong>{profile.name}</strong></a>
-        <nav aria-label="Portfolio navigation">
+        <nav aria-label="Persona navigation">
           <a href="#about">About</a><a href="#experience">Experience</a><a href="#projects">Projects</a><a href="#contact">Contact</a>
         </nav>
         <a className="portfolio-contact-link" href={profile.email ? `mailto:${profile.email}` : "#contact"}>Let’s talk <ArrowUpRight size={15} /></a>

@@ -116,23 +116,23 @@ export function PortfolioEditor() {
   async function copyPublicUrl() {
     if (!remoteEnabled || !slug) return;
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/portfolio/${slug}`);
+      await navigator.clipboard.writeText(`${window.location.origin}/persona/${slug}`);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1400);
     } catch { setSyncStatus("Could not copy the public link in this browser"); }
   }
 
-  const portfolioHref = remoteEnabled && slug ? `/portfolio/${slug}` : "/portfolio";
+  const portfolioHref = remoteEnabled && slug ? `/persona/${slug}` : "/persona";
 
   return (
-    <section className="portfolio-editor" aria-label="Edit public portfolio">
+    <section className="portfolio-editor" aria-label="Edit persona">
       <header className="portfolio-editor-header">
-        <div><h2>Portfolio</h2></div>
-        <div className="portfolio-editor-actions"><span className={`portfolio-editor-save-status ${remoteEnabled ? "is-published" : "is-local"}`}><Check size={14} /> {syncStatus}</span><Link className="planit-secondary-button" href={portfolioHref} target="_blank" rel="noreferrer"><Eye size={16} /> View public page <ExternalLink size={13} /></Link>{remoteEnabled && <button type="button" className="portfolio-copy-link" onClick={copyPublicUrl}><Copy size={14} /> {copied ? "Copied" : "Copy public link"}</button>}</div>
+        <div><h2>Persona</h2></div>
+        <div className="portfolio-editor-actions"><span className={`portfolio-editor-save-status ${remoteEnabled ? "is-published" : "is-local"}`}><Check size={14} /> {syncStatus}</span><Link className="planit-secondary-button" href={portfolioHref} target="_blank" rel="noreferrer"><Eye size={16} /> View persona <ExternalLink size={13} /></Link>{remoteEnabled && <button type="button" className="portfolio-copy-link" onClick={copyPublicUrl}><Copy size={14} /> {copied ? "Copied" : "Copy persona link"}</button>}</div>
       </header>
 
       <div className="portfolio-editor-panel portfolio-address-panel">
-        <label><span>Public page address</span><div><strong>/portfolio/</strong><input value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/--+/g, "-").replace(/^-+/, ""))} maxLength={48} placeholder="your-name" /></div></label>
+        <label><span>Persona address</span><div><strong>/persona/</strong><input value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/--+/g, "-").replace(/^-+/, ""))} maxLength={48} placeholder="your-name" /></div></label>
 
       </div>
 

@@ -10,8 +10,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const row = await getPortfolioBySlug(slug.toLowerCase());
   const saved = row ? readPortfolioProfile(JSON.stringify({ profile: row.profile, theme: row.theme })) : null;
-  if (!saved) return { title: "Portfolio" };
-  return { title: `${saved.profile.name} — Portfolio`, description: saved.profile.intro };
+  if (!saved) return { title: "Persona" };
+  return { title: `${saved.profile.name} — Persona`, description: saved.profile.intro };
 }
 
 export default async function SharedPortfolioPage({ params }: { params: Promise<{ slug: string }> }) {

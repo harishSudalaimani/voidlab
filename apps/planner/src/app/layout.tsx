@@ -7,7 +7,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Kiroku — Your personal planner",
-  description: "Plan your days, keep study notes, and collect ideas for later.",
+  description: "Plan your days, create notebooks, track your activity, and collect ideas for later.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

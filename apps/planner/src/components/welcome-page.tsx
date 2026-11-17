@@ -35,7 +35,7 @@ export function WelcomePage({ initialMode }: { initialMode: AuthMode }) {
   return (
     <main className="welcome-page">
       <div className="welcome-atmosphere" aria-hidden="true">
-        <WelcomeCosmos />
+        <WelcomeCosmos theme="light" />
       </div>
 
       <div className="welcome-layout">
