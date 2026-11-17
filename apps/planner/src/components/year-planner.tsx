@@ -560,7 +560,7 @@ function GoalDrawer({
           <div className="mt-3 space-y-2">
             {milestones.length === 0 && (
               <p className="rounded-xl border border-dashed border-white/10 p-4 text-center text-xs text-mist-500">
-                No milestones yet.
+                No milestones
               </p>
             )}
             {milestones.map((milestone) => (

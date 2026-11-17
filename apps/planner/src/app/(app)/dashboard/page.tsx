@@ -86,11 +86,6 @@ export default async function DashboardPage() {
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-mist-100 sm:text-4xl">
             {greeting()}, {firstName}.
           </h1>
-          <p className="mt-2 text-sm text-mist-300">
-            {stats.goalsTotal === 0
-              ? "Your year is a blank page. Add a goal to get moving."
-              : `${stats.goalsDone} of ${stats.goalsTotal} goals complete · ${stats.milestonesDone} of ${stats.milestonesTotal} milestones done.`}
-          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {workspace.role !== "viewer" && (
@@ -252,7 +247,7 @@ export default async function DashboardPage() {
           <div className="mt-4 space-y-2">
             {goals.length === 0 && (
               <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-mist-500">
-                No goals for {year} yet.
+                No goals
               </p>
             )}
             {goals.slice(0, 5).map((goal) => (
@@ -279,7 +274,7 @@ export default async function DashboardPage() {
           <div className="mt-4 space-y-2">
             {upcoming.length === 0 && (
               <p className="rounded-xl border border-dashed border-white/10 p-5 text-center text-sm text-mist-500">
-                Nothing planned yet. Add the first adventure.
+                Nothing planned
               </p>
             )}
             {upcoming.map((item) => (

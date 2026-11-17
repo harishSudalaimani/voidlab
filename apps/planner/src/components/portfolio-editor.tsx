@@ -12,13 +12,13 @@ import {
   type PortfolioThemeId,
 } from "@/lib/portfolio-data";
 
-const LIST_FIELDS: { key: keyof Pick<PortfolioProfile, "experience" | "education" | "skills" | "projects" | "certifications" | "achievements">; label: string; hint: string; placeholder: string }[] = [
-  { key: "experience", label: "Professional experience", hint: "One role per line: Role — Company — Dates — What you did", placeholder: "Product designer — Example Co. — 2023–present — Led a redesign that improved…" },
-  { key: "education", label: "Education", hint: "One entry per line: Degree — School — Dates — Details", placeholder: "BSc Computer Science — Example University — 2020–2024 — Focused on…" },
-  { key: "skills", label: "Technical skills", hint: "One skill or tool per line", placeholder: "TypeScript\nReact\nFigma" },
-  { key: "projects", label: "Projects", hint: "One project per line: Name — Summary — Tools — Link (optional)", placeholder: "Kiroku — A personal planning app — Next.js, React — https://example.com" },
-  { key: "certifications", label: "Certifications", hint: "One entry per line: Certification — Issuer — Year", placeholder: "Cloud Practitioner — Example Academy — 2025" },
-  { key: "achievements", label: "Achievements", hint: "One entry per line: Achievement — Details", placeholder: "Hackathon finalist — Selected from 200 teams" },
+const LIST_FIELDS: { key: keyof Pick<PortfolioProfile, "experience" | "education" | "skills" | "projects" | "certifications" | "achievements">; label: string; placeholder: string }[] = [
+  { key: "experience", label: "Professional experience", placeholder: "Product designer — Example Co. — 2023–present — Led a redesign that improved…" },
+  { key: "education", label: "Education", placeholder: "BSc Computer Science — Example University — 2020–2024 — Focused on…" },
+  { key: "skills", label: "Technical skills", placeholder: "TypeScript\nReact\nFigma" },
+  { key: "projects", label: "Projects", placeholder: "Kiroku — A personal planning app — Next.js, React — https://example.com" },
+  { key: "certifications", label: "Certifications", placeholder: "Cloud Practitioner — Example Academy — 2025" },
+  { key: "achievements", label: "Achievements", placeholder: "Hackathon finalist — Selected from 200 teams" },
 ];
 
 export function PortfolioEditor() {
@@ -27,7 +27,7 @@ export function PortfolioEditor() {
   const [slug, setSlug] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [remoteEnabled, setRemoteEnabled] = useState(false);
-  const [syncStatus, setSyncStatus] = useState("Loading your portfolio…");
+  const [syncStatus, setSyncStatus] = useState("Loading…");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -56,12 +56,12 @@ export function PortfolioEditor() {
           }
           if (typeof remote.slug === "string") setSlug(remote.slug);
           setRemoteEnabled(true);
-          setSyncStatus(remote.saved ? "Published · changes sync to your public page" : "Connected · save to publish your page");
+          setSyncStatus(remote.saved ? "Published" : "Connected");
         } else {
-          setSyncStatus("Local preview · saved in this browser");
+          setSyncStatus("Local preview");
         }
       } catch {
-        setSyncStatus("Local preview · saved in this browser");
+        setSyncStatus("Local preview");
       }
       if (!cancelled) setLoaded(true);
     }
@@ -80,7 +80,7 @@ export function PortfolioEditor() {
       setSyncStatus("Use 3–48 lowercase letters, numbers, or single hyphens for your address");
       return;
     }
-    setSyncStatus("Saving to your public page…");
+    setSyncStatus("Saving…");
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
       void fetch("/api/portfolio", {
@@ -93,7 +93,7 @@ export function PortfolioEditor() {
           const result = await response.json().catch(() => ({})) as { error?: string };
           throw new Error(result.error || "Could not publish your latest changes");
         }
-        setSyncStatus("Published · changes sync to your public page");
+        setSyncStatus("Published");
       }).catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setSyncStatus(error instanceof Error ? error.message : "Could not publish your latest changes");
@@ -127,17 +127,17 @@ export function PortfolioEditor() {
   return (
     <section className="portfolio-editor" aria-label="Edit public portfolio">
       <header className="portfolio-editor-header">
-        <div><p className="planner-eyebrow">PORTFOLIO STUDIO</p><h2>Shape your public page.</h2><p>Edit your details and pick a complete visual style. Visitors can view the page but won’t see these controls.</p></div>
+        <div><h2>Portfolio</h2></div>
         <div className="portfolio-editor-actions"><span className={`portfolio-editor-save-status ${remoteEnabled ? "is-published" : "is-local"}`}><Check size={14} /> {syncStatus}</span><Link className="planit-secondary-button" href={portfolioHref} target="_blank" rel="noreferrer"><Eye size={16} /> View public page <ExternalLink size={13} /></Link>{remoteEnabled && <button type="button" className="portfolio-copy-link" onClick={copyPublicUrl}><Copy size={14} /> {copied ? "Copied" : "Copy public link"}</button>}</div>
       </header>
 
       <div className="portfolio-editor-panel portfolio-address-panel">
         <label><span>Public page address</span><div><strong>/portfolio/</strong><input value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/--+/g, "-").replace(/^-+/, ""))} maxLength={48} placeholder="your-name" /></div></label>
-        <p>{remoteEnabled ? "Anyone with this link can view your published portfolio. Only your signed-in Kiroku workspace can edit it." : "This local preview is saved in this browser. Sign in from your Kiroku workspace and configure the database to publish a shareable public link."}</p>
+
       </div>
 
       <div className="portfolio-editor-panel">
-        <div className="portfolio-editor-panel-heading"><span><Palette size={17} /> Choose a design</span><small>One click changes the entire public page</small></div>
+        <div className="portfolio-editor-panel-heading"><span><Palette size={17} /> Choose a design</span></div>
         <div className="portfolio-theme-grid">
           {PORTFOLIO_THEMES.map((option) => (
             <button key={option.id} type="button" onClick={() => setTheme(option.id)} className={`portfolio-theme-option ${theme === option.id ? "is-selected" : ""}`} aria-pressed={theme === option.id}>
@@ -150,7 +150,7 @@ export function PortfolioEditor() {
       </div>
 
       <div className="portfolio-editor-panel">
-        <div className="portfolio-editor-panel-heading"><span><Save size={17} /> Profile and contact</span><small>Autosaves as you edit</small></div>
+        <div className="portfolio-editor-panel-heading"><span><Save size={17} /> Profile and contact</span></div>
         <div className="portfolio-editor-fields">
           <label><span>Name</span><input value={profile.name} onChange={(event) => setText("name", event.target.value)} placeholder="Your name" /></label>
           <label><span>Professional title</span><input value={profile.role} onChange={(event) => setText("role", event.target.value)} placeholder="Your role and focus" /></label>
@@ -159,17 +159,17 @@ export function PortfolioEditor() {
           <label><span>GitHub URL</span><input type="url" value={profile.github} onChange={(event) => setText("github", event.target.value)} placeholder="https://github.com/you" /></label>
           <label><span>LinkedIn URL</span><input type="url" value={profile.linkedin} onChange={(event) => setText("linkedin", event.target.value)} placeholder="https://linkedin.com/in/you" /></label>
           <label><span>Résumé file path</span><input value={profile.resumeHref} onChange={(event) => setText("resumeHref", event.target.value)} placeholder="/resume.pdf" /></label>
-          <p className="portfolio-editor-hint">Place your PDF in the app’s <code>public/</code> folder, then enter its path above.</p>
+
           <label className="is-wide"><span>Short introduction</span><textarea rows={3} value={profile.intro} onChange={(event) => setText("intro", event.target.value)} placeholder="A short introduction visitors will see first" /></label>
           <label className="is-wide"><span>About me</span><textarea rows={5} value={profile.about} onChange={(event) => setText("about", event.target.value)} placeholder="Your background, interests, and professional story" /></label>
         </div>
       </div>
 
       <div className="portfolio-editor-panel">
-        <div className="portfolio-editor-panel-heading"><span><ArrowUpRight size={17} /> Your work and background</span><small>Add entries one per line</small></div>
+        <div className="portfolio-editor-panel-heading"><span><ArrowUpRight size={17} /> Your work and background</span></div>
         <div className="portfolio-editor-lists">
           {LIST_FIELDS.map((field) => (
-            <label key={field.key}><span>{field.label}</span><small>{field.hint}</small><textarea rows={field.key === "skills" ? 5 : 4} value={profile[field.key].join("\n")} onChange={(event) => setList(field.key, event.target.value)} placeholder={field.placeholder} /></label>
+            <label key={field.key}><span>{field.label}</span><textarea rows={field.key === "skills" ? 5 : 4} value={profile[field.key].join("\n")} onChange={(event) => setList(field.key, event.target.value)} placeholder={field.placeholder} /></label>
           ))}
         </div>
       </div>

@@ -1,4 +1,4 @@
-const CACHE_NAME = "kiroku-shell-v1";
+const CACHE_NAME = "kiroku-shell-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/kiroku-192.png", "/kiroku-512.png"];
 
 self.addEventListener("install", (event) => {

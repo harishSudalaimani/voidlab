@@ -23,6 +23,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { Logo } from "@/components/logo";
 import { DrawingNotebook } from "@/components/drawing-notebook";
 import { FinanceDashboard } from "@/components/finance-dashboard";
 import { PortfolioEditor } from "@/components/portfolio-editor";
@@ -287,15 +288,14 @@ export function TodayPlanner({
   return (
     <div className="planit-app">
       <header className="planit-header">
-        <div>
-          <p className="planner-eyebrow">KIROKU</p>
-          <h1>Make room for what matters.</h1>
-          <p className="planner-date-range">Your 2027 planner · January 1 – December 31</p>
+        <div className="planner-brand-lockup">
+          <Logo withWordmark={false} />
+          <span>KIROKU</span>
         </div>
         <div className="planit-header-actions">
           {!isInstalled && (
             <div className="planit-install-wrap">
-              <button type="button" className="planit-install-button" onClick={installKiroku}><Download size={16} /><span>Install app</span></button>
+              <button type="button" className="planit-install-button" onClick={installKiroku} aria-label="Install Kiroku" title="Install Kiroku"><Download size={16} /></button>
               {installHelpOpen && (
                 <div className="planit-install-help" role="status">
                   <button type="button" onClick={() => setInstallHelpOpen(false)} aria-label="Close install instructions"><X size={15} /></button>
@@ -305,9 +305,8 @@ export function TodayPlanner({
               )}
             </div>
           )}
-          <button type="button" className="planner-theme-button" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "white" : "dark"} theme`}>
+          <button type="button" className="planner-theme-button" onClick={toggleTheme} aria-label={`Switch to ${theme === "dark" ? "white" : "dark"} theme`} title={`Switch to ${theme === "dark" ? "white" : "dark"} theme`} aria-pressed={theme === "light"}>
             {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
-            <span>{theme === "dark" ? "White theme" : "Dark theme"}</span>
           </button>
         </div>
       </header>
@@ -355,16 +354,13 @@ export function TodayPlanner({
                       </li>
                     ))}
                   </ul>
-                ) : <p className="planner-empty-tasks">Add anything you want to remember for this date.</p>}
-                <p className="planner-local-note">Saved on this device</p>
+                ) : null}
               </section>
 
               <section className="planner-calendar" aria-label="Choose a planner date">
                 <div className="planner-calendar-heading">
                   <div>
-                    <span className="planner-calendar-kicker">YOUR PLANNER</span>
                     <h2>{new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(calendarMonth)}</h2>
-                    <p>{fullDate}</p>
                   </div>
                   <div className="planner-calendar-actions">
                     <div className="planner-month-nav" aria-label="Change month">
@@ -375,11 +371,6 @@ export function TodayPlanner({
                         <ChevronRight size={17} />
                       </button>
                     </div>
-                    <label className="planner-date-jump" aria-label="Jump to a date">
-                      <CalendarDays size={15} />
-                      <span>Go to date</span>
-                      <input aria-label="Jump to any date in 2027" type="date" min={START_DATE} max={END_DATE} value={selectedKey} onChange={(event) => selectDate(event.target.value)} />
-                    </label>
                   </div>
                 </div>
                 <div className="planner-month-grid" role="group" aria-label={new Intl.DateTimeFormat("en", { month: "long", year: "numeric" }).format(calendarMonth)}>
@@ -403,7 +394,7 @@ export function TodayPlanner({
       {section === "study" && (
         <section className="planit-section" role="tabpanel" aria-label="Study notes">
           <div className="section-title-row">
-            <div><h2>Study notes</h2><p>Keep class notes, ideas, and revisions together.</p></div>
+            <div><h2>Study notes</h2></div>
             <button type="button" className="planit-primary-button" onClick={createNote}><Plus size={17} /> New note</button>
           </div>
           <div className="study-layout">
@@ -415,7 +406,7 @@ export function TodayPlanner({
                   <span>{note.subject || "No subject"} · {new Date(note.updatedAt).toLocaleDateString()}</span>
                   <small>{note.body || "Start writing…"}</small>
                 </button>
-              )) : <p className="planit-empty">No notes yet. Create one to start your study notebook.</p>}
+              )) : <p className="planit-empty">No notes</p>}
             </aside>
             <div className={cn("study-editor", studyFullscreen && studyView === "note" && "is-fullscreen")}>
               {selectedNote ? (
@@ -439,7 +430,7 @@ export function TodayPlanner({
                   )}
                 </>
               ) : (
-                <div className="study-empty-editor"><BookOpen size={28} /><p>Select a note or create a new one.</p><button type="button" className="planit-primary-button" onClick={createNote}><Plus size={17} /> New note</button></div>
+                <div className="study-empty-editor"><BookOpen size={28} /><button type="button" className="planit-primary-button" onClick={createNote}><Plus size={17} /> New note</button></div>
               )}
             </div>
           </div>
@@ -451,7 +442,7 @@ export function TodayPlanner({
           {bucketView === "notebook" && selectedBucketItem ? (
             <>
               <div className="section-title-row bucket-notebook-header">
-                <div><h2>{selectedBucketItem.title}</h2><p>Idea notebook · add as many pages as you need.</p></div>
+                <div><h2>{selectedBucketItem.title}</h2></div>
                 <button type="button" className="planit-secondary-button" onClick={() => setBucketView("list")}><ChevronLeft size={16} /> Back to list</button>
               </div>
               <DrawingNotebook storageScope={storageScope} bookId={`bucket-${selectedBucketItem.id}`} title="Idea notebook" />
@@ -459,7 +450,7 @@ export function TodayPlanner({
           ) : (
             <>
           <div className="section-title-row">
-            <div><h2>Bucket list</h2><p>Save the places, skills, and experiences you want to make time for.</p></div>
+            <div><h2>Bucket list</h2></div>
             <button type="button" className="planit-secondary-button" onClick={surpriseMe}><Shuffle size={16} /> Surprise me</button>
           </div>
           <form className="bucket-add-form" onSubmit={addBucketItem}>
@@ -491,8 +482,7 @@ export function TodayPlanner({
                 </li>
               ))}
             </ul>
-          ) : <p className="planit-empty">Nothing here yet. Add an idea you want to remember.</p>}
-          <p className="planner-local-note">Your list stays on this device.</p>
+          ) : <p className="planit-empty">No ideas</p>}
             </>
           )}
         </section>

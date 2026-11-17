@@ -185,12 +185,7 @@ export function BucketBoard({ items, canEdit }: BucketBoardProps) {
             <CalendarDays size={22} />
           </span>
           <p className="text-sm font-semibold text-mist-200">
-            {items.length === 0 ? "Your bucket list is empty" : "Nothing matches those filters"}
-          </p>
-          <p className="max-w-sm text-xs text-mist-500">
-            {items.length === 0
-              ? "Add the first thing you want to do — a trip, a skill, a ridiculous idea."
-              : "Try a different status, category or search."}
+            {items.length === 0 ? "No ideas" : "No matches"}
           </p>
           {canEdit && items.length === 0 && (
             <button
@@ -198,7 +193,7 @@ export function BucketBoard({ items, canEdit }: BucketBoardProps) {
               onClick={() => setEditing("new")}
               className="btn btn-primary btn-sm mt-1"
             >
-              <Plus size={14} /> Add the first item
+              <Plus size={14} /> Add item
             </button>
           )}
         </div>

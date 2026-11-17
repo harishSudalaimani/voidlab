@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  ChevronLeft,
-  ChevronRight,
   Eraser,
   Check,
   Maximize2,
@@ -183,8 +181,8 @@ function loadBook(key: string, scope: string, legacyDateKey: string | undefined,
     const blackStrokes = parseArray(window.localStorage.getItem(blackKey));
     if (whiteStrokes || blackStrokes) {
       const pages = [];
-      if (whiteStrokes?.length) pages.push(migratedPage("White page", "white", whiteStrokes));
-      if (blackStrokes?.length) pages.push(migratedPage("Black page", "black", blackStrokes));
+      if (whiteStrokes?.length) pages.push(migratedPage("Page 1", "white", whiteStrokes));
+      if (blackStrokes?.length) pages.push(migratedPage("Page 1", "black", blackStrokes));
       return pages.length ? pages : [makePage(defaultTitle)];
     }
 
@@ -419,21 +417,11 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
     }
   }
 
-  function movePage(amount: number) {
-    const next = visiblePages[currentIndex + amount];
-    if (next) {
-      setTextDraft(null);
-      setSelectedTextId(null);
-      setSelectedPageId(next.id);
-    }
-  }
-
   return (
     <section className={cn("drawing-notebook", isFullscreen && "is-fullscreen")} aria-label={title}>
       <div className="drawing-notebook-heading">
         <div className="drawing-book-title"><NotebookPen size={18} /><h3>{title}</h3></div>
         <div className="drawing-notebook-heading-actions">
-          {currentPage && <div className="drawing-page-number">Page {Math.max(0, currentIndex) + 1} of {visiblePages.length}</div>}
           <button type="button" className="drawing-fullscreen-button" onClick={() => setIsFullscreen((value) => !value)} aria-label={isFullscreen ? "Exit full screen" : "View board full screen"}>
             {isFullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
             <span>{isFullscreen ? "Exit" : "Full screen"}</span>
@@ -526,11 +514,6 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey }: 
             {cursor.visible && tool !== "text" && (
               <span className={cn("drawing-cursor", tool === "pen" ? "is-pen" : "is-eraser")} style={{ left: cursor.x, top: cursor.y, "--cursor-color": currentPage.penColor, "--cursor-size": `${currentPage.eraserSize}px` } as React.CSSProperties} />
             )}
-          </div>
-          <div className="drawing-page-footer">
-            <button type="button" className="drawing-icon-button" onClick={() => movePage(-1)} disabled={currentIndex <= 0} aria-label="Previous page"><ChevronLeft size={17} /></button>
-            <span>{currentPage.boardKind === "white" ? "White page" : "Black page"} · {currentPage.strokes.length || currentPage.texts.length ? "Saved on this device" : "Blank page"}</span>
-            <button type="button" className="drawing-icon-button" onClick={() => movePage(1)} disabled={currentIndex >= visiblePages.length - 1} aria-label="Next page"><ChevronRight size={17} /></button>
           </div>
         </>
       )}
