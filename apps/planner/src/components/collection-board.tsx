@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, LayoutDashboard, Plus, Trash2 } from "lucide-react";
 import { DrawingNotebook } from "@/components/drawing-notebook";
 import { cn } from "@/lib/cn";
 
@@ -26,6 +26,7 @@ export function CollectionBoard({ kind, storageScope }: { kind: "bucket" | "wish
   const [title, setTitle] = useState("");
   const [url, setUrl] = useState("");
   const [entryError, setEntryError] = useState("");
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const storageKey = `kiroku-${kind}-v2:${encodeURIComponent(storageScope)}`;
 
   useEffect(() => {
@@ -79,6 +80,7 @@ export function CollectionBoard({ kind, storageScope }: { kind: "bucket" | "wish
     ...Array.from({ length: 10 }, (_, index) => new Date().getFullYear() + index + 1),
   ])].sort((left, right) => right - left), [entries]);
   const visibleEntries = entries.filter((entry) => entry.year === year && entry.month === month);
+  const selectedEntry = visibleEntries.find((entry) => entry.id === selectedEntryId) ?? null;
 
   function addEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,14 +107,24 @@ export function CollectionBoard({ kind, storageScope }: { kind: "bucket" | "wish
 
   return (
     <section className="planit-section collection-board-section" role="tabpanel" aria-label={isWishlist ? "Wishlist" : "Bucket list"}>
-      <div className="section-title-row">
+      {!selectedEntry && <div className="section-title-row">
         <div><h2>{isWishlist ? "Wishlist" : "Bucket list"}</h2><p>{isWishlist ? "Save things you would like to buy." : "Collect experiences you want to have."}</p></div>
         <div className="collection-period-picker">
-          <label className="bucket-year-picker"><span>Year</span><select aria-label={`${isWishlist ? "Wishlist" : "Bucket list"} year`} value={year} onChange={(event) => setYear(Number(event.target.value))}>{years.map((itemYear) => <option key={itemYear} value={itemYear}>{itemYear}</option>)}</select></label>
-          <label className="bucket-year-picker"><span>Month</span><select aria-label={`${isWishlist ? "Wishlist" : "Bucket list"} month`} value={month} onChange={(event) => setMonth(Number(event.target.value))}>{MONTHS.map((itemMonth, index) => <option key={itemMonth} value={index + 1}>{itemMonth}</option>)}</select></label>
+            <label className="bucket-year-picker"><span>Year</span><select aria-label={`${isWishlist ? "Wishlist" : "Bucket list"} year`} value={year} onChange={(event) => { setYear(Number(event.target.value)); setSelectedEntryId(null); }}>{years.map((itemYear) => <option key={itemYear} value={itemYear}>{itemYear}</option>)}</select></label>
+            <label className="bucket-year-picker"><span>Month</span><select aria-label={`${isWishlist ? "Wishlist" : "Bucket list"} month`} value={month} onChange={(event) => { setMonth(Number(event.target.value)); setSelectedEntryId(null); }}>{MONTHS.map((itemMonth, index) => <option key={itemMonth} value={index + 1}>{itemMonth}</option>)}</select></label>
         </div>
-      </div>
+      </div>}
 
+      {selectedEntry ? (
+        <>
+          <div className="collection-board-open-heading">
+            <button type="button" className="planit-secondary-button" onClick={() => setSelectedEntryId(null)}><ArrowLeft size={16} /> Back to {isWishlist ? "Wishlist" : "Bucket list"}</button>
+            <span>{MONTHS[selectedEntry.month - 1]} {selectedEntry.year}</span>
+          </div>
+          <div className="collection-board-open-title"><h3>{selectedEntry.title}</h3>{selectedEntry.url?.startsWith("http://") || selectedEntry.url?.startsWith("https://") ? <a className="collection-entry-link" href={selectedEntry.url} target="_blank" rel="noreferrer" aria-label={`Open link for ${selectedEntry.title}`} title="Open product link"><ExternalLink size={15} /></a> : null}</div>
+          <DrawingNotebook storageScope={storageScope} bookId={`${kind}-${selectedEntry.id}`} title={selectedEntry.title} compactControls />
+        </>
+      ) : <>
       <form className={cn("bucket-add-form", "bucket-simple-form", "collection-entry-form", isWishlist && "is-wishlist")} onSubmit={addEntry}>
         <label className="sr-only" htmlFor={`${kind}-entry-title`}>{isWishlist ? "Product name" : "Bucket list item"}</label>
         <input id={`${kind}-entry-title`} value={title} onChange={(event) => setTitle(event.target.value)} placeholder={isWishlist ? "Product or idea name…" : `Add something for ${MONTHS[month - 1]} ${year}…`} maxLength={180} required />
@@ -132,18 +144,17 @@ export function CollectionBoard({ kind, storageScope }: { kind: "bucket" | "wish
               {visibleEntries.map((entry) => (
                 <li key={entry.id} className={cn("bucket-item", entry.done && "is-done")}>
                   <button type="button" className="planner-task-check" onClick={() => setEntries((current) => current.map((item) => item.id === entry.id ? { ...item, done: !item.done } : item))} aria-label={entry.done ? `Reopen ${entry.title}` : `Mark ${entry.title} done`} aria-pressed={entry.done}>{entry.done && <Check size={13} />}</button>
-                  <span className="bucket-item-title">{entry.title}</span>
+                  <button type="button" className="bucket-item-title collection-entry-open" onClick={() => setSelectedEntryId(entry.id)}>{entry.title}</button>
                   {entry.url?.startsWith("http://") || entry.url?.startsWith("https://") ? <a className="collection-entry-link" href={entry.url} target="_blank" rel="noreferrer" aria-label={`Open link for ${entry.title}`} title="Open product link"><ExternalLink size={15} /></a> : null}
+                  <button type="button" className="collection-open-board-button" onClick={() => setSelectedEntryId(entry.id)} aria-label={`Open board for ${entry.title}`} title="Open board"><LayoutDashboard size={16} /></button>
                   <button type="button" className="planner-task-delete" onClick={() => setEntries((current) => current.filter((item) => item.id !== entry.id))} aria-label={`Delete ${entry.title}`}><Trash2 size={15} /></button>
                 </li>
               ))}
             </ul>
           ) : <p className="planit-empty">Nothing added for {MONTHS[month - 1]} yet.</p>}
         </div>
-        <div className="collection-drawing-board">
-          <DrawingNotebook storageScope={storageScope} bookId={`${kind}-${year}-${String(month).padStart(2, "0")}`} title={`${isWishlist ? "Wishlist" : "Bucket list"} ${year}-${month}`} compactControls />
-        </div>
       </div>
+      </>}
     </section>
   );
 }

@@ -1632,6 +1632,43 @@ html[data-theme="light"] .planit-app {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
+.drawing-cursor.is-line {
+  width: 28px;
+  height: 3px;
+  transform: translate(-50%, -50%) rotate(-35deg);
+  border: 1px solid color-mix(in srgb, var(--cursor-color) 70%, #111);
+  border-radius: 3px;
+  background: var(--cursor-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.drawing-cursor.is-rectangle {
+  width: 24px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--cursor-color);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--cursor-color) 12%, transparent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.drawing-cursor.is-sticker {
+  transform: translate(-50%, -50%);
+  font: 27px/1 "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+}
+
+.drawing-cursor.is-select {
+  transform: translate(-5px, -3px);
+  color: #1d4ed8;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.55));
+}
+
+.drawing-canvas svg.is-select-tool,
+.drawing-canvas svg.is-select-tool [data-board-kind] {
+  cursor: none;
+}
+
 .drawing-text-entry {
   position: absolute;
   z-index: 3;
@@ -6190,7 +6227,7 @@ html[data-theme="light"] .planner-theme-button::after {
 
 }
 
-/* Keep both boards compact, with all drawing controls on one row. */
+/* Keep controls visible on narrow board toolbars. */
 .drawing-notebook.is-compact-controls {
   padding: 9px 11px 11px;
 }
@@ -6210,17 +6247,12 @@ html[data-theme="light"] .planner-theme-button::after {
 
 .drawing-notebook.is-compact-controls .drawing-toolbar {
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-start;
   gap: 8px;
   margin: 0 0 8px;
   padding: 5px 7px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.drawing-notebook.is-compact-controls .drawing-toolbar::-webkit-scrollbar {
-  display: none;
+  overflow: visible;
 }
 
 .drawing-notebook.is-compact-controls .drawing-tool-switch,
@@ -6230,6 +6262,21 @@ html[data-theme="light"] .planner-theme-button::after {
 .drawing-notebook.is-compact-controls .drawing-color-palette,
 .drawing-notebook.is-compact-controls .drawing-toolbar-actions {
   flex: 0 0 auto;
+}
+
+.drawing-notebook.is-compact-controls .drawing-tool-switch {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.drawing-notebook.is-compact-controls .drawing-sticker-palette {
+  max-width: min(100%, 250px);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.drawing-notebook.is-compact-controls .drawing-toolbar-actions {
+  flex-wrap: wrap;
 }
 
 .drawing-text-bold {
@@ -6910,6 +6957,71 @@ html[data-theme="light"] .planner-theme-button::after {
 }
 
 .collection-entry-link:hover {
+  background: var(--planner-hover);
+  color: var(--planner-accent);
+}
+
+.collection-board-open-heading,
+.collection-board-open-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.collection-board-open-heading {
+  justify-content: space-between;
+  color: var(--planner-muted);
+  font-size: 11px;
+}
+
+.collection-board-open-title {
+  min-width: 0;
+  padding: 3px 1px 7px;
+}
+
+.collection-board-open-title h3 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--planner-text);
+  font-size: 17px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.collection-entry-open {
+  min-width: 0;
+  flex: 1;
+  padding: 6px 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.collection-entry-open:hover {
+  color: var(--planner-accent);
+}
+
+.collection-open-board-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--planner-muted);
+  cursor: pointer;
+}
+
+.collection-open-board-button:hover {
   background: var(--planner-hover);
   color: var(--planner-accent);
 }

@@ -8,6 +8,7 @@ import {
   Minus,
   Maximize2,
   Minimize2,
+  MousePointer2,
   NotebookPen,
   PenLine,
   Plus,
@@ -23,7 +24,7 @@ import { cn } from "@/lib/cn";
 
 type BoardKind = "white" | "black";
 type InkPoint = { x: number; y: number };
-type InkStroke = { points: InkPoint[]; color: string; width: number; erase?: boolean; shape?: "line" | "rectangle" };
+type InkStroke = { id: string; points: InkPoint[]; color: string; width: number; erase?: boolean; shape?: "line" | "rectangle" };
 type BoardText = { id: string; x: number; y: number; value: string; color: string; size: number; bold?: boolean };
 type BoardSticker = { id: string; x: number; y: number; value: string; size: number };
 type NotebookAttachment = { id: string; name: string; mimeType: string; size: number; blob: Blob };
@@ -43,6 +44,7 @@ type NotebookPage = {
 type ActiveStroke = { pageId: string; stroke: InkStroke };
 type ActiveTextMove = { pageId: string; textId: string; offsetX: number; offsetY: number };
 type TextDraft = { x: number; y: number; value: string; editId?: string };
+type BoardSelection = { kind: "stroke" | "text" | "sticker"; id: string };
 type NotebookProps = {
   storageScope: string;
   bookId: string;
@@ -165,6 +167,14 @@ function validPage(value: unknown): value is NotebookPage {
 
 function normalizePage(page: NotebookPage): NotebookPage {
   const candidate = page as NotebookPage & { texts?: unknown; stickers?: unknown; textSize?: unknown; attachments?: unknown };
+  const strokes = Array.isArray(page.strokes) ? page.strokes.flatMap((value): InkStroke[] => {
+    if (!value || typeof value !== "object") return [];
+    const stroke = value as Partial<InkStroke>;
+    if (!Array.isArray(stroke.points) || typeof stroke.color !== "string" || !Number.isFinite(stroke.width)) return [];
+    const points = stroke.points.filter((point): point is InkPoint => Boolean(point && typeof point === "object" && Number.isFinite((point as InkPoint).x) && Number.isFinite((point as InkPoint).y)));
+    if (!points.length) return [];
+    return [{ ...stroke, id: typeof stroke.id === "string" ? stroke.id : crypto.randomUUID(), points, color: stroke.color, width: Number(stroke.width) } as InkStroke];
+  }) : [];
   const texts = Array.isArray(candidate.texts) ? candidate.texts.filter((value): value is BoardText => {
     if (!value || typeof value !== "object") return false;
     const text = value as Partial<BoardText>;
@@ -196,7 +206,7 @@ function normalizePage(page: NotebookPage): NotebookPage {
       && Number.isFinite(attachment.size)
       && attachment.blob instanceof Blob;
   }) : [];
-  return { ...page, texts, stickers, textSize, attachments };
+  return { ...page, strokes, texts, stickers, textSize, attachments };
 }
 
 function NotebookFileLink({ attachment, onRemove }: { attachment: NotebookAttachment; onRemove: () => void }) {
@@ -223,6 +233,7 @@ function migratedPage(title: string, boardKind: BoardKind, legacy: unknown[]): N
     return Array.isArray(candidate.points) && typeof candidate.color === "string";
   }).map((stroke) => ({
     ...stroke,
+    id: typeof stroke.id === "string" ? stroke.id : crypto.randomUUID(),
     erase: stroke.erase ?? stroke.color.toLowerCase() === background,
   }));
   return { ...makePage(title, boardKind), strokes };
@@ -262,7 +273,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
   const [pages, setPages] = useState<NotebookPage[]>([]);
   const [loadedBookKey, setLoadedBookKey] = useState<string | null>(null);
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null);
-  const [tool, setTool] = useState<"pen" | "eraser" | "text" | "line" | "rectangle" | "sticker">("pen");
+  const [tool, setTool] = useState<"pen" | "eraser" | "text" | "line" | "rectangle" | "sticker" | "select">("pen");
   const [selectedSticker, setSelectedSticker] = useState(BOARD_STICKERS[0]);
   const [stickerSize, setStickerSize] = useState(STICKER_SIZES[1].value);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -270,6 +281,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
   const [textDraft, setTextDraft] = useState<TextDraft | null>(null);
   const [textBold, setTextBold] = useState(false);
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
+  const [selectedBoardItem, setSelectedBoardItem] = useState<BoardSelection | null>(null);
   const textInputRef = useRef<HTMLTextAreaElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const activeStrokeRef = useRef<ActiveStroke | null>(null);
@@ -344,11 +356,13 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
     setTool("pen");
     setTextDraft(null);
     setSelectedTextId(null);
+    setSelectedBoardItem(null);
   }
 
   function deletePage() {
     setTextDraft(null);
     setSelectedTextId(null);
+    setSelectedBoardItem(null);
     if (!currentPage || pages.length <= 1) {
       if (currentPage) updatePage(currentPage.id, { title: "Page 1", strokes: [], texts: [], stickers: [], attachments: [] });
       return;
@@ -368,7 +382,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
 
   function showCursor(event: React.PointerEvent<SVGSVGElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
-    setCursor({ x: event.clientX - bounds.left, y: event.clientY - bounds.top, visible: (tool === "pen" || tool === "eraser") && (event.pointerType === "mouse" || event.pointerType === "pen") });
+    setCursor({ x: event.clientX - bounds.left, y: event.clientY - bounds.top, visible: tool !== "text" && (event.pointerType === "mouse" || event.pointerType === "pen") });
   }
 
   function startStroke(event: React.PointerEvent<SVGSVGElement>) {
@@ -387,9 +401,18 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
       });
       return;
     }
+    if (tool === "select") {
+      const target = (event.target as SVGElement).closest<SVGElement>("[data-board-kind][data-board-id]");
+      const kind = target?.dataset.boardKind;
+      const id = target?.dataset.boardId;
+      setSelectedBoardItem(kind && id && (kind === "stroke" || kind === "text" || kind === "sticker") ? { kind, id } : null);
+      setSelectedTextId(kind === "text" && id ? id : null);
+      return;
+    }
     event.currentTarget.setPointerCapture(event.pointerId);
     const erase = tool === "eraser";
     const stroke: InkStroke = {
+      id: crypto.randomUUID(),
       points: [pointFrom(event)],
       color: erase ? background : currentPage.penColor,
       width: erase ? currentPage.eraserSize : currentPage.penSize,
@@ -460,12 +483,17 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
   function handlePlacedTextPointerDown(event: React.PointerEvent<SVGTextElement>, item: BoardText) {
     event.preventDefault();
     event.stopPropagation();
-    if (tool !== "text" && tool !== "eraser") return;
+    if (tool !== "text" && tool !== "eraser" && tool !== "select") return;
     if (!currentPage) return;
     if (tool === "eraser") {
       updatePage(currentPage.id, { texts: (currentPage.texts ?? []).filter((text) => text.id !== item.id) });
       setSelectedTextId(null);
       setTextDraft(null);
+      return;
+    }
+    if (tool === "select") {
+      setSelectedBoardItem({ kind: "text", id: item.id });
+      setSelectedTextId(item.id);
       return;
     }
     const svg = event.currentTarget.ownerSVGElement;
@@ -492,6 +520,24 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
     updatePage(currentPage.id, { texts: currentPage.texts.filter((item) => item.id !== selectedText.id) });
     setSelectedTextId(null);
     setTextDraft(null);
+  }
+
+  function deleteSelectedBoardItem() {
+    if (!currentPage || !selectedBoardItem) return;
+    if (selectedBoardItem.kind === "stroke") updatePage(currentPage.id, { strokes: currentPage.strokes.filter((item) => item.id !== selectedBoardItem.id) });
+    if (selectedBoardItem.kind === "text") updatePage(currentPage.id, { texts: currentPage.texts.filter((item) => item.id !== selectedBoardItem.id) });
+    if (selectedBoardItem.kind === "sticker") updatePage(currentPage.id, { stickers: currentPage.stickers.filter((item) => item.id !== selectedBoardItem.id) });
+    setSelectedBoardItem(null);
+    setSelectedTextId(null);
+    setTextDraft(null);
+  }
+
+  function handlePlacedStickerPointerDown(event: React.PointerEvent<SVGTextElement>, sticker: BoardSticker) {
+    if (tool !== "select") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedBoardItem({ kind: "sticker", id: sticker.id });
+    setSelectedTextId(null);
   }
 
   function undoMark() {
@@ -546,7 +592,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
       <div className="drawing-page-strip" aria-label="Notebook pages">
         <div className="drawing-page-tabs">
           {visiblePages.map((page, index) => (
-            <button key={page.id} type="button" className={cn("drawing-page-tab", page.id === currentPage?.id && "is-active")} onClick={() => { setTextDraft(null); setSelectedTextId(null); setSelectedPageId(page.id); }} aria-pressed={page.id === currentPage?.id}>
+            <button key={page.id} type="button" className={cn("drawing-page-tab", page.id === currentPage?.id && "is-active")} onClick={() => { setTextDraft(null); setSelectedTextId(null); setSelectedBoardItem(null); setSelectedPageId(page.id); }} aria-pressed={page.id === currentPage?.id}>
               <span>{index + 1}</span>{!notebookMode && (page.title || `Page ${index + 1}`)}
             </button>
           ))}
@@ -578,6 +624,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
               <button type="button" className={cn(tool === "rectangle" && "is-active")} onClick={() => { setTool("rectangle"); setTextDraft(null); setSelectedTextId(null); }} aria-pressed={tool === "rectangle"}><Square size={15} /><span>Box</span></button>
               <button type="button" className={cn(tool === "sticker" && "is-active")} onClick={() => { setTool("sticker"); setTextDraft(null); setSelectedTextId(null); }} aria-pressed={tool === "sticker"}><SmilePlus size={15} /><span>Sticker</span></button>
               <button type="button" className={cn(tool === "eraser" && "is-active")} onClick={() => { setTool("eraser"); setTextDraft(null); setSelectedTextId(null); }} aria-pressed={tool === "eraser"}><Eraser size={16} /><span>Eraser</span></button>
+              <button type="button" className={cn(tool === "select" && "is-active")} onClick={() => { setTool("select"); setTextDraft(null); setSelectedTextId(null); }} aria-pressed={tool === "select"}><MousePointer2 size={15} /><span>Select</span></button>
             </div>
 
             {tool === "sticker" ? (
@@ -589,7 +636,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
                   {STICKER_SIZES.map((size) => <button key={size.label} type="button" className={cn(stickerSize === size.value && "is-active")} onClick={() => setStickerSize(size.value)} aria-pressed={stickerSize === size.value}>{size.label}</button>)}
                 </div>
               </>
-            ) : tool !== "eraser" ? (
+            ) : tool === "select" ? null : tool !== "eraser" ? (
               <>
                 <div className="drawing-color-palette" role="group" aria-label={tool === "text" ? "Text color" : "Pen color"}>
                   {inks.map((color) => <button key={color} type="button" className={cn("drawing-color-swatch", currentPage.penColor === color && "is-selected")} style={{ "--swatch-color": color } as React.CSSProperties} onClick={() => updatePage(currentPage.id, { penColor: color })} aria-label={`Choose ${tool === "text" ? "text" : "pen"} color ${color}`} aria-pressed={currentPage.penColor === color} />)}
@@ -621,23 +668,30 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
                   <button type="button" className="drawing-icon-button" onClick={deleteSelectedText} aria-label="Delete selected text" title="Delete text"><Trash2 size={15} /></button>
                 </>
               )}
+              {tool === "select" && selectedBoardItem && <button type="button" className="drawing-icon-button" onClick={deleteSelectedBoardItem} aria-label={`Delete selected ${selectedBoardItem.kind}`} title={`Delete selected ${selectedBoardItem.kind}`}><Trash2 size={16} /></button>}
               <button type="button" className="drawing-icon-button" onClick={undoMark} disabled={tool === "text" ? !currentPage.texts.length : tool === "sticker" ? !currentPage.stickers.length : !currentPage.strokes.length && !currentPage.texts.length} aria-label={tool === "text" ? "Undo last text" : tool === "sticker" ? "Undo last sticker" : "Undo last mark"} title="Undo"><Undo2 size={17} /></button>
-              <button type="button" className="drawing-icon-button" onClick={() => { setTextDraft(null); updatePage(currentPage.id, { strokes: [], texts: [], stickers: [] }); }} disabled={!currentPage.strokes.length && !currentPage.texts.length && !currentPage.stickers.length} aria-label="Clear page" title="Clear page"><Trash2 size={16} /></button>
+              <button type="button" className="drawing-icon-button" onClick={() => { setTextDraft(null); setSelectedBoardItem(null); setSelectedTextId(null); updatePage(currentPage.id, { strokes: [], texts: [], stickers: [] }); }} disabled={!currentPage.strokes.length && !currentPage.texts.length && !currentPage.stickers.length} aria-label="Clear page" title="Clear page"><Trash2 size={16} /></button>
             </div>
           </div>
 
           <div className={cn("drawing-canvas", darkPaper && "is-blackboard")} style={{ backgroundColor: background }}>
-            <svg className={cn(tool === "text" && "is-text-tool", tool === "eraser" && "is-eraser-tool")} viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`} preserveAspectRatio="none" onPointerDown={startStroke} onPointerMove={continueStroke} onPointerUp={finishStroke} onPointerCancel={finishStroke} onPointerLeave={() => setCursor((old) => ({ ...old, visible: false }))} role="img" aria-label={notebookMode ? `${title}, page ${currentIndex + 1}` : `${currentPage.boardKind}board drawing page ${currentIndex + 1}`}>
-              {canvasStrokes.map((stroke, index) => (
-                <path key={index} d={stroke.shape === "rectangle" && stroke.points.length > 1
+            <svg className={cn(tool === "text" && "is-text-tool", tool === "select" && "is-select-tool")} viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`} preserveAspectRatio="none" onPointerDown={startStroke} onPointerMove={continueStroke} onPointerUp={finishStroke} onPointerCancel={finishStroke} onPointerLeave={() => setCursor((old) => ({ ...old, visible: false }))} role="img" aria-label={notebookMode ? `${title}, page ${currentIndex + 1}` : `${currentPage.boardKind}board drawing page ${currentIndex + 1}`}>
+              {canvasStrokes.map((stroke) => <g key={stroke.id}>
+                <path data-board-kind="stroke" data-board-id={stroke.id} d={stroke.shape === "rectangle" && stroke.points.length > 1
                   ? `M${stroke.points[0].x},${stroke.points[0].y} L${stroke.points[1].x},${stroke.points[0].y} L${stroke.points[1].x},${stroke.points[1].y} L${stroke.points[0].x},${stroke.points[1].y} Z`
                   : strokePath(stroke.points)} fill="none" stroke={stroke.erase ? background : stroke.color} strokeWidth={stroke.width} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-              ))}
-              {currentPage.stickers.map((sticker) => <text key={sticker.id} x={sticker.x} y={sticker.y} fontSize={sticker.size} textAnchor="middle" dominantBaseline="central" fontFamily="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif" pointerEvents="none">{sticker.value}</text>)}
+                {selectedBoardItem?.kind === "stroke" && selectedBoardItem.id === stroke.id && <path d={stroke.shape === "rectangle" && stroke.points.length > 1
+                  ? `M${stroke.points[0].x},${stroke.points[0].y} L${stroke.points[1].x},${stroke.points[0].y} L${stroke.points[1].x},${stroke.points[1].y} L${stroke.points[0].x},${stroke.points[1].y} Z`
+                  : strokePath(stroke.points)} fill="none" stroke="#5686ed" strokeWidth={stroke.width + 5} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 5" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+              </g>)}
+              {currentPage.stickers.map((sticker) => <g key={sticker.id}>
+                {selectedBoardItem?.kind === "sticker" && selectedBoardItem.id === sticker.id && <rect x={sticker.x - sticker.size / 2 - 5} y={sticker.y - sticker.size / 2 - 5} width={sticker.size + 10} height={sticker.size + 10} rx={5} fill="none" stroke="#5686ed" strokeWidth={2} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+                <text data-board-kind="sticker" data-board-id={sticker.id} x={sticker.x} y={sticker.y} fontSize={sticker.size} textAnchor="middle" dominantBaseline="central" fontFamily="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif" pointerEvents={tool === "select" ? "visiblePainted" : "none"} onPointerDown={(event) => handlePlacedStickerPointerDown(event, sticker)}>{sticker.value}</text>
+              </g>)}
               {currentPage.texts.map((item) => (
                 <g key={item.id}>
-                  {tool === "text" && item.id === selectedTextId && <rect x={item.x - 5} y={item.y - item.size} width={Math.max(item.size * 2, Math.max(...item.value.split("\n").map((line) => line.length)) * item.size * 0.62 + 10)} height={item.size * 1.45 * item.value.split("\n").length} rx={5} fill="none" stroke="#5686ed" strokeWidth={2} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
-                  <text x={item.x} y={item.y} fill={item.color} fontSize={item.size} fontFamily="ui-rounded, system-ui, sans-serif" fontWeight={item.bold ? "750" : "500"} onPointerDown={(event) => handlePlacedTextPointerDown(event, item)}>{item.value.split("\n").map((line, lineIndex) => <tspan key={lineIndex} x={item.x} dy={lineIndex === 0 ? 0 : item.size * 1.25}>{line || " "}</tspan>)}</text>
+                  {(tool === "text" && item.id === selectedTextId || tool === "select" && selectedBoardItem?.kind === "text" && item.id === selectedBoardItem.id) && <rect x={item.x - 5} y={item.y - item.size} width={Math.max(item.size * 2, Math.max(...item.value.split("\n").map((line) => line.length)) * item.size * 0.62 + 10)} height={item.size * 1.45 * item.value.split("\n").length} rx={5} fill="none" stroke="#5686ed" strokeWidth={2} strokeDasharray="5 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />}
+                  <text data-board-kind="text" data-board-id={item.id} x={item.x} y={item.y} fill={item.color} fontSize={item.size} fontFamily="ui-rounded, system-ui, sans-serif" fontWeight={item.bold ? "750" : "500"} onPointerDown={(event) => handlePlacedTextPointerDown(event, item)}>{item.value.split("\n").map((line, lineIndex) => <tspan key={lineIndex} x={item.x} dy={lineIndex === 0 ? 0 : item.size * 1.25}>{line || " "}</tspan>)}</text>
                 </g>
               ))}
             </svg>
@@ -649,7 +703,7 @@ export function DrawingNotebook({ storageScope, bookId, title, legacyDateKey, co
               </form>
             )}
             {cursor.visible && tool !== "text" && (
-              <span className={cn("drawing-cursor", tool === "pen" ? "is-pen" : "is-eraser")} style={{ left: cursor.x, top: cursor.y, "--cursor-color": currentPage.penColor, "--cursor-size": `${currentPage.eraserSize}px` } as React.CSSProperties} />
+              <span className={cn("drawing-cursor", `is-${tool}`)} style={{ left: cursor.x, top: cursor.y, "--cursor-color": currentPage.penColor, "--cursor-size": `${currentPage.eraserSize}px` } as React.CSSProperties}>{tool === "sticker" ? selectedSticker : tool === "select" ? <MousePointer2 size={22} fill="white" /> : null}</span>
             )}
           </div>
           {(currentPage.attachments.length > 0 || attachmentError) && (
