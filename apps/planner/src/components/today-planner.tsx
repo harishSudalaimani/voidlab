@@ -8,15 +8,20 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Clock3,
   Download,
-  Heart,
+  Bookmark,
+  Film,
   Images,
   Lightbulb,
+  ListMusic,
   Moon,
   NotebookPen,
   PenLine,
   Plus,
   Sun,
+  Target,
+  Timer,
   Trash2,
   X,
 } from "lucide-react";
@@ -28,10 +33,16 @@ import { Gallery } from "@/components/gallery";
 import { ActivityTracker } from "@/components/activity-tracker";
 import { WelcomeCosmos } from "@/components/welcome-cosmos";
 import { CollectionBoard } from "@/components/collection-board";
+import { PomodoroSection } from "@/components/pomodoro-section";
+import { MediaPlayerSection } from "@/components/media-player-section";
+import { StudioSection } from "@/components/studio-section";
+import { BookmarksSection } from "@/components/bookmarks-section";
 
-type DayTask = { id: string; title: string; done: boolean };
+type TaskPriority = "high" | "normal" | "low";
+type DayTask = { id: string; title: string; done: boolean; priority?: TaskPriority; time?: string };
+type DailyPlanNotes = { focus: string; reflection: string };
 type Theme = "dark" | "light";
-type Section = "planner" | "study" | "bucket" | "wishlist" | "activity" | "portfolio" | "gallery";
+type Section = "planner" | "study" | "pomodoro" | "media" | "studio" | "bookmarks" | "bucket" | "activity" | "portfolio" | "gallery";
 type NotebookStyle = "linen" | "botanical" | "modern" | "midnight";
 type NotebookMeta = { id: string; name: string; style: NotebookStyle; paperColor: string; createdAt: number };
 type InstallPromptEvent = Event & {
@@ -97,6 +108,10 @@ export function TodayPlanner({
   const [tasks, setTasks] = useState<DayTask[]>([]);
   const [loadedTaskKey, setLoadedTaskKey] = useState<string | null>(null);
   const [newTask, setNewTask] = useState("");
+  const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>("normal");
+  const [newTaskTime, setNewTaskTime] = useState("");
+  const [dailyPlan, setDailyPlan] = useState<DailyPlanNotes>({ focus: "", reflection: "" });
+  const [loadedDailyPlanKey, setLoadedDailyPlanKey] = useState<string | null>(null);
   const [theme, setTheme] = useState<Theme>("dark");
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [installHelpOpen, setInstallHelpOpen] = useState(false);
@@ -111,6 +126,7 @@ export function TodayPlanner({
   const [newNotebookPaper, setNewNotebookPaper] = useState(NOTEBOOK_PAPERS[0].color);
 
   const taskStorageKey = `planit-day-v1:${encodeURIComponent(storageScope)}:${selectedKey}`;
+  const dailyPlanStorageKey = `planit-daily-plan-v1:${encodeURIComponent(storageScope)}:${selectedKey}`;
   const notebooksStorageKey = `planit-notebook-library-v1:${encodeURIComponent(storageScope)}`;
   const activeNotebook = notebooks.find((notebook) => notebook.id === activeNotebookId) ?? null;
   const fullDate = new Intl.DateTimeFormat("en", {
@@ -149,13 +165,31 @@ export function TodayPlanner({
   }, []);
 
   useEffect(() => {
-    setTasks(readArray<DayTask>(taskStorageKey, `northstar-day-v2:${encodeURIComponent(storageScope)}:${selectedKey}`));
+    const savedTasks = readArray<DayTask>(taskStorageKey, `northstar-day-v2:${encodeURIComponent(storageScope)}:${selectedKey}`);
+    setTasks(savedTasks.map((task) => ({ ...task, priority: task.priority === "high" || task.priority === "low" ? task.priority : "normal", time: typeof task.time === "string" && /^\d{2}:\d{2}$/.test(task.time) ? task.time : "" })));
     setLoadedTaskKey(taskStorageKey);
   }, [taskStorageKey]);
 
   useEffect(() => {
     if (loadedTaskKey === taskStorageKey) window.localStorage.setItem(taskStorageKey, JSON.stringify(tasks));
   }, [loadedTaskKey, taskStorageKey, tasks]);
+
+  useEffect(() => {
+    setLoadedDailyPlanKey(null);
+    try {
+      const saved = window.localStorage.getItem(dailyPlanStorageKey);
+      const parsed = saved ? JSON.parse(saved) as Partial<DailyPlanNotes> : {};
+      setDailyPlan({ focus: typeof parsed.focus === "string" ? parsed.focus : "", reflection: typeof parsed.reflection === "string" ? parsed.reflection : "" });
+    } catch {
+      setDailyPlan({ focus: "", reflection: "" });
+    }
+    setLoadedDailyPlanKey(dailyPlanStorageKey);
+  }, [dailyPlanStorageKey]);
+
+  useEffect(() => {
+    if (loadedDailyPlanKey !== dailyPlanStorageKey) return;
+    try { window.localStorage.setItem(dailyPlanStorageKey, JSON.stringify(dailyPlan)); } catch { /* Keep today's notes available in memory if browser storage is full. */ }
+  }, [dailyPlan, dailyPlanStorageKey, loadedDailyPlanKey]);
 
   useEffect(() => {
     setNotebooks(readArray<NotebookMeta>(notebooksStorageKey));
@@ -215,8 +249,9 @@ export function TodayPlanner({
     event.preventDefault();
     const title = newTask.trim();
     if (!title) return;
-    setTasks((current) => [...current, { id: crypto.randomUUID(), title, done: false }]);
+    setTasks((current) => [...current, { id: crypto.randomUUID(), title, done: false, priority: newTaskPriority, time: newTaskTime }]);
     setNewTask("");
+    setNewTaskTime("");
   }
 
   function createNotebook(event: React.FormEvent<HTMLFormElement>) {
@@ -236,6 +271,8 @@ export function TodayPlanner({
   }
 
   const visibleTasks = loadedTaskKey === taskStorageKey ? tasks : [];
+  const completedTasks = visibleTasks.filter((task) => task.done).length;
+  const scheduledTasks = visibleTasks.filter((task) => task.time).sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
 
   return (
     <div className="planit-app">
@@ -271,11 +308,20 @@ export function TodayPlanner({
         <button type="button" role="tab" aria-selected={section === "study"} className={cn("planit-tab", section === "study" && "is-active")} onClick={() => setSection("study")}>
           <NotebookPen size={17} /> Notebook
         </button>
+        <button type="button" role="tab" aria-selected={section === "pomodoro"} className={cn("planit-tab", section === "pomodoro" && "is-active")} onClick={() => setSection("pomodoro")}>
+          <Timer size={17} /> Pomodoro
+        </button>
+        <button type="button" role="tab" aria-selected={section === "media"} className={cn("planit-tab", section === "media" && "is-active")} onClick={() => setSection("media")}>
+          <ListMusic size={17} /> Media player
+        </button>
+        <button type="button" role="tab" aria-selected={section === "studio"} className={cn("planit-tab", section === "studio" && "is-active")} onClick={() => setSection("studio")}>
+          <Film size={17} /> Studio
+        </button>
+        <button type="button" role="tab" aria-selected={section === "bookmarks"} className={cn("planit-tab", section === "bookmarks" && "is-active")} onClick={() => setSection("bookmarks")}>
+          <Bookmark size={17} /> Bookmarks
+        </button>
         <button type="button" role="tab" aria-selected={section === "bucket"} className={cn("planit-tab", section === "bucket" && "is-active")} onClick={() => setSection("bucket")}>
           <Lightbulb size={17} /> Bucket list
-        </button>
-        <button type="button" role="tab" aria-selected={section === "wishlist"} className={cn("planit-tab", section === "wishlist" && "is-active")} onClick={() => setSection("wishlist")}>
-          <Heart size={17} /> Wishlist
         </button>
         <button type="button" role="tab" aria-selected={section === "activity"} className={cn("planit-tab", section === "activity" && "is-active")} onClick={() => setSection("activity")}>
           <Activity size={17} /> Activity
@@ -290,32 +336,65 @@ export function TodayPlanner({
 
       {section === "planner" && (
         <div className="planner-screen" role="tabpanel">
+          <header className="planner-day-heading">
+            <div><p className="planner-eyebrow">Daily planner</p><h1>{fullDate}</h1><p>Set a focus, plan your time, and work through the day.</p></div>
+            <div className="planner-day-progress" aria-label={`${completedTasks} of ${visibleTasks.length} tasks complete`}>
+              <div><strong>{completedTasks}<small> / {visibleTasks.length}</small></strong><span>tasks complete</span></div>
+              <div className="planner-progress-track"><span style={{ width: `${visibleTasks.length ? completedTasks / visibleTasks.length * 100 : 0}%` }} /></div>
+            </div>
+          </header>
           <div className="planner-workspace">
-            <DrawingNotebook storageScope={storageScope} bookId={`planner-${selectedKey}`} title="Planner board" legacyDateKey={selectedKey} compactControls />
+            <main className="planner-day-main">
+              <section className="planner-focus-card" aria-label="Today's focus">
+                <div><Target size={18} /><label htmlFor="planner-day-focus">Today's focus</label></div>
+                <input id="planner-day-focus" value={dailyPlan.focus} onChange={(event) => setDailyPlan((current) => ({ ...current, focus: event.target.value }))} maxLength={180} placeholder="What matters most today?" />
+              </section>
 
-            <aside className="planner-side-column">
               <section className="planner-tasks-card" aria-label="Tasks for this date">
                 <div className="planner-card-heading">
-                  <div><h2>Tasks</h2><p>{fullDate}</p></div>
+                  <div><h2>Tasks and priorities</h2><p>Set importance and a time to make your day actionable.</p></div>
                 </div>
                 <form className="planner-task-form" onSubmit={addTask}>
                   <label className="sr-only" htmlFor="planner-new-task">Add a task</label>
-                  <input id="planner-new-task" value={newTask} onChange={(event) => setNewTask(event.target.value)} placeholder="Write a task…" maxLength={180} />
+                  <input id="planner-new-task" value={newTask} onChange={(event) => setNewTask(event.target.value)} placeholder="Add a task…" maxLength={180} />
+                  <label className="sr-only" htmlFor="planner-new-task-priority">Task priority</label>
+                  <select id="planner-new-task-priority" value={newTaskPriority} onChange={(event) => setNewTaskPriority(event.target.value as TaskPriority)} aria-label="Task priority"><option value="high">High priority</option><option value="normal">Normal priority</option><option value="low">Low priority</option></select>
+                  <label className="planner-task-time-input" aria-label="Optional task time"><Clock3 size={14} /><input type="time" value={newTaskTime} onChange={(event) => setNewTaskTime(event.target.value)} aria-label="Task time" /></label>
                   <button type="submit" disabled={!newTask.trim()} aria-label="Add task"><Plus size={18} /></button>
                 </form>
                 {visibleTasks.length ? (
                   <ul className="planner-task-list">
                     {visibleTasks.map((task) => (
-                      <li key={task.id} className={cn("planner-task", task.done && "is-done")}>
+                      <li key={task.id} className={cn("planner-task", task.done && "is-done", `is-priority-${task.priority ?? "normal"}`)}>
                         <button type="button" className="planner-task-check" onClick={() => setTasks((current) => current.map((item) => item.id === task.id ? { ...item, done: !item.done } : item))} aria-label={task.done ? `Reopen ${task.title}` : `Complete ${task.title}`} aria-pressed={task.done}>{task.done && <Check size={13} />}</button>
-                        <span>{task.title}</span>
+                        <span className="planner-task-copy"><strong>{task.title}</strong>{task.time && <small><Clock3 size={12} /> {task.time}</small>}</span>
+                        <label className="sr-only" htmlFor={`priority-${task.id}`}>Priority for {task.title}</label>
+                        <select className="planner-task-priority" id={`priority-${task.id}`} value={task.priority ?? "normal"} onChange={(event) => setTasks((current) => current.map((item) => item.id === task.id ? { ...item, priority: event.target.value as TaskPriority } : item))}><option value="high">High</option><option value="normal">Normal</option><option value="low">Low</option></select>
                         <button type="button" className="planner-task-delete" onClick={() => setTasks((current) => current.filter((item) => item.id !== task.id))} aria-label={`Delete ${task.title}`}><Trash2 size={15} /></button>
                       </li>
                     ))}
                   </ul>
-                ) : null}
+                ) : <p className="planner-empty-hint">Add tasks, priorities, and time blocks for this date.</p>}
               </section>
 
+              <section className="planner-agenda-card" aria-label="Today's agenda">
+                <div className="planner-card-heading"><div><h2>Time plan</h2><p>Tasks with a time appear in your agenda.</p></div></div>
+                {scheduledTasks.length ? <ol>{scheduledTasks.map((task) => <li key={task.id} className={task.done ? "is-done" : ""}><time>{task.time}</time><span>{task.title}</span><i /></li>)}</ol> : <p className="planner-empty-hint">Add a time to any task to build your agenda.</p>}
+              </section>
+
+              <section className="planner-reflection-card" aria-label="Daily reflection">
+                <div><h2>End-of-day note</h2><p>Capture a small win or something to carry into tomorrow.</p></div>
+                <textarea value={dailyPlan.reflection} onChange={(event) => setDailyPlan((current) => ({ ...current, reflection: event.target.value }))} maxLength={1200} placeholder="What went well today?" aria-label="End-of-day reflection" />
+              </section>
+
+              <details className="planner-visual-board">
+                <summary>Open visual planning board</summary>
+                <p>Use the canvas for a freeform view, sketches, and sticky notes for this date.</p>
+                <DrawingNotebook storageScope={storageScope} bookId={`planner-${selectedKey}`} title="Visual planning board" legacyDateKey={selectedKey} compactControls />
+              </details>
+            </main>
+
+            <aside className="planner-side-column">
               <section className="planner-calendar" aria-label="Choose a planner date">
                 <div className="planner-calendar-heading">
                   <div>
@@ -402,8 +481,16 @@ export function TodayPlanner({
         </section>
       )}
 
-      {section === "bucket" && <CollectionBoard kind="bucket" storageScope={storageScope} />}
-      {section === "wishlist" && <CollectionBoard kind="wishlist" storageScope={storageScope} />}
+      <div className="pomodoro-section-host" style={{ display: section === "pomodoro" ? undefined : "none" }}>
+        <PomodoroSection storageScope={storageScope} />
+      </div>
+      {section === "media" && <MediaPlayerSection storageScope={storageScope} />}
+      <div className="studio-section-host" style={{ display: section === "studio" ? undefined : "none" }}>
+        <StudioSection isActive={section === "studio"} storageScope={storageScope} />
+      </div>
+      {section === "bookmarks" && <BookmarksSection storageScope={storageScope} />}
+
+      {section === "bucket" && <CollectionBoard storageScope={storageScope} />}
 
       {section === "activity" && <ActivityTracker storageScope={storageScope} />}
       {section === "portfolio" && <PortfolioEditor />}

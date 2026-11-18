@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FolderPlus, ImagePlus, Trash2, Upload, Video } from "lucide-react";
+import { FolderPlus, ImagePlus, Music2, Trash2, Upload, Video } from "lucide-react";
 
 type GalleryItem = {
   id: string;
   scope: string;
   name: string;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
   mimeType: string;
   createdAt: number;
   blob: Blob;
@@ -118,7 +118,8 @@ function MediaPreview({ item }: { item: GalleryItem }) {
   return item.type === "image"
     // eslint-disable-next-line @next/next/no-img-element
     ? <img className="gallery-preview" src={url} alt={item.name} />
-    : <video className="gallery-preview" src={url} controls preload="metadata" aria-label={item.name} />;
+    : item.type === "video" ? <video className="gallery-preview" src={url} controls preload="metadata" aria-label={item.name} />
+      : <div className="gallery-audio-preview"><Music2 size={28} /><strong title={item.name}>{item.name}</strong><audio src={url} controls preload="metadata" aria-label={item.name} /></div>;
 }
 
 export function Gallery({ storageScope }: { storageScope: string }) {
@@ -163,8 +164,8 @@ export function Gallery({ storageScope }: { storageScope: string }) {
     const uploaded: GalleryItem[] = [];
     try {
       for (const file of files) {
-        const type = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : null;
-        if (!type) throw new Error(`${file.name} is not a supported photo or video.`);
+        const type = file.type.startsWith("video/") ? "video" : file.type.startsWith("image/") ? "image" : file.type.startsWith("audio/") ? "audio" : null;
+        if (!type) throw new Error(`${file.name} is not a supported photo, video, or audio file.`);
         const item: GalleryItem = {
           id: `${encodeURIComponent(storageScope)}:${crypto.randomUUID()}`,
           scope: storageScope,
@@ -232,8 +233,8 @@ export function Gallery({ storageScope }: { storageScope: string }) {
   return (
     <section className="gallery-section" aria-label="Gallery">
       <header className="gallery-heading">
-        <div><p className="gallery-eyebrow">Your collection</p><h2>Gallery</h2><p>Keep photos and videos together in one place.</p></div>
-        <input ref={inputRef} className="sr-only" type="file" accept="image/*,video/*" multiple onChange={uploadFiles} aria-label="Choose photos and videos" />
+        <div><p className="gallery-eyebrow">Your collection</p><h2>Gallery</h2><p>Keep photos, videos, and audio together in one place.</p></div>
+        <input ref={inputRef} className="sr-only" type="file" accept="image/*,video/*,audio/*" multiple onChange={uploadFiles} aria-label="Choose photos, videos, and audio" />
         <div className="gallery-heading-actions">
           <button type="button" className="planit-secondary-button" onClick={() => setShowFolderForm((visible) => !visible)}><FolderPlus size={16} /> New folder</button>
           <button type="button" className="planit-primary-button" onClick={() => inputRef.current?.click()} disabled={busy || loadedScope !== storageScope}><Upload size={16} /> {busy ? "Uploading…" : "Upload media"}</button>
@@ -254,7 +255,7 @@ export function Gallery({ storageScope }: { storageScope: string }) {
             <article className="gallery-item" key={item.id}>
               <MediaPreview item={item} />
               <div className="gallery-item-caption">
-                <span className="gallery-item-type">{item.type === "image" ? <ImagePlus size={13} /> : <Video size={13} />}{item.type}</span>
+                <span className="gallery-item-type">{item.type === "image" ? <ImagePlus size={13} /> : item.type === "video" ? <Video size={13} /> : <Music2 size={13} />}{item.type}</span>
                 <strong title={item.name}>{item.name}</strong>
                 <button type="button" onClick={() => void removeItem(item)} aria-label={`Delete ${item.name}`} title="Delete"><Trash2 size={15} /></button>
               </div>
@@ -263,7 +264,7 @@ export function Gallery({ storageScope }: { storageScope: string }) {
         </div>
       ) : (
         <button type="button" className="gallery-empty" onClick={() => inputRef.current?.click()} disabled={busy || loadedScope !== storageScope}>
-          <span><ImagePlus size={23} /></span><strong>{selectedFolder ? `${selectedFolder.name} is empty` : "Your gallery is empty"}</strong><small>Add photos or videos from this device.</small>
+          <span><ImagePlus size={23} /></span><strong>{selectedFolder ? `${selectedFolder.name} is empty` : "Your gallery is empty"}</strong><small>Add photos, videos, or audio from this device.</small>
         </button>
       )}
     </section>
