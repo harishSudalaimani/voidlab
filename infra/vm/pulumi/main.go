@@ -211,7 +211,7 @@ func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.V
 		Name: pulumi.String("cloudinit-" + vm.name + ".iso"),
 		Pool: pulumi.String(cfg.poolName),
 		Target: &libvirt.VolumeTargetArgs{
-			Format: &libvirt.VolumeTargetFormatArgs{Type: pulumi.String("raw")},
+			Format: &libvirt.VolumeTargetFormatArgs{Type: pulumi.String("iso")},
 		},
 		Create: &libvirt.VolumeCreateArgs{
 			Content: &libvirt.VolumeCreateContentArgs{Url: cloudInit.Path},
