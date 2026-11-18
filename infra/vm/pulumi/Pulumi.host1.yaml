@@ -1,5 +1,5 @@
 config:
-  libvirt:uri: "qemu+sshcmd://void@192.168.29.52/system?keyfile=/home/harish/.ssh/id_ed25519_voidlab&knownhosts=/home/harish/.ssh/known_hosts&proxy=native"
+  libvirt:uri: "qemu+sshcmd://void@192.168.29.52/system?keyfile=/Users/harish/.ssh/voidlab&knownhosts=/Users/harish/.ssh/known_hosts&proxy=native"
   voidlab-vm:networkName: voidlab-network
   voidlab-vm:networkCIDR: 10.20.0.0/24
   voidlab-vm:gateway: 10.20.0.1
@@ -12,7 +12,7 @@ config:
   voidlab-vm:poolName: voidlab-pool
   voidlab-vm:poolPath: /var/lib/libvirt/images/voidlab
   voidlab-vm:ubuntuImageURL: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
-  voidlab-vm:sshPublicKeyPath: /home/harish/.ssh/id_ed25519_voidlab.pub
+  voidlab-vm:sshPublicKeyPath: /Users/harish/.ssh/voidlab.pub
   voidlab-vm:timezone: Asia/Kolkata
   voidlab-vm:cpVCPU: 1
   voidlab-vm:workerVCPU: 1
