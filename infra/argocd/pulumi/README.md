@@ -1,84 +1,72 @@
-# VoidLab Argo CD installation
+# VoidLab Argo CD bootstrap
 
-This independent Pulumi Go project installs the official Argo CD Helm chart into the existing VoidLab Kubernetes cluster. It creates the `argocd` namespace and Helm release, and schedules all Argo CD workloads onto the Kubernetes node `worker-1` (`worker-01` is not a node name in this cluster).
+This Pulumi project bootstraps Argo CD in the existing Kubernetes cluster and creates one root Argo CD `Application`. The Helm release installs Argo CD; the root Application watches `gitops/argocd/applications` in this repository so that future application definitions can be delivered through Argo CD.
 
-This project does not manage VMs or bootstrap Kubernetes/Cilium. It installs Argo CD only; a GitOps root `Application` will be added once the repository URL, branch, and application path are known.
+## Placement
 
-## Versions and placement
+All Argo CD chart workloads inherit the chart's global node selector and are pinned to Kubernetes node `worker-3` (`10.21.0.13`), the VM running on host2 (`dark@192.168.29.81`). The selector affects only Argo CD's own pods. Applications managed by Argo CD can schedule across the cluster unless their manifests set their own placement rules.
 
-The project pins Argo Helm chart `10.18.0`, which packages Argo CD `3.6.1` and declares Kubernetes `>=1.25.0`; the existing cluster runs Kubernetes 1.37. It pulls the chart from the official OCI artifact `oci://ghcr.io/argoproj/argo-helm/argo-cd`. This avoids the GitHub release-assets download endpoint that timed out during the first update. Its `global.nodeSelector` is inherited by the component pods unless overridden, so the configured selector places Argo CD workloads on `worker-1`.
+The chart uses its single-replica, non-HA defaults. Argo CD is unavailable while `worker-3` is down. Its API and UI stay on a `ClusterIP`; access them with `kubectl port-forward` through the existing control-plane SSH tunnel.
 
-This uses the chart's non-HA defaults and a `ClusterIP` service. Keeping every Argo CD component on one node is suitable for this home lab, but Argo CD will be unavailable if `worker-1` is down. The UI and API are not exposed by a LoadBalancer, NodePort, or ingress; use `kubectl port-forward` through the existing SSH API tunnel.
+## Configuration and ownership
 
-The Kubernetes Pulumi provider reads the local kubeconfig and its current context. It does not copy the kubeconfig or cluster credentials into this project's Pulumi configuration. Set `KUBECONFIG` to the kubeconfig exported by the Kubernetes project when running Pulumi.
+- `Pulumi.argocd.yaml` pins chart `10.18.0`, namespace `argocd`, and node `worker-3`.
+- `main.go` manages the namespace, Helm release, and root `Application` only.
+- The root Application watches `gitops/argocd/applications` from `https://github.com/harishSudalaimani/voidlab.git`, revision `main`, with automated sync, pruning, and self-healing enabled. It allows an empty directory so the root app can start before the first child Application is added. Removing a child Application manifest from Git prunes that Application resource.
+- Put Argo CD `Application` manifests in `gitops/argocd/applications`. Those child Applications should point to workload manifests elsewhere in the repository. Do not add application workloads to this Pulumi project.
+- If the GitHub repository is private, configure repository credentials in Argo CD before the root Application can sync. Do not commit a token or deploy key.
+- The existing Kubernetes Pulumi stack remains the one-time cluster bootstrap. Argo CD will manage future platform and application deployments; transfer ownership of already-installed resources such as Cilium deliberately before asking Argo CD to reconcile them.
 
-## Files
-
-- `Pulumi.yaml`: project identity `voidlab-argocd` and Pulumi Cloud backend.
-- `Pulumi.dev.yaml`: chart, namespace, and node selector for the `dev` stack.
-- `main.go`: namespace and Helm release resources, plus stack outputs.
-- `go.mod`: Pulumi Go SDK and Kubernetes provider SDK dependencies.
-- `config/`: reserved for later Argo CD bootstrap configuration; no credentials are stored here.
+The Kubernetes provider uses the local kubeconfig selected by `KUBECONFIG`; it does not store cluster credentials in this project's Pulumi config. The Argo CD Pulumi stack is independent from the Kubernetes stack.
 
 ## Deploy manually
 
-First, export a fresh kubeconfig from the successful Kubernetes stack. This writes to a temporary file, verifies that it has a current context, and only then replaces `/home/harish/.kube/voidlab`:
+These commands are for you to run on the development machine. They do not SSH to the hypervisor; Pulumi connects through the Kubernetes API tunnel.
 
-```bash
-cd /home/harish/Documents/voidlab/infra/kubernetes/pulumi
-set -euo pipefail
-umask 077
-mkdir -p /home/harish/.kube
-tmp_config="$(mktemp /home/harish/.kube/voidlab.XXXXXX)"
-trap 'rm -f "$tmp_config"' EXIT
-pulumi stack output kubeconfigBase64 --stack snharish85-gmail-com-org/voidlab-kubernetes/dev --show-secrets | base64 --decode > "$tmp_config"
-test -s "$tmp_config"
-kubectl --kubeconfig "$tmp_config" config current-context
-mv "$tmp_config" /home/harish/.kube/voidlab
-trap - EXIT
-```
-
-Start the Kubernetes API tunnel in one terminal and leave it open:
+In one terminal, keep the control-plane tunnel open:
 
 ```bash
 k -N -L 16443:10.20.0.10:6443
 ```
 
-In a second terminal, select the kubeconfig and prepare the Go project:
+In another terminal, create a local kubeconfig from the Kubernetes stack output, then keep this tunnel and shell open. The secret is piped directly into the file rather than printed:
 
 ```bash
-cd /home/harish/Documents/voidlab/infra/argocd/pulumi
-export KUBECONFIG=/home/harish/.kube/voidlab
+cd /Users/harish/Documents/voidlab/infra/kubernetes/pulumi
+umask 077
+mkdir -p "$HOME/.kube"
+pulumi stack output kubeconfigBase64 --stack snharish85-gmail-com-org/voidlab-kubernetes/k8 --show-secrets | base64 -D > "$HOME/.kube/voidlab"
+
+export KUBECONFIG="$HOME/.kube/voidlab"
+kubectl config current-context
 kubectl get nodes -o wide
-go mod tidy
-gofmt -w main.go
-go build -o /tmp/voidlab-argocd-check ./...
 ```
 
-The Pulumi Cloud stack identity is `snharish85-gmail-com-org/voidlab-argocd/dev`. If it already exists, select it. If it does not exist, initialize this independent Argo CD stack once:
+Then select the Argo CD stack and verify the cluster is reachable before previewing:
 
 ```bash
-pulumi stack select snharish85-gmail-com-org/voidlab-argocd/dev
+cd /Users/harish/Documents/voidlab/infra/argocd/pulumi
+pulumi stack select snharish85-gmail-com-org/voidlab-argocd/argocd
+pulumi preview --stack snharish85-gmail-com-org/voidlab-argocd/argocd
 ```
 
-Or, only when it does not exist:
+If the stack does not exist yet:
 
 ```bash
-pulumi stack init snharish85-gmail-com-org/voidlab-argocd/dev
+pulumi stack init snharish85-gmail-com-org/voidlab-argocd/argocd
 ```
 
-Review the plan before applying it:
+After reviewing the preview, apply it:
 
 ```bash
-pulumi preview --stack snharish85-gmail-com-org/voidlab-argocd/dev
-pulumi up --stack snharish85-gmail-com-org/voidlab-argocd/dev
+pulumi up --stack snharish85-gmail-com-org/voidlab-argocd/argocd
 ```
 
-The preview should show only the `argocd` namespace and Helm release, with no Libvirt resources or changes to the Kubernetes bootstrap project.
+The preview should create the `argocd` namespace, Argo CD Helm release, and `voidlab-applications` root Application. It should not create or modify VMs, Kubernetes nodes, Cilium, or workload resources. `Pulumi.argocd.yaml` configures the Argo CD stack; the kubeconfig/current context selects the Kubernetes cluster.
 
 ## Access Argo CD
 
-With the API tunnel and `KUBECONFIG` still active, forward the Argo CD HTTPS service:
+With the API tunnel and `KUBECONFIG` still active:
 
 ```bash
 kubectl -n argocd port-forward svc/argocd-server 8080:443
@@ -87,22 +75,18 @@ kubectl -n argocd port-forward svc/argocd-server 8080:443
 Open `https://localhost:8080`. The initial username is `admin`. Retrieve the initial password directly from the cluster when needed; do not paste it into source files or Pulumi configuration:
 
 ```bash
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 --decode
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -D
 printf '\n'
 ```
 
-Change the initial password after first login. Argo CD's official installation keeps its API server inside the cluster by default; this project preserves that by using a `ClusterIP` service.
+Change the initial password after first login. If the repository is private, add its read-only Git credentials to Argo CD so `voidlab-applications` can sync.
 
-## Future GitOps bootstrap
+## Pinned chart details
 
-The next step is to point Argo CD at the GitOps repository with a root `Application` or `ApplicationSet`. The repository URL, branch, and directory layout have not been specified, so this project does not create a placeholder application that would fail to sync. After that source is configured, Argo CD can own Cilium and the platform/application projects. Transfer Cilium's existing Helm release deliberately so Pulumi and Argo CD do not reconcile it independently.
+The project pins the official Argo Helm chart `10.18.0` from `oci://ghcr.io/argoproj/argo-helm/argo-cd`. The chart's `global.nodeSelector` is defined as the default selector for all components. No component-specific selector overrides are set here.
 
-## References
+References:
 
-- [Official Argo Helm chart releases and OCI usage](https://github.com/argoproj/argo-helm)
-- [Pulumi Helm Release support for OCI charts](https://www.pulumi.com/dev/tutorials/kubernetes-helm-part-one/)
-- [Pinned chart metadata for 10.18.0](https://github.com/argoproj/argo-helm/blob/argo-cd-10.18.0/charts/argo-cd/Chart.yaml)
-- [Official chart values](https://github.com/argoproj/argo-helm/blob/argo-cd-10.18.0/charts/argo-cd/values.yaml)
+- [Official Argo Helm chart values for 10.18.0](https://github.com/argoproj/argo-helm/blob/argo-cd-10.18.0/charts/argo-cd/values.yaml)
 - [Pulumi Kubernetes provider configuration](https://www.pulumi.com/registry/packages/kubernetes/installation-configuration/)
-- [Argo CD installation guide](https://argo-cd.readthedocs.io/en/release-3.6/operator-manual/installation/)
 - [Argo CD local access and initial password](https://argo-cd.readthedocs.io/en/stable/try_argo_cd_locally/)

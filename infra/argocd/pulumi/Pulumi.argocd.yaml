@@ -1,0 +1,7 @@
+config:
+  voidlab-argocd:chartVersion: 10.18.0
+  voidlab-argocd:namespace: argocd
+  voidlab-argocd:nodeName: worker-3
+  voidlab-argocd:gitOpsRepoURL: https://github.com/harishSudalaimani/voidlab.git
+  voidlab-argocd:gitOpsRevision: main
+  voidlab-argocd:gitOpsApplicationsPath: gitops/argocd/applications
