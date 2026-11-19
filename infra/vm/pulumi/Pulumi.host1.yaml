@@ -15,9 +15,9 @@ config:
   voidlab-vm:timezone: Asia/Kolkata
   voidlab-vm:controlPlaneCount: 1
   voidlab-vm:workerCount: 2
-  voidlab-vm:cpVCPU: 1
+  voidlab-vm:cpVCPU: 2
   voidlab-vm:workerVCPU: 1
-  voidlab-vm:cpMemoryMiB: 2048
-  voidlab-vm:workerMemoryMiB: 4096
+  voidlab-vm:cpMemoryMiB: 3072
+  voidlab-vm:workerMemoryMiB: 6144
   voidlab-vm:cpDiskGiB: 30
   voidlab-vm:workerDiskGiB: 40
