@@ -4,6 +4,7 @@ set -euo pipefail
 node_name="$1"
 expected_ip="$2"
 allow_single_cpu="$3"
+node_addresses_csv="$4"
 
 . /etc/os-release
 if [[ "${ID:-}" != "ubuntu" || "${VERSION_ID:-}" != "24.04" ]]; then
@@ -41,4 +42,15 @@ if [[ ! -e /sys/fs/cgroup/cgroup.controllers ]]; then
   exit 1
 fi
 
-echo "${node_name}: Ubuntu 24.04, hostname, address, memory, and cgroup preflight passed"
+IFS=',' read -r -a node_addresses <<<"$node_addresses_csv"
+for peer_ip in "${node_addresses[@]}"; do
+  if [[ "$peer_ip" == "$expected_ip" ]]; then
+    continue
+  fi
+  if ! timeout 3 bash -c "exec 3<>/dev/tcp/${peer_ip}/22" >/dev/null 2>&1; then
+    echo "${node_name}: cannot reach peer ${peer_ip} on TCP 22; check the WireGuard routes and host forwarding" >&2
+    exit 1
+  fi
+done
+
+echo "${node_name}: Ubuntu 24.04, hostname, address, memory, cgroup, and six-node routing preflight passed"

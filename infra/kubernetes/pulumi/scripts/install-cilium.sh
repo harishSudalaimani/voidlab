@@ -53,7 +53,7 @@ if kubectl get daemonset cilium -n kube-system >/dev/null 2>&1; then
   exit 0
 fi
 
-# Use kubeadm's per-node PodCIDRs and VXLAN across the VoidLab VM network.
+# Use kubeadm's per-node PodCIDRs and VXLAN across the routed WireGuard link.
 # Explicit API server addressing lets Cilium route services without kube-proxy.
 # One operator replica keeps the small cluster light.
 cilium install \

@@ -1,80 +1,59 @@
 # VoidLab Kubernetes bootstrap
 
-This independent Pulumi Go project configures the four existing Ubuntu Server 24.04 VMs for Kubernetes 1.37, initializes kubeadm on `cp`, joins the three workers, installs Cilium as the CNI, waits for the nodes to become Ready, and exports a kubeconfig for use through an SSH tunnel.
+This independent Pulumi Go project configures the six Ubuntu Server 24.04 VMs for Kubernetes 1.37: it initializes kubeadm on `cp`, joins five workers split across two hypervisors, installs Cilium as the CNI, waits for all six nodes to become Ready, and exports a kubeconfig for use through an SSH tunnel.
 
 It does not create or manage VMs. It does not install Argo CD, Kubernetes platform services, or applications.
 
 ## Cilium version and network settings
 
-The stack pins Cilium `1.21.0-pre.4` and Cilium CLI `v0.20.1` in `Pulumi.dev.yaml`. Cilium 1.21 is a prerelease as of this project setup. Cilium's current development compatibility table includes Kubernetes 1.37, while its current stable documentation is for Cilium 1.20.4 and does not list Kubernetes 1.37. The selected prerelease is therefore an early-access choice for the requested Kubernetes version, not a stable Cilium release. Change `ciliumVersion` after a stable Cilium release documents Kubernetes 1.37 support.
+The stack pins Cilium `1.21.0-pre.4` and Cilium CLI `v0.20.1` in `Pulumi.k8.yaml`. Cilium 1.21 is a prerelease as of this project setup. Cilium's current development compatibility table includes Kubernetes 1.37, while its current stable documentation is for Cilium 1.20.4 and does not list Kubernetes 1.37. The selected prerelease is therefore an early-access choice for the requested Kubernetes version, not a stable Cilium release. Change `ciliumVersion` after a stable Cilium release documents Kubernetes 1.37 support.
 
-The cluster uses kubeadm without its kube-proxy phase, and Cilium runs in full kube-proxy replacement mode. Cilium uses kubeadm's per-node PodCIDRs (`ipam.mode=kubernetes`), VXLAN tunneling across the VoidLab private VM network, and the control-plane IP and port for direct API server access. The operator is limited to one replica for this small cluster. The Cilium CLI archive is checked against that release's SHA-256 file. Pulumi waits for Cilium and all four Kubernetes nodes to become Ready.
+The cluster uses kubeadm without its kube-proxy phase, and Cilium runs in full kube-proxy replacement mode. Cilium uses kubeadm's per-node PodCIDRs (`ipam.mode=kubernetes`), VXLAN tunneling across a routed WireGuard link between the hypervisors, and the control-plane IP and port for direct API server access. The operator is limited to one replica for this small cluster. The Cilium CLI archive is checked against that release's SHA-256 file. Pulumi waits for Cilium and all six Kubernetes nodes to become Ready.
 
 Argo CD will later need a deliberate ownership handoff for the existing Cilium Helm release if GitOps is to manage Cilium upgrades and configuration. Avoid configuring Pulumi and Argo CD to independently reconcile the same Cilium release.
 
 ## Safety and prerequisites
 
 - Pulumi state belongs to the independent Pulumi Cloud project `voidlab-kubernetes`; no stack is created by these files.
-- SSH connections go through the Fedora hypervisor (`192.168.29.52`) to the VM NAT addresses. The Pulumi Command provider verifies the hypervisor and each VM host key. It refuses to connect when those keys are not configured.
-- The private SSH key is read from `/home/harish/.ssh/id_ed25519_voidlab` at runtime. It is not stored in this repository or Pulumi config. Pulumi treats the key input and bootstrap outputs as secrets.
-- The preflight commands only inspect OS, hostname, IP address, RAM, cgroup version, and CPU count. Package installation starts only after all four preflights pass.
+- SSH connections to `cp`, `worker-1`, and `worker-2` go through host1 (`192.168.29.52`). Connections to `worker-3`, `worker-4`, and `worker-5` go through host2 (`192.168.29.81`). The Pulumi Command provider verifies both hypervisors and all six VM host keys using the existing local `known_hosts` entries and read-only scans from each authenticated hypervisor.
+- The VM SSH private key is read from `/Users/harish/.ssh/voidlab`; the hypervisor keys are read from `/Users/harish/.ssh/voidlab` and `/Users/harish/.ssh/dark`. They are not stored in this repository or Pulumi config. Pulumi treats the key inputs and bootstrap outputs as secrets.
+- All six VMs must have routed node-to-node connectivity before bootstrapping. The two libvirt NAT networks remain separate; a WireGuard tunnel between the hypervisors must route `10.20.0.0/24` and `10.21.0.0/24` in both directions and allow Cilium VXLAN traffic.
+- The hypervisor setup installs `wireguard-tools`, writes the WireGuard configuration, opens UDP 51820, enables forwarding, assigns `wg-voidlab` to a dedicated firewalld zone, and adds subnet-scoped firewalld policies. It ensures the existing `voidlab-network` is active and set to autostart, installs a libvirt network hook, and explicitly applies and verifies the routed-subnet allow and NAT-bypass rules in libvirt's own nftables chains before node preflight. The hook reapplies the rules whenever `voidlab-network` starts or updates after libvirt loads the hook. It requires passwordless sudo and an already active `firewalld`; it does not enable firewalld automatically.
+- The VM preflight checks OS, hostname, IP address, RAM, cgroup version, CPU count, and TCP reachability to every node. Kubernetes package installation starts only after all six preflights pass.
 - `cp` is configured with one vCPU. You chose to accept the Kubernetes 1.37 kubeadm CPU preflight exception; the project records that choice and passes `--ignore-preflight-errors=NumCPU` to kubeadm. This is below the upstream recommendation of two CPUs for a control-plane node.
-- After the preflight, updates disable swap, configure containerd with systemd cgroups, install and hold kubelet/kubeadm/kubectl from the official `v1.37` apt repository, and perform kubeadm bootstrap. These are changes inside the four Ubuntu guests.
+- After the preflight, updates disable swap, configure containerd with systemd cgroups, install and hold kubelet/kubeadm/kubectl from the official `v1.37` apt repository, and perform kubeadm bootstrap. These are changes inside all six Ubuntu guests.
 - kubeadm tokens and the exported kubeconfig are secret Pulumi outputs. Do not use `--show-secrets` in a shared terminal or paste those outputs into chat.
 
 ## SSH host-key configuration
 
-The Command provider's SSH host-key verification is mandatory here. Configure the public host key for the hypervisor and for each VM. Each value must contain only the key type and base64 key, for example `ssh-ed25519 AAAAC3...`.
+SSH host-key verification is automatic. The Pulumi program reads the two hypervisor host keys from the development machine's `~/.ssh/known_hosts` (checking each host IP and its `k`/`k1` shortcut). Each hypervisor then scans only its own private libvirt network for the VM host keys. Those discovered keys are passed to the SSH connections to the six guests; they are not saved as Pulumi config.
 
-You can collect candidate public keys with `ssh-keyscan`, then verify their fingerprints through a trusted channel before configuring them. Do not treat a scan by itself as verification.
+Before the first preview, connect to both hypervisors with the existing trusted SSH shortcuts so their keys are present in `known_hosts`. The VM scans run during `pulumi up`; if a VM's SSH service is not ready yet or the hypervisor lacks `ssh-keyscan`, the scan fails with the affected IP.
 
-```bash
-# Hypervisor key from the development machine:
-ssh-keyscan -t ed25519 192.168.29.52
-
-# VM keys from the hypervisor, which can reach the NAT subnet:
-k 'for ip in 10.20.0.10 10.20.0.11 10.20.0.12 10.20.0.13; do ssh-keyscan -t ed25519 "$ip" 2>/dev/null; done'
-```
-
-If the Pulumi Cloud stack does not exist yet, create it once. This creates only the Kubernetes project's independent state:
+If the Pulumi Cloud stack does not exist yet, create it once. This creates only the Kubernetes project's independent state; `Pulumi.k8.yaml` supplies the VM addresses, SSH key paths, and single-CPU control-plane exception:
 
 ```bash
-cd /home/harish/Documents/voidlab/infra/kubernetes/pulumi
-pulumi stack init snharish85-gmail-com-org/voidlab-kubernetes/dev
+cd /Users/harish/Documents/voidlab/infra/kubernetes/pulumi
+pulumi stack init snharish85-gmail-com-org/voidlab-kubernetes/k8
 ```
-
-Set each verified key, replacing the placeholders with the key type and key data (omit the host/address column):
-
-The `HYPERVISOR_KEY_DATA`, `CP_KEY_DATA`, and `WORKER_*_KEY_DATA` strings below are placeholders and must never be entered literally. Copy the key type and base64 field from the matching `ssh-keyscan` line after verifying its fingerprint. For example, from `192.168.29.52 ssh-ed25519 AAAA...`, use `ssh-ed25519 AAAA...` as the value.
-
-```bash
-cd /home/harish/Documents/voidlab/infra/kubernetes/pulumi
-pulumi config set voidlab-kubernetes:hypervisorHostKey 'ssh-ed25519 HYPERVISOR_KEY_DATA' --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
-pulumi config set voidlab-kubernetes:cpHostKey 'ssh-ed25519 CP_KEY_DATA' --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
-pulumi config set voidlab-kubernetes:worker1HostKey 'ssh-ed25519 WORKER_1_KEY_DATA' --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
-pulumi config set voidlab-kubernetes:worker2HostKey 'ssh-ed25519 WORKER_2_KEY_DATA' --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
-pulumi config set voidlab-kubernetes:worker3HostKey 'ssh-ed25519 WORKER_3_KEY_DATA' --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
-```
-
-These are public keys, not secrets. The private key is never passed through a shell command or saved by these config commands.
 
 ## Validate and deploy manually
 
 Run these commands on the Fedora GUI development machine. The named Pulumi Cloud stack must exist first; this project does not initialize stacks.
 
 ```bash
-cd /home/harish/Documents/voidlab/infra/kubernetes/pulumi
+cd /Users/harish/Documents/voidlab/infra/kubernetes/pulumi
 gofmt -w main.go
-pulumi preview --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
+pulumi preview --stack snharish85-gmail-com-org/voidlab-kubernetes/k8
 ```
 
-After the successful bootstrap, the preview should show no changes unless you intentionally modify configuration or scripts. This project manages only remote Kubernetes setup commands; it must not show Libvirt or VM resources. Apply only a reviewed plan:
+After the successful bootstrap, the preview should show no changes unless you intentionally modify configuration or scripts. This project manages remote hypervisor networking and Kubernetes bootstrap commands; it must not show Libvirt or VM resources. Apply only a reviewed plan:
 
 ```bash
-pulumi up --stack snharish85-gmail-com-org/voidlab-kubernetes/dev
+pulumi up --stack snharish85-gmail-com-org/voidlab-kubernetes/k8
 ```
 
-An intended bootstrap update initializes `cp` without kube-proxy, joins the workers, installs the configured Cilium prerelease in replacement mode, waits for all nodes to become Ready, and exports a kubeconfig. Cilium's kube-proxy-free setup uses the API server address and port directly, as described in its [kubeadm guide](https://docs.cilium.io/en/latest/network/kubernetes/kubeproxy-free/).
+An intended bootstrap update initializes `cp` without kube-proxy, joins all five workers, installs the configured Cilium prerelease in replacement mode, waits for all six nodes to become Ready, and exports a kubeconfig. Cilium's kube-proxy-free setup uses the API server address and port directly, as described in its [kubeadm guide](https://docs.cilium.io/en/latest/network/kubernetes/kubeproxy-free/).
 
 ## Connect kubectl
 
@@ -83,7 +62,7 @@ After a successful update, save the secret kubeconfig output on the development 
 ```bash
 umask 077
 mkdir -p ~/.kube
-pulumi stack output kubeconfigBase64 --stack snharish85-gmail-com-org/voidlab-kubernetes/dev --show-secrets | base64 --decode > ~/.kube/voidlab
+pulumi stack output kubeconfigBase64 --stack snharish85-gmail-com-org/voidlab-kubernetes/k8 --show-secrets | base64 --decode > ~/.kube/voidlab
 ```
 
 Keep an SSH tunnel open in a separate terminal:
@@ -98,11 +77,12 @@ Then query the cluster from another terminal:
 KUBECONFIG=~/.kube/voidlab kubectl get nodes -o wide
 ```
 
-The bootstrap waits until the four nodes report `Ready`; Cilium's agents and operator must be healthy for that to complete.
+The bootstrap waits until all six nodes report `Ready`; Cilium's agents and operator must be healthy for that to complete.
 
 ## Recovery notes
 
 - Pulumi remote commands do not have delete commands, so removing a command resource from state will not uninstall packages, reset kubeadm, or delete cluster data.
+- WireGuard keys, interface configuration, routes, sysctl settings, firewalld zones and policies, libvirt nftables rules, and the libvirt network hook persist on both hypervisors if this stack is destroyed. The hook installer preserves a pre-existing `/etc/libvirt/hooks/network` script at `/etc/libvirt/hooks/network.voidlab-original`; remove the VoidLab setup manually only when you intentionally retire the routed link.
 - Cilium is installed by a remote command and persists in the cluster. Removing that Pulumi command from state does not uninstall Cilium. Plan any migration of its Helm release to Argo CD before GitOps begins managing it.
 - `joinTokenGeneration` is a deliberate rerun trigger for control-plane init, worker joins, readiness checking, and kubeconfig export. Increment it only when you need to rerun that bootstrap sequence. Do not paste the generated token into source or a non-secret Pulumi setting.
 - Do not rerun `kubeadm init` manually on an initialized control plane. The bootstrap script checks for `/etc/kubernetes/admin.conf` before initializing.

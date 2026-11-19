@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-expected_nodes=4
+expected_nodes=6
 for attempt in $(seq 1 120); do
   node_count="$(kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes --no-headers 2>/dev/null | wc -l)"
   if (( node_count >= expected_nodes )); then

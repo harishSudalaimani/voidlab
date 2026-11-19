@@ -422,14 +422,25 @@ func validateSettings(cfg settings) error {
 	if !strings.HasPrefix(cfg.poolPath, "/") {
 		return fmt.Errorf("poolPath %q must be an absolute host path", cfg.poolPath)
 	}
+	seenIPs := map[netip.Addr]string{}
+	seenMACs := map[string]string{}
 	for _, vm := range cfg.vms {
 		address, err := netip.ParseAddr(vm.ipConfigKey)
 		if err != nil || !address.Is4() || !prefix.Contains(address) || address == gateway {
 			return fmt.Errorf("reserved IP %q for %s must be an IPv4 address in %s and differ from the gateway", vm.ipConfigKey, vm.name, cfg.cidr)
 		}
+		if prior, exists := seenIPs[address]; exists {
+			return fmt.Errorf("reserved IP %q is assigned to both %s and %s", address, prior, vm.name)
+		}
+		seenIPs[address] = vm.name
 		if !address.Less(start) && !end.Less(address) {
 			return fmt.Errorf("reserved IP %q for %s must remain outside the DHCP dynamic range", vm.ipConfigKey, vm.name)
 		}
+		mac := strings.ToLower(vm.mac)
+		if prior, exists := seenMACs[mac]; exists {
+			return fmt.Errorf("MAC address %q is assigned to both %s and %s", vm.mac, prior, vm.name)
+		}
+		seenMACs[mac] = vm.name
 		if vm.vcpus < 1 || vm.memoryMiB < 1 || vm.diskGiB < 1 || vm.dataDiskGiB < 0 {
 			return fmt.Errorf("CPU, memory, and system disk settings for %s must be positive, and data disk size must not be negative", vm.name)
 		}
