@@ -1,0 +1,24 @@
+config:
+  libvirt:uri: "qemu+sshcmd://k1/system?proxy=auto"
+  voidlab-vm:networkName: voidlab-network
+  voidlab-vm:networkCIDR: 10.21.0.0/24
+  voidlab-vm:gateway: 10.21.0.1
+  voidlab-vm:dhcpRangeStart: 10.21.0.100
+  voidlab-vm:dhcpRangeEnd: 10.21.0.254
+  voidlab-vm:worker1IP: 10.21.0.13
+  voidlab-vm:worker2IP: 10.21.0.14
+  voidlab-vm:worker3IP: 10.21.0.15
+  voidlab-vm:poolName: voidlab-pool
+  voidlab-vm:poolPath: /data/vms/voidlab
+  voidlab-vm:dataPoolName: voidlab-data-pool
+  voidlab-vm:dataPoolPath: /storage/voidlab
+  voidlab-vm:ubuntuImageURL: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+  voidlab-vm:sshPublicKeyPath: /Users/harish/.ssh/voidlab.pub
+  voidlab-vm:timezone: Asia/Kolkata
+  voidlab-vm:controlPlaneCount: 0
+  voidlab-vm:workerCount: 3
+  voidlab-vm:workerIndexOffset: 2
+  voidlab-vm:workerVCPU: 2
+  voidlab-vm:workerMemoryMiB: 9216
+  voidlab-vm:workerDiskGiB: 75
+  voidlab-vm:vmDataDiskGiB: 600
