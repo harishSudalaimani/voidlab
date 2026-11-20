@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/netip"
+	"net/url"
 	"os"
-	"strconv"
+	"path/filepath"
 	"strings"
 
+	"github.com/harish/voidlab/infra/inventory"
 	"github.com/pulumi/pulumi-terraform-provider/sdks/go/libvirt/libvirt"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -21,7 +23,7 @@ const (
 type vmSpec struct {
 	name        string
 	role        string
-	ipConfigKey string
+	ip          string
 	mac         string
 	vcpus       int
 	memoryMiB   int
@@ -49,7 +51,11 @@ type settings struct {
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := config.New(ctx, "voidlab-vm")
-		publicKeyPath := configString(cfg, "sshPublicKeyPath", "/home/harish/.ssh/id_ed25519_voidlab.pub")
+		var host inventory.Host
+		if err := cfg.GetObject("host", &host); err != nil {
+			return fmt.Errorf("read host settings: %w", err)
+		}
+		publicKeyPath := host.SSHPublicKeyPath
 		keyBytes, err := os.ReadFile(publicKeyPath)
 		if err != nil {
 			return fmt.Errorf("read SSH public key %q: %w", publicKeyPath, err)
@@ -59,64 +65,48 @@ func main() {
 			return fmt.Errorf("%q does not contain an OpenSSH public key", publicKeyPath)
 		}
 
-		controlPlaneCount := configInt(cfg, "controlPlaneCount", 1)
-		workerCount := configInt(cfg, "workerCount", 3)
-		workerIndexOffset := configInt(cfg, "workerIndexOffset", 0)
-		if controlPlaneCount < 0 || controlPlaneCount > 1 {
-			return fmt.Errorf("controlPlaneCount must be 0 or 1")
+		vms := make([]vmSpec, 0, len(host.Nodes))
+		for i, node := range host.Nodes {
+			vms = append(vms, makeVMSpec(node, i))
 		}
-		if workerCount < 0 {
-			return fmt.Errorf("workerCount must not be negative")
+		imageURL := host.UbuntuImageURL
+		if imageURL == "" {
+			imageURL = defaultImageURL
 		}
-		if workerIndexOffset < 0 {
-			return fmt.Errorf("workerIndexOffset must not be negative")
+		timezone := host.Timezone
+		if timezone == "" {
+			timezone = "Asia/Kolkata"
 		}
-		cpVCPU := configInt(cfg, "cpVCPU", 1)
-		workerVCPU := configInt(cfg, "workerVCPU", 1)
-		cpMemory := configInt(cfg, "cpMemoryMiB", 2048)
-		workerMemory := configInt(cfg, "workerMemoryMiB", 4096)
-		cpDisk := configInt(cfg, "cpDiskGiB", 20)
-		workerDisk := configInt(cfg, "workerDiskGiB", 50)
-		vmDataDisk := configInt(cfg, "vmDataDiskGiB", 0)
-		vms := make([]vmSpec, 0, controlPlaneCount+workerCount)
-		if controlPlaneCount == 1 {
-			vms = append(vms, vmSpec{name: "cp", role: "Kubernetes control plane", ipConfigKey: "cpIP", mac: "52:54:00:20:00:10", vcpus: cpVCPU, memoryMiB: cpMemory, diskGiB: cpDisk, dataDiskGiB: vmDataDisk})
-		}
-		for i := 1; i <= workerCount; i++ {
-			workerNumber := i + workerIndexOffset
-			vms = append(vms, vmSpec{
-				name:        fmt.Sprintf("worker-%d", workerNumber),
-				role:        "Kubernetes worker",
-				ipConfigKey: fmt.Sprintf("worker%dIP", i),
-				mac:         fmt.Sprintf("52:54:00:20:00:%02x", 0x10+i),
-				vcpus:       workerVCPU,
-				memoryMiB:   workerMemory,
-				diskGiB:     workerDisk,
-				dataDiskGiB: vmDataDisk,
-			})
+		dataPoolName := host.DataPoolName
+		if dataPoolName == "" {
+			dataPoolName = "voidlab-data-pool"
 		}
 		cfgSettings := settings{
-			networkName:   configString(cfg, "networkName", "voidlab-network"),
-			cidr:          configString(cfg, "networkCIDR", "10.20.0.0/24"),
-			gateway:       configString(cfg, "gateway", "10.20.0.1"),
-			dhcpStart:     configString(cfg, "dhcpRangeStart", "10.20.0.100"),
-			dhcpEnd:       configString(cfg, "dhcpRangeEnd", "10.20.0.254"),
-			poolName:      configString(cfg, "poolName", "voidlab-pool"),
-			poolPath:      configString(cfg, "poolPath", "/var/lib/libvirt/images/voidlab"),
-			dataPoolName:  configString(cfg, "dataPoolName", "voidlab-data-pool"),
-			dataPoolPath:  configString(cfg, "dataPoolPath", ""),
-			imageURL:      configString(cfg, "ubuntuImageURL", defaultImageURL),
+			networkName:   host.NetworkName,
+			cidr:          host.NetworkCIDR,
+			gateway:       host.Gateway,
+			dhcpStart:     host.DHCPRangeStart,
+			dhcpEnd:       host.DHCPRangeEnd,
+			poolName:      host.PoolName,
+			poolPath:      host.PoolPath,
+			dataPoolName:  dataPoolName,
+			dataPoolPath:  host.DataPoolPath,
+			imageURL:      imageURL,
 			publicKey:     publicKey,
 			publicKeyPath: publicKeyPath,
-			timezone:      configString(cfg, "timezone", "Asia/Kolkata"),
+			timezone:      timezone,
 			vms:           vms,
-		}
-		for i := range cfgSettings.vms {
-			key := cfgSettings.vms[i].ipConfigKey
-			cfgSettings.vms[i].ipConfigKey = configString(cfg, key, defaultVMIP(cfgSettings.vms[i].name, cfgSettings.cidr))
 		}
 		if err := validateSettings(cfgSettings); err != nil {
 			return err
+		}
+		providerURI, err := libvirtURI(host)
+		if err != nil {
+			return err
+		}
+		provider, err := libvirt.NewProvider(ctx, "libvirt-"+host.Name, &libvirt.ProviderArgs{Uri: pulumi.StringPtr(providerURI)})
+		if err != nil {
+			return fmt.Errorf("configure libvirt connection for %s: %w", host.Name, err)
 		}
 
 		pool, err := libvirt.NewPool(ctx, "voidlab-pool", &libvirt.PoolArgs{
@@ -130,7 +120,7 @@ func main() {
 				Build:     pulumi.Bool(true),
 				Start:     pulumi.Bool(true),
 			},
-		})
+		}, pulumi.Provider(provider))
 		if err != nil {
 			return fmt.Errorf("create libvirt storage pool: %w", err)
 		}
@@ -144,15 +134,22 @@ func main() {
 			Create: &libvirt.VolumeCreateArgs{
 				Content: &libvirt.VolumeCreateContentArgs{Url: pulumi.String(cfgSettings.imageURL)},
 			},
-		}, pulumi.DependsOn([]pulumi.Resource{pool}))
+		}, pulumi.DependsOn([]pulumi.Resource{pool}), pulumi.Provider(provider))
 		if err != nil {
 			return fmt.Errorf("create Ubuntu base image volume: %w", err)
 		}
 
 		var dataPool *libvirt.Pool
-		if vmDataDisk > 0 {
+		needsDataPool := false
+		for _, vm := range cfgSettings.vms {
+			if vm.dataDiskGiB > 0 {
+				needsDataPool = true
+				break
+			}
+		}
+		if needsDataPool {
 			if cfgSettings.dataPoolPath == "" {
-				return fmt.Errorf("dataPoolPath must be configured when vmDataDiskGiB is positive")
+				return fmt.Errorf("dataPoolPath must be configured when a node has a data disk")
 			}
 			dataPool, err = libvirt.NewPool(ctx, "voidlab-data-pool", &libvirt.PoolArgs{
 				Name: pulumi.String(cfgSettings.dataPoolName),
@@ -165,7 +162,7 @@ func main() {
 					Build:     pulumi.Bool(true),
 					Start:     pulumi.Bool(true),
 				},
-			})
+			}, pulumi.Provider(provider))
 			if err != nil {
 				return fmt.Errorf("create libvirt data storage pool: %w", err)
 			}
@@ -176,14 +173,16 @@ func main() {
 			reservations = append(reservations, &libvirt.NetworkIpDhcpHostArgs{
 				Name: pulumi.String(vm.name),
 				Mac:  pulumi.String(vm.mac),
-				Ip:   pulumi.String(vm.ipConfigKey),
+				Ip:   pulumi.String(vm.ip),
 			})
 		}
 		network, err := libvirt.NewNetwork(ctx, "voidlab-network", &libvirt.NetworkArgs{
 			Name:      pulumi.String(cfgSettings.networkName),
 			Autostart: pulumi.Bool(true),
-			Forward:   &libvirt.NetworkForwardArgs{Mode: pulumi.String("nat")},
-			Dns:       &libvirt.NetworkDnsArgs{Enable: pulumi.String("yes")},
+			// Keep the libvirt bridge separate from the host's wg-voidlab interface.
+			Bridge:  &libvirt.NetworkBridgeArgs{Name: pulumi.StringPtr("virbr-voidlab")},
+			Forward: &libvirt.NetworkForwardArgs{Mode: pulumi.String("nat")},
+			Dns:     &libvirt.NetworkDnsArgs{Enable: pulumi.String("yes")},
 			Ips: libvirt.NetworkIpArray{
 				&libvirt.NetworkIpArgs{
 					Address: pulumi.String(cfgSettings.gateway),
@@ -200,22 +199,22 @@ func main() {
 					},
 				},
 			},
-		})
+		}, pulumi.Provider(provider))
 		if err != nil {
 			return fmt.Errorf("create libvirt NAT network: %w", err)
 		}
 
 		vmNames, vmIPs, vmIDs, sshCommands := pulumi.Map{}, pulumi.Map{}, pulumi.Map{}, pulumi.Map{}
 		for _, vm := range cfgSettings.vms {
-			_, _, domain, err := createVM(ctx, cfgSettings, vm, baseImage, pool, dataPool, network)
+			_, _, domain, err := createVM(ctx, cfgSettings, vm, baseImage, pool, dataPool, network, provider)
 			if err != nil {
 				return err
 			}
 			vmNames[vm.name] = pulumi.String(vm.name)
-			vmIPs[vm.name] = pulumi.String(vm.ipConfigKey)
+			vmIPs[vm.name] = pulumi.String(vm.ip)
 			vmIDs[vm.name] = domain.ID()
 			keyPath := strings.TrimSuffix(cfgSettings.publicKeyPath, ".pub")
-			sshCommands[vm.name] = pulumi.Sprintf("ssh -i %s void@%s", keyPath, vm.ipConfigKey)
+			sshCommands[vm.name] = pulumi.Sprintf("ssh -i %s %s@%s", keyPath, host.VMSSHUser, vm.ip)
 		}
 
 		ctx.Export("vmNames", vmNames)
@@ -223,12 +222,19 @@ func main() {
 		ctx.Export("vmIDs", vmIDs)
 		ctx.Export("sshCommands", sshCommands)
 		ctx.Export("networkName", pulumi.String(cfgSettings.networkName))
+		ctx.Export("vmSubnet", pulumi.String(cfgSettings.cidr))
+		ctx.Export("hostName", pulumi.String(host.Name))
+		// Named outputs let other stacks read the addresses declared in this host file.
+		for _, vm := range cfgSettings.vms {
+			outputKey := inventory.OutputKey(vm.name)
+			ctx.Export("nodeIP_"+outputKey, pulumi.String(vm.ip))
+		}
 		ctx.Export("storagePoolName", pool.Name)
 		return nil
 	})
 }
 
-func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.Volume, pool, dataPool *libvirt.Pool, network *libvirt.Network) (*libvirt.Volume, *libvirt.Volume, *libvirt.Domain, error) {
+func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.Volume, pool, dataPool *libvirt.Pool, network *libvirt.Network, provider *libvirt.Provider) (*libvirt.Volume, *libvirt.Volume, *libvirt.Domain, error) {
 	diskName := vm.name + ".qcow2"
 	disk, err := libvirt.NewVolume(ctx, "disk-"+vm.name, &libvirt.VolumeArgs{
 		Name:     pulumi.String(diskName),
@@ -241,7 +247,7 @@ func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.V
 		Target: &libvirt.VolumeTargetArgs{
 			Format: &libvirt.VolumeTargetFormatArgs{Type: pulumi.String("qcow2")},
 		},
-	}, pulumi.DependsOn([]pulumi.Resource{pool, baseImage}))
+	}, pulumi.DependsOn([]pulumi.Resource{pool, baseImage}), pulumi.Provider(provider))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create %s disk: %w", vm.name, err)
 	}
@@ -256,7 +262,7 @@ func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.V
 		Name:     pulumi.String("cloudinit-" + vm.name + ".iso"),
 		MetaData: pulumi.String(metaData),
 		UserData: pulumi.String(userData),
-	})
+	}, pulumi.Provider(provider))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create %s cloud-init disk: %w", vm.name, err)
 	}
@@ -269,7 +275,7 @@ func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.V
 		Create: &libvirt.VolumeCreateArgs{
 			Content: &libvirt.VolumeCreateContentArgs{Url: cloudInit.Path},
 		},
-	}, pulumi.DependsOn([]pulumi.Resource{pool, cloudInit}))
+	}, pulumi.DependsOn([]pulumi.Resource{pool, cloudInit}), pulumi.Provider(provider))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("upload %s cloud-init disk: %w", vm.name, err)
 	}
@@ -286,7 +292,7 @@ func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.V
 			Target: &libvirt.VolumeTargetArgs{
 				Format: &libvirt.VolumeTargetFormatArgs{Type: pulumi.String("qcow2")},
 			},
-		}, pulumi.DependsOn([]pulumi.Resource{dataPool}))
+		}, pulumi.DependsOn([]pulumi.Resource{dataPool}), pulumi.Provider(provider))
 		if err != nil {
 			return nil, nil, nil, fmt.Errorf("create %s data disk: %w", vm.name, err)
 		}
@@ -351,47 +357,75 @@ func createVM(ctx *pulumi.Context, cfg settings, vm vmSpec, baseImage *libvirt.V
 				},
 			},
 		},
-	}, pulumi.DependsOn(domainDependencies))
+	}, pulumi.DependsOn(domainDependencies), pulumi.Provider(provider))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("create %s VM: %w", vm.name, err)
 	}
 	return disk, cloudInitVolume, domain, nil
 }
 
-func configString(cfg *config.Config, key, fallback string) string {
-	if value := cfg.Get(key); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func configInt(cfg *config.Config, key string, fallback int) int {
-	if value := cfg.Get(key); value != "" {
-		if parsed, err := strconv.Atoi(value); err == nil {
-			return parsed
+func makeVMSpec(node inventory.Node, index int) vmSpec {
+	vcpus, memoryMiB, diskGiB := node.VCPUs, node.MemoryMiB, node.DiskGiB
+	if node.Role == "control-plane" {
+		if vcpus == 0 {
+			vcpus = 2
+		}
+		if memoryMiB == 0 {
+			memoryMiB = 3072
+		}
+		if diskGiB == 0 {
+			diskGiB = 30
+		}
+	} else {
+		if vcpus == 0 {
+			vcpus = 2
+		}
+		if memoryMiB == 0 {
+			memoryMiB = 4096
+		}
+		if diskGiB == 0 {
+			diskGiB = 50
 		}
 	}
-	return fallback
+	mac := node.MAC
+	if mac == "" {
+		mac = fmt.Sprintf("52:54:00:20:00:%02x", 0x10+index)
+	}
+	return vmSpec{
+		name:        node.Name,
+		role:        node.Role,
+		ip:          node.IP,
+		mac:         mac,
+		vcpus:       vcpus,
+		memoryMiB:   memoryMiB,
+		diskGiB:     diskGiB,
+		dataDiskGiB: node.DataDiskGiB,
+	}
 }
 
-func defaultVMIP(name, cidr string) string {
-	prefix, err := netip.ParsePrefix(cidr)
-	if err != nil || !prefix.Addr().Is4() {
-		return "10.20.0.13"
+func libvirtURI(host inventory.Host) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("locate home directory for libvirt SSH settings: %w", err)
 	}
-	hostOffset := 10
-	if name != "cp" {
-		var workerNumber int
-		if _, err := fmt.Sscanf(name, "worker-%d", &workerNumber); err != nil || workerNumber < 1 || workerNumber >= 245 {
-			return "10.20.0.13"
-		}
-		hostOffset += workerNumber
+	query := url.Values{}
+	query.Set("keyfile", host.SSHPrivateKeyPath)
+	query.Set("knownhosts", filepath.Join(home, ".ssh", "known_hosts"))
+	target := host.Address
+	proxy := "native"
+	if host.SSHAlias != "" {
+		target = host.SSHAlias
+		proxy = "auto"
 	}
-	address := prefix.Masked().Addr()
-	for i := 0; i < hostOffset; i++ {
-		address = address.Next()
+	query.Set("proxy", proxy)
+	uri := url.URL{
+		Scheme:   "qemu+sshcmd",
+		User:     url.User(host.SSHUser),
+		Host:     target,
+		Path:     "/system",
+		RawQuery: query.Encode(),
 	}
-	return address.String()
+	return uri.String(), nil
 }
 
 func mustPrefixBits(cidr string) int {
@@ -422,19 +456,24 @@ func validateSettings(cfg settings) error {
 	if !strings.HasPrefix(cfg.poolPath, "/") {
 		return fmt.Errorf("poolPath %q must be an absolute host path", cfg.poolPath)
 	}
+	for _, vm := range cfg.vms {
+		if vm.dataDiskGiB > 0 && !strings.HasPrefix(cfg.dataPoolPath, "/") {
+			return fmt.Errorf("dataPoolPath %q must be an absolute host path when %s has a data disk", cfg.dataPoolPath, vm.name)
+		}
+	}
 	seenIPs := map[netip.Addr]string{}
 	seenMACs := map[string]string{}
 	for _, vm := range cfg.vms {
-		address, err := netip.ParseAddr(vm.ipConfigKey)
+		address, err := netip.ParseAddr(vm.ip)
 		if err != nil || !address.Is4() || !prefix.Contains(address) || address == gateway {
-			return fmt.Errorf("reserved IP %q for %s must be an IPv4 address in %s and differ from the gateway", vm.ipConfigKey, vm.name, cfg.cidr)
+			return fmt.Errorf("reserved IP %q for %s must be an IPv4 address in %s and differ from the gateway", vm.ip, vm.name, cfg.cidr)
 		}
 		if prior, exists := seenIPs[address]; exists {
 			return fmt.Errorf("reserved IP %q is assigned to both %s and %s", address, prior, vm.name)
 		}
 		seenIPs[address] = vm.name
 		if !address.Less(start) && !end.Less(address) {
-			return fmt.Errorf("reserved IP %q for %s must remain outside the DHCP dynamic range", vm.ipConfigKey, vm.name)
+			return fmt.Errorf("reserved IP %q for %s must remain outside the DHCP dynamic range", vm.ip, vm.name)
 		}
 		mac := strings.ToLower(vm.mac)
 		if prior, exists := seenMACs[mac]; exists {

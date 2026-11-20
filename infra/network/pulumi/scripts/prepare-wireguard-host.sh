@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if ! command -v dnf >/dev/null 2>&1; then
-  echo "WireGuard host setup currently expects Fedora with dnf" >&2
+if command -v dnf >/dev/null 2>&1; then
+  dnf install -y wireguard-tools firewalld >&2
+elif command -v apt-get >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive apt-get update >&2
+  DEBIAN_FRONTEND=noninteractive apt-get install -y wireguard-tools firewalld >&2
+else
+  echo "Install wireguard-tools and firewalld with the host's package manager first" >&2
   exit 1
 fi
-
-dnf install -y wireguard-tools >&2
 if ! firewall-cmd --state >/dev/null 2>&1; then
-  echo "firewalld must already be active; start it manually after confirming SSH remains allowed" >&2
+  echo "firewalld must be active on the hypervisor; start it after confirming SSH remains allowed" >&2
   exit 1
 fi
 install -d -m 0700 /etc/wireguard

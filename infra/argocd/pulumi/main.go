@@ -13,23 +13,25 @@ import (
 )
 
 const (
-	defaultChartVersion = "10.18.0"
+	defaultChartVersion = "10.18.2"
+	defaultAppVersion   = "v3.6.2"
 	defaultNamespace    = "argocd"
-	defaultNodeName     = "worker-3"
-	chartOCI            = "oci://ghcr.io/argoproj/argo-helm/argo-cd"
+	chartName           = "argo-cd"
+	chartRepository     = "https://argoproj.github.io/argo-helm"
 )
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := config.New(ctx, "voidlab-argocd")
 		chartVersion := configString(cfg, "chartVersion", defaultChartVersion)
+		appVersion := configString(cfg, "appVersion", defaultAppVersion)
 		namespaceName := configString(cfg, "namespace", defaultNamespace)
-		nodeName := configString(cfg, "nodeName", defaultNodeName)
 		repoURL := configString(cfg, "gitOpsRepoURL", "https://github.com/harishSudalaimani/voidlab.git")
 		repoRevision := configString(cfg, "gitOpsRevision", "main")
 		appsPath := configString(cfg, "gitOpsApplicationsPath", "gitops/argocd/applications")
-		if chartVersion == "" || namespaceName == "" || nodeName == "" || repoURL == "" || repoRevision == "" || appsPath == "" {
-			return fmt.Errorf("chartVersion, namespace, nodeName, gitOpsRepoURL, gitOpsRevision, and gitOpsApplicationsPath must not be empty")
+		nodeName := configString(cfg, "nodeName", "worker-1")
+		if chartVersion == "" || appVersion == "" || namespaceName == "" || repoURL == "" || repoRevision == "" || appsPath == "" || nodeName == "" {
+			return fmt.Errorf("chartVersion, appVersion, namespace, gitOpsRepoURL, gitOpsRevision, gitOpsApplicationsPath, and nodeName must not be empty")
 		}
 
 		argocdNamespace, err := corev1.NewNamespace(ctx, "argocd-namespace", &corev1.NamespaceArgs{
@@ -43,6 +45,9 @@ func main() {
 
 		values := pulumi.Map{
 			"global": pulumi.Map{
+				"image": pulumi.Map{
+					"tag": pulumi.String(appVersion),
+				},
 				"nodeSelector": pulumi.Map{
 					"kubernetes.io/hostname": pulumi.String(nodeName),
 				},
@@ -55,8 +60,9 @@ func main() {
 		}
 
 		argocd, err := helm.NewRelease(ctx, "argocd", &helm.ReleaseArgs{
-			Chart:           pulumi.String(chartOCI),
+			Chart:           pulumi.String(chartName),
 			Version:         pulumi.String(chartVersion),
+			RepositoryOpts:  helm.RepositoryOptsArgs{Repo: pulumi.String(chartRepository)},
 			Namespace:       pulumi.String(namespaceName),
 			CreateNamespace: pulumi.Bool(false),
 			Values:          values,
@@ -103,9 +109,10 @@ func main() {
 		}
 
 		ctx.Export("argocdNamespace", pulumi.String(namespaceName))
+		ctx.Export("argocdNodeName", pulumi.String(nodeName))
+		ctx.Export("argocdAppVersion", pulumi.String(appVersion))
 		ctx.Export("argocdReleaseName", argocd.Status.Name())
 		ctx.Export("argocdChartVersion", pulumi.String(chartVersion))
-		ctx.Export("scheduledNode", pulumi.String(nodeName))
 		ctx.Export("gitOpsRootApplication", rootApplication.Metadata.Name())
 		ctx.Export("gitOpsApplicationsPath", pulumi.String(appsPath))
 		ctx.Export("serverService", pulumi.String(namespaceName+"/argocd-server"))

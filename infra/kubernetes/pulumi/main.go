@@ -4,31 +4,31 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"github.com/harish/voidlab/infra/inventory"
 	"github.com/pulumi/pulumi-command/sdk/go/command/remote"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
 const (
-	defaultHypervisorHost = "192.168.29.52"
-	defaultSSHUser        = "void"
-	defaultSSHKeyPath     = "/Users/harish/.ssh/voidlab"
-	defaultPodCIDR        = "10.244.0.0/16"
-	defaultCiliumVersion  = "1.21.0-pre.4"
-	defaultCiliumCLI      = "v0.20.1"
+	defaultVMConfigDirectory = "../../vm/pulumi"
+	defaultPodCIDR           = "10.244.0.0/16"
 )
 
 type node struct {
-	name    string
-	address string
-	hostKey pulumi.StringPtrInput
-	jump    jumpHost
+	name         string
+	role         string
+	address      pulumi.StringOutput
+	hostKey      pulumi.StringPtrInput
+	jump         jumpHost
+	sshUser      string
+	vmPrivateKey string
 }
 
 type jumpHost struct {
@@ -39,17 +39,11 @@ type jumpHost struct {
 }
 
 type clusterConfig struct {
-	vmSSHUser           string
-	vmPrivateKey        string
-	host1VMSubnet       string
-	host2VMSubnet       string
-	host1TunnelAddress  string
-	host2TunnelAddress  string
 	controlPlane        node
 	workers             []node
+	tunnelTarget        string
+	tunnelKeyPath       string
 	podCIDR             string
-	ciliumVersion       string
-	ciliumCLIVersion    string
 	allowOneCPU         bool
 	joinTokenGeneration string
 }
@@ -57,142 +51,78 @@ type clusterConfig struct {
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := config.New(ctx, "voidlab-kubernetes")
-		vmKeyPath := configString(cfg, "vmSSHPrivateKeyPath", defaultSSHKeyPath)
-		vmPrivateKey, err := readPrivateKey(vmKeyPath)
+		hosts, err := inventory.LoadHosts(configString(cfg, "vmConfigDirectory", defaultVMConfigDirectory))
 		if err != nil {
-			return fmt.Errorf("read VM SSH private key: %w", err)
+			return err
 		}
-		host1KeyPath := configString(cfg, "host1SSHPrivateKeyPath", "/Users/harish/.ssh/voidlab")
-		host1PrivateKey, err := readPrivateKey(host1KeyPath)
+		// The network stack owns the node IP list and only publishes routingVerified after peer checks pass.
+		networkStack, err := pulumi.NewStackReference(ctx, "network-stack", &pulumi.StackReferenceArgs{
+			Name: pulumi.String(configString(cfg, "networkStack", "snharish85-gmail-com-org/voidlab-network/network")),
+		})
 		if err != nil {
-			return fmt.Errorf("read host1 SSH private key: %w", err)
+			return fmt.Errorf("reference network stack: %w", err)
 		}
-		host2KeyPath := configString(cfg, "host2SSHPrivateKeyPath", "/Users/harish/.ssh/dark")
-		host2PrivateKey, err := readPrivateKey(host2KeyPath)
-		if err != nil {
-			return fmt.Errorf("read host2 SSH private key: %w", err)
-		}
-
-		host1Address := configString(cfg, "hypervisorHost1", defaultHypervisorHost)
-		host2Address := configString(cfg, "hypervisorHost2", "192.168.29.81")
-		host1Key, err := readKnownHostKey(host1Address, "k")
-		if err != nil {
-			return fmt.Errorf("resolve host1 SSH host key from local known_hosts: %w", err)
-		}
-		host2Key, err := readKnownHostKey(host2Address, "k1")
-		if err != nil {
-			return fmt.Errorf("resolve host2 SSH host key from local known_hosts: %w", err)
-		}
-
-		host1 := jumpHost{
-			address:    host1Address,
-			user:       configString(cfg, "hypervisorHost1User", "void"),
-			privateKey: host1PrivateKey,
-			hostKey:    pulumi.String(host1Key),
-		}
-		host2 := jumpHost{
-			address:    host2Address,
-			user:       configString(cfg, "hypervisorHost2User", "dark"),
-			privateKey: host2PrivateKey,
-			hostKey:    pulumi.String(host2Key),
-		}
-		vmKeyScans, err := discoverVMHostKeys(ctx, host1, host2,
-			[]string{configString(cfg, "controlPlaneIP", "10.20.0.10"), configString(cfg, "worker1IP", "10.20.0.11"), configString(cfg, "worker2IP", "10.20.0.12")},
-			[]string{configString(cfg, "worker3IP", "10.21.0.13"), configString(cfg, "worker4IP", "10.21.0.14"), configString(cfg, "worker5IP", "10.21.0.15")})
-		if err != nil {
-			return fmt.Errorf("register VM host-key discovery: %w", err)
-		}
+		routingVerified := networkStack.GetOutput(pulumi.String("routingVerified")).ApplyT(func(value interface{}) (bool, error) {
+			verified, ok := value.(bool)
+			if !ok {
+				return false, fmt.Errorf("network stack routingVerified output has type %T, expected bool", value)
+			}
+			return verified, nil
+		}).(pulumi.BoolOutput)
 		cluster := clusterConfig{
-			vmSSHUser:          configString(cfg, "vmSSHUser", defaultSSHUser),
-			vmPrivateKey:       vmPrivateKey,
-			host1VMSubnet:      configString(cfg, "host1VMSubnet", "10.20.0.0/24"),
-			host2VMSubnet:      configString(cfg, "host2VMSubnet", "10.21.0.0/24"),
-			host1TunnelAddress: configString(cfg, "host1TunnelAddress", "10.254.29.1"),
-			host2TunnelAddress: configString(cfg, "host2TunnelAddress", "10.254.29.2"),
-			controlPlane: node{name: "cp", address: configString(cfg, "controlPlaneIP", "10.20.0.10"), hostKey: vmKeyScans[0].Stdout.ApplyT(func(output string) (string, error) {
-				return scannedHostKey(output, configString(cfg, "controlPlaneIP", "10.20.0.10"))
-			}).(pulumi.StringOutput), jump: host1},
-			workers: []node{
-				{name: "worker-1", address: configString(cfg, "worker1IP", "10.20.0.11"), hostKey: vmKeyScans[0].Stdout.ApplyT(func(output string) (string, error) {
-					return scannedHostKey(output, configString(cfg, "worker1IP", "10.20.0.11"))
-				}).(pulumi.StringOutput), jump: host1},
-				{name: "worker-2", address: configString(cfg, "worker2IP", "10.20.0.12"), hostKey: vmKeyScans[0].Stdout.ApplyT(func(output string) (string, error) {
-					return scannedHostKey(output, configString(cfg, "worker2IP", "10.20.0.12"))
-				}).(pulumi.StringOutput), jump: host1},
-				{name: "worker-3", address: configString(cfg, "worker3IP", "10.21.0.13"), hostKey: vmKeyScans[1].Stdout.ApplyT(func(output string) (string, error) {
-					return scannedHostKey(output, configString(cfg, "worker3IP", "10.21.0.13"))
-				}).(pulumi.StringOutput), jump: host2},
-				{name: "worker-4", address: configString(cfg, "worker4IP", "10.21.0.14"), hostKey: vmKeyScans[1].Stdout.ApplyT(func(output string) (string, error) {
-					return scannedHostKey(output, configString(cfg, "worker4IP", "10.21.0.14"))
-				}).(pulumi.StringOutput), jump: host2},
-				{name: "worker-5", address: configString(cfg, "worker5IP", "10.21.0.15"), hostKey: vmKeyScans[1].Stdout.ApplyT(func(output string) (string, error) {
-					return scannedHostKey(output, configString(cfg, "worker5IP", "10.21.0.15"))
-				}).(pulumi.StringOutput), jump: host2},
-			},
 			podCIDR:             configString(cfg, "podCIDR", defaultPodCIDR),
-			ciliumVersion:       configString(cfg, "ciliumVersion", defaultCiliumVersion),
-			ciliumCLIVersion:    configString(cfg, "ciliumCLIVersion", defaultCiliumCLI),
 			allowOneCPU:         cfg.GetBool("allowSingleCPUControlPlane"),
 			joinTokenGeneration: configString(cfg, "joinTokenGeneration", "1"),
 		}
-
-		prepareWireGuard, err := readScript("prepare-wireguard-host.sh")
-		if err != nil {
-			return err
+		foundHub := false
+		for _, host := range hosts {
+			hostKeyPath, err := readPrivateKey(host.SSHPrivateKeyPath)
+			if err != nil {
+				return fmt.Errorf("read %s hypervisor SSH key: %w", host.Name, err)
+			}
+			hostKey, err := readKnownHostKey(host.Address, host.SSHAlias)
+			if err != nil {
+				return fmt.Errorf("resolve %s SSH host key: %w", host.Name, err)
+			}
+			vmPrivateKey, err := readPrivateKey(host.VMSSHPrivateKeyPath)
+			if err != nil {
+				return fmt.Errorf("read %s VM SSH key: %w", host.Name, err)
+			}
+			jump := jumpHost{address: host.Address, user: host.SSHUser, privateKey: hostKeyPath, hostKey: pulumi.String(hostKey)}
+			if host.Name == "host1" {
+				foundHub = true
+				cluster.tunnelTarget = host.SSHAlias
+				if cluster.tunnelTarget == "" {
+					cluster.tunnelTarget = host.SSHUser + "@" + host.Address
+				}
+				cluster.tunnelKeyPath = host.SSHPrivateKeyPath
+			}
+			addresses := make([]pulumi.StringOutput, len(host.Nodes))
+			for i, declaredNode := range host.Nodes {
+				addresses[i] = requireVerifiedNetworkAddress(declaredNode.Name, routingVerified,
+					networkStack.GetStringOutput(pulumi.String("nodeIP_"+inventory.OutputKey(declaredNode.Name))))
+			}
+			scan, err := discoverVMHostKeys(ctx, host.Name, jump, addresses)
+			if err != nil {
+				return fmt.Errorf("register %s VM host-key discovery: %w", host.Name, err)
+			}
+			for i, declaredNode := range host.Nodes {
+				current := node{
+					name: declaredNode.Name, role: declaredNode.Role, address: addresses[i],
+					hostKey: hostKeyOutput(scan.Stdout, addresses[i]), jump: jump,
+					sshUser: host.VMSSHUser, vmPrivateKey: vmPrivateKey,
+				}
+				if current.role == "control-plane" {
+					cluster.controlPlane = current
+				} else {
+					cluster.workers = append(cluster.workers, current)
+				}
+			}
 		}
-		host1WireGuardKey, err := runHostScript(ctx, "prepare-wireguard-host1", host1, prepareWireGuard, nil, nil, false)
-		if err != nil {
-			return fmt.Errorf("register host1 WireGuard preparation: %w", err)
+		if !foundHub {
+			return fmt.Errorf("host1 must exist because it is the WireGuard hub and SSH tunnel entry point")
 		}
-		host2WireGuardKey, err := runHostScript(ctx, "prepare-wireguard-host2", host2, prepareWireGuard, nil, nil, false)
-		if err != nil {
-			return fmt.Errorf("register host2 WireGuard preparation: %w", err)
-		}
-		configureWireGuard, err := readScript("configure-wireguard-host.sh")
-		if err != nil {
-			return err
-		}
-		host1WireGuard, err := configureHostWireGuard(ctx, "configure-wireguard-host1", host1, configureWireGuard,
-			[]string{cluster.host1VMSubnet, cluster.host2VMSubnet, cluster.host1TunnelAddress, cluster.host2TunnelAddress, host2.address},
-			host2WireGuardKey.Stdout, []pulumi.Resource{host1WireGuardKey, host2WireGuardKey})
-		if err != nil {
-			return fmt.Errorf("register host1 WireGuard routes: %w", err)
-		}
-		host2WireGuard, err := configureHostWireGuard(ctx, "configure-wireguard-host2", host2, configureWireGuard,
-			[]string{cluster.host2VMSubnet, cluster.host1VMSubnet, cluster.host2TunnelAddress, cluster.host1TunnelAddress, host1.address},
-			host1WireGuardKey.Stdout, []pulumi.Resource{host1WireGuardKey, host2WireGuardKey})
-		if err != nil {
-			return fmt.Errorf("register host2 WireGuard routes: %w", err)
-		}
-		libvirtHookScript, err := readScript("install-libvirt-forwarding-hook.sh")
-		if err != nil {
-			return err
-		}
-		host1LibvirtForwarding, err := runHostScript(ctx, "install-libvirt-forwarding-host1", host1, libvirtHookScript,
-			[]string{cluster.host1VMSubnet, cluster.host2VMSubnet, "voidlab-network", "wg-voidlab"}, []pulumi.Resource{host1WireGuard}, false)
-		if err != nil {
-			return fmt.Errorf("register host1 libvirt forwarding hook: %w", err)
-		}
-		host2LibvirtForwarding, err := runHostScript(ctx, "install-libvirt-forwarding-host2", host2, libvirtHookScript,
-			[]string{cluster.host2VMSubnet, cluster.host1VMSubnet, "voidlab-network", "wg-voidlab"}, []pulumi.Resource{host2WireGuard}, false)
-		if err != nil {
-			return fmt.Errorf("register host2 libvirt forwarding hook: %w", err)
-		}
-		applyLibvirtRulesScript, err := readScript("apply-libvirt-forwarding-rules.sh")
-		if err != nil {
-			return err
-		}
-		host1LibvirtRules, err := runHostScript(ctx, "apply-libvirt-forwarding-rules-host1", host1, applyLibvirtRulesScript,
-			[]string{cluster.host1VMSubnet, cluster.host2VMSubnet, "voidlab-network", "wg-voidlab"}, []pulumi.Resource{host1LibvirtForwarding}, false)
-		if err != nil {
-			return fmt.Errorf("register host1 libvirt forwarding rules: %w", err)
-		}
-		host2LibvirtRules, err := runHostScript(ctx, "apply-libvirt-forwarding-rules-host2", host2, applyLibvirtRulesScript,
-			[]string{cluster.host2VMSubnet, cluster.host1VMSubnet, "voidlab-network", "wg-voidlab"}, []pulumi.Resource{host2LibvirtForwarding}, false)
-		if err != nil {
-			return fmt.Errorf("register host2 libvirt forwarding rules: %w", err)
-		}
-		routingResources := []pulumi.Resource{host1LibvirtRules, host2LibvirtRules}
+		allNodes := cluster.nodes()
 
 		preflightScript, err := readScript("preflight.sh")
 		if err != nil {
@@ -202,28 +132,24 @@ func main() {
 		if err != nil {
 			return err
 		}
-		preflights := make([]pulumi.Resource, 0, 6)
+		preflights := make([]pulumi.Resource, 0, len(allNodes))
 		for _, current := range cluster.nodes() {
 			allowOneCPU := "false"
-			if current.name == "cp" && cluster.allowOneCPU {
+			if current.role == "control-plane" && cluster.allowOneCPU {
 				allowOneCPU = "true"
 			}
-			nodeAddresses := make([]string, 0, len(cluster.nodes()))
-			for _, node := range cluster.nodes() {
-				nodeAddresses = append(nodeAddresses, node.address)
-			}
-			check, err := runScript(ctx, "preflight-"+current.name, cluster, current, preflightScript,
-				[]string{current.name, current.address, allowOneCPU, strings.Join(nodeAddresses, ",")}, routingResources, false)
+			check, err := runScript(ctx, "preflight-"+current.name, current, preflightScript,
+				[]pulumi.StringInput{pulumi.String(current.name), pulumi.String(current.role), pulumi.String(allowOneCPU)}, nil, false)
 			if err != nil {
 				return fmt.Errorf("register %s preflight: %w", current.name, err)
 			}
 			preflights = append(preflights, check)
 		}
 
-		setupResources := make([]pulumi.Resource, 0, 6)
+		setupResources := make([]pulumi.Resource, 0, len(allNodes))
 		for _, current := range cluster.nodes() {
-			setup, err := runScript(ctx, "install-"+current.name, cluster, current, setupScript,
-				[]string{"v1.37"}, preflights, false)
+			setup, err := runScript(ctx, "install-"+current.name, current, setupScript,
+				[]pulumi.StringInput{pulumi.String("v1.37")}, preflights, false)
 			if err != nil {
 				return fmt.Errorf("register %s Kubernetes setup: %w", current.name, err)
 			}
@@ -234,11 +160,11 @@ func main() {
 		if err != nil {
 			return err
 		}
-		initArgs := []string{cluster.controlPlane.address, cluster.podCIDR, "false", cluster.joinTokenGeneration}
+		initArgs := []pulumi.StringInput{cluster.controlPlane.address, pulumi.String(cluster.podCIDR), pulumi.String("false"), pulumi.String(cluster.joinTokenGeneration)}
 		if cluster.allowOneCPU {
-			initArgs[2] = "true"
+			initArgs[2] = pulumi.String("true")
 		}
-		controlPlaneInit, err := runScript(ctx, "init-control-plane", cluster, cluster.controlPlane, initScript,
+		controlPlaneInit, err := runScript(ctx, "init-control-plane", cluster.controlPlane, initScript,
 			initArgs, setupResources, true)
 		if err != nil {
 			return fmt.Errorf("register kubeadm init: %w", err)
@@ -246,54 +172,48 @@ func main() {
 
 		joinResources := make([]pulumi.Resource, 0, len(cluster.workers))
 		for _, worker := range cluster.workers {
-			join, err := registerWorkerJoin(ctx, cluster, worker, controlPlaneInit.Stdout, []pulumi.Resource{controlPlaneInit})
+			join, err := registerWorkerJoin(ctx, worker, controlPlaneInit.Stdout, []pulumi.Resource{controlPlaneInit})
 			if err != nil {
 				return fmt.Errorf("register %s join: %w", worker.name, err)
 			}
 			joinResources = append(joinResources, join)
 		}
 
-		ciliumScript, err := readScript("install-cilium.sh")
-		if err != nil {
-			return err
-		}
-		ciliumInstall, err := runScriptWithoutPreviousOutputEnv(ctx, "install-cilium", cluster, cluster.controlPlane, ciliumScript,
-			[]string{cluster.ciliumVersion, cluster.ciliumCLIVersion, cluster.controlPlane.address}, joinResources, false)
-		if err != nil {
-			return fmt.Errorf("register Cilium installation: %w", err)
-		}
-
 		readyScript, err := readScript("wait-for-nodes.sh")
 		if err != nil {
 			return err
 		}
-		registration, err := runScript(ctx, "confirm-six-nodes", cluster, cluster.controlPlane, readyScript,
-			[]string{cluster.joinTokenGeneration}, []pulumi.Resource{ciliumInstall}, false)
+		registration, err := runScript(ctx, "confirm-nodes-registered", cluster.controlPlane, readyScript,
+			[]pulumi.StringInput{pulumi.String(strconv.Itoa(len(allNodes)))}, joinResources, false)
 		if err != nil {
-			return fmt.Errorf("register cluster readiness check: %w", err)
+			return fmt.Errorf("register node-registration check: %w", err)
 		}
 
 		kubeconfigScript, err := readScript("export-kubeconfig.sh")
 		if err != nil {
 			return err
 		}
-		kubeconfig, err := runScript(ctx, "export-kubeconfig", cluster, cluster.controlPlane, kubeconfigScript,
-			[]string{cluster.controlPlane.address, cluster.joinTokenGeneration}, []pulumi.Resource{registration}, true)
+		kubeconfig, err := runScript(ctx, "export-kubeconfig", cluster.controlPlane, kubeconfigScript,
+			[]pulumi.StringInput{cluster.controlPlane.address, pulumi.String(cluster.joinTokenGeneration)}, []pulumi.Resource{registration}, true)
 		if err != nil {
 			return fmt.Errorf("register kubeconfig export: %w", err)
 		}
 
 		names, addresses := pulumi.Map{}, pulumi.Map{}
-		for _, current := range cluster.nodes() {
+		roles := pulumi.Map{}
+		for _, current := range allNodes {
 			names[current.name] = pulumi.String(current.name)
-			addresses[current.name] = pulumi.String(current.address)
+			addresses[current.name] = current.address
+			roles[current.name] = pulumi.String(current.role)
 		}
 		ctx.Export("nodeNames", names)
 		ctx.Export("nodeIPs", addresses)
+		ctx.Export("nodeRoles", roles)
+		ctx.Export("controlPlaneIP", cluster.controlPlane.address)
 		ctx.Export("kubernetesVersion", pulumi.String("1.37"))
 		ctx.Export("podCIDR", pulumi.String(cluster.podCIDR))
-		ctx.Export("cni", pulumi.String("Cilium "+cluster.ciliumVersion+" with kube-proxy replacement"))
-		ctx.Export("sshTunnel", pulumi.String(fmt.Sprintf("k -N -L 16443:%s:6443", cluster.controlPlane.address)))
+		ctx.Export("sshTunnel", pulumi.Sprintf("ssh -i %s -N -L 16443:%s:6443 %s",
+			shellQuote(cluster.tunnelKeyPath), cluster.controlPlane.address, shellQuote(cluster.tunnelTarget)))
 		ctx.Export("kubeconfigBase64", kubeconfig.Stdout)
 		return nil
 	})
@@ -303,7 +223,7 @@ func (c clusterConfig) nodes() []node {
 	return append([]node{c.controlPlane}, c.workers...)
 }
 
-func discoverVMHostKeys(ctx *pulumi.Context, host1, host2 jumpHost, host1IPs, host2IPs []string) ([]*remote.Command, error) {
+func discoverVMHostKeys(ctx *pulumi.Context, hostName string, host jumpHost, addresses []pulumi.StringOutput) (*remote.Command, error) {
 	scanScript := `#!/usr/bin/env bash
 set -uo pipefail
 command -v ssh-keyscan >/dev/null || { echo "ssh-keyscan is required on the hypervisor" >&2; exit 1; }
@@ -324,29 +244,15 @@ for ip in "$@"; do
 done
 `
 
-	newScan := func(name string, host jumpHost, addresses []string) (*remote.Command, error) {
-		command := "bash -s --"
-		for _, address := range addresses {
-			command += " " + shellQuote(address)
-		}
-		return remote.NewCommand(ctx, name, &remote.CommandArgs{
-			Connection:             hostConnection(host),
-			Create:                 pulumi.String(command),
-			Stdin:                  pulumi.String(scanScript),
-			AddPreviousOutputInEnv: pulumi.Bool(false),
-			Logging:                remote.LoggingNone,
-		})
+	args := make([]pulumi.StringInput, len(addresses))
+	for i, address := range addresses {
+		args[i] = address
 	}
-
-	host1Scan, err := newScan("discover-vm-host-keys-host1", host1, host1IPs)
-	if err != nil {
-		return nil, fmt.Errorf("register host1 VM host-key scan: %w", err)
-	}
-	host2Scan, err := newScan("discover-vm-host-keys-host2", host2, host2IPs)
-	if err != nil {
-		return nil, fmt.Errorf("register host2 VM host-key scan: %w", err)
-	}
-	return []*remote.Command{host1Scan, host2Scan}, nil
+	command := pulumi.Sprintf("bash -s -- %s", shellQuoteInputs(args))
+	return remote.NewCommand(ctx, "discover-vm-host-keys-"+hostName, &remote.CommandArgs{
+		Connection: hostConnection(host), Create: command, Stdin: pulumi.String(scanScript),
+		AddPreviousOutputInEnv: pulumi.Bool(false), Logging: remote.LoggingNone,
+	})
 }
 
 func hostConnection(host jumpHost) *remote.ConnectionArgs {
@@ -400,23 +306,50 @@ func scannedHostKey(output, address string) (string, error) {
 	return "", fmt.Errorf("host-key discovery output did not contain a valid ed25519 key for %s", address)
 }
 
-func runScript(ctx *pulumi.Context, name string, cluster clusterConfig, target node, script string, args []string, dependencies []pulumi.Resource, secretStdout bool) (*remote.Command, error) {
-	return runScriptWithPreviousOutputEnv(ctx, name, cluster, target, script, args, dependencies, secretStdout, true)
+func hostKeyOutput(scanOutput, address pulumi.StringOutput) pulumi.StringOutput {
+	return pulumi.All(scanOutput, address).ApplyT(func(values []interface{}) (string, error) {
+		return scannedHostKey(values[0].(string), values[1].(string))
+	}).(pulumi.StringOutput)
 }
 
-func runScriptWithoutPreviousOutputEnv(ctx *pulumi.Context, name string, cluster clusterConfig, target node, script string, args []string, dependencies []pulumi.Resource, secretStdout bool) (*remote.Command, error) {
-	return runScriptWithPreviousOutputEnv(ctx, name, cluster, target, script, args, dependencies, secretStdout, false)
-}
-
-func runScriptWithPreviousOutputEnv(ctx *pulumi.Context, name string, cluster clusterConfig, target node, script string, args []string, dependencies []pulumi.Resource, secretStdout, addPreviousOutputInEnv bool) (*remote.Command, error) {
-	command := "sudo -n bash -s"
-	if len(args) != 0 {
-		command += " -- "
-		quoted := make([]string, 0, len(args))
-		for _, arg := range args {
-			quoted = append(quoted, shellQuote(arg))
+func requireVerifiedNetworkAddress(nodeName string, routingVerified pulumi.BoolOutput, address pulumi.StringOutput) pulumi.StringOutput {
+	// If routing is false, dependent Kubernetes commands receive an error instead of an IP.
+	return pulumi.All(routingVerified, address).ApplyT(func(values []interface{}) (string, error) {
+		verified, ok := values[0].(bool)
+		if !ok || !verified {
+			return "", fmt.Errorf("network stack has not verified routing for node %s", nodeName)
 		}
-		command += strings.Join(quoted, " ")
+		ip, ok := values[1].(string)
+		if !ok || ip == "" {
+			return "", fmt.Errorf("network stack did not export an IP address for node %s", nodeName)
+		}
+		return ip, nil
+	}).(pulumi.StringOutput)
+}
+
+func shellQuoteInputs(args []pulumi.StringInput) pulumi.StringOutput {
+	// Some arguments come from another Pulumi stack and are only known when Pulumi resolves its outputs.
+	inputs := make([]any, len(args))
+	for i, arg := range args {
+		inputs[i] = arg
+	}
+	return pulumi.All(inputs...).ApplyT(func(values []interface{}) (string, error) {
+		quoted := make([]string, len(values))
+		for i, value := range values {
+			argument, ok := value.(string)
+			if !ok {
+				return "", fmt.Errorf("command argument %d has type %T, expected string", i, value)
+			}
+			quoted[i] = shellQuote(argument)
+		}
+		return strings.Join(quoted, " "), nil
+	}).(pulumi.StringOutput)
+}
+
+func runScript(ctx *pulumi.Context, name string, target node, script string, args []pulumi.StringInput, dependencies []pulumi.Resource, secretStdout bool) (*remote.Command, error) {
+	var command pulumi.StringInput = pulumi.String("sudo -n bash -s")
+	if len(args) != 0 {
+		command = pulumi.Sprintf("sudo -n bash -s -- %s", shellQuoteInputs(args))
 	}
 	options := []pulumi.ResourceOption{pulumi.AdditionalSecretOutputs([]string{"stdout"})}
 	if !secretStdout {
@@ -426,37 +359,34 @@ func runScriptWithPreviousOutputEnv(ctx *pulumi.Context, name string, cluster cl
 		options = append(options, pulumi.DependsOn(dependencies))
 	}
 	commandArgs := &remote.CommandArgs{
-		Connection: connection(cluster, target),
-		Create:     pulumi.String(command),
+		Connection: connection(target),
+		Create:     command,
 		Stdin:      pulumi.String(script),
 		Logging:    remote.LoggingNone,
-	}
-	if !addPreviousOutputInEnv {
-		commandArgs.AddPreviousOutputInEnv = pulumi.Bool(false)
 	}
 	return remote.NewCommand(ctx, name, commandArgs, options...)
 }
 
-func registerWorkerJoin(ctx *pulumi.Context, cluster clusterConfig, worker node, joinCommand pulumi.StringOutput, dependencies []pulumi.Resource) (*remote.Command, error) {
+func registerWorkerJoin(ctx *pulumi.Context, worker node, joinCommand pulumi.StringOutput, dependencies []pulumi.Resource) (*remote.Command, error) {
 	create := joinCommand.ApplyT(func(join string) string {
 		join = strings.TrimSpace(join)
 		script := "if test -s /etc/kubernetes/kubelet.conf; then echo already-joined; else " + join + "; fi"
 		return "sudo -n bash -lc " + shellQuote(script)
 	}).(pulumi.StringOutput)
 	return remote.NewCommand(ctx, "join-"+worker.name, &remote.CommandArgs{
-		Connection:             connection(cluster, worker),
+		Connection:             connection(worker),
 		Create:                 create,
 		AddPreviousOutputInEnv: pulumi.Bool(false),
 		Logging:                remote.LoggingNone,
 	}, pulumi.DependsOn(dependencies))
 }
 
-func connection(cluster clusterConfig, target node) *remote.ConnectionArgs {
-	vmKey := pulumi.ToSecret(pulumi.String(cluster.vmPrivateKey)).(pulumi.StringOutput)
+func connection(target node) *remote.ConnectionArgs {
+	vmKey := pulumi.ToSecret(pulumi.String(target.vmPrivateKey)).(pulumi.StringOutput)
 	jumpKey := pulumi.ToSecret(pulumi.String(target.jump.privateKey)).(pulumi.StringOutput)
 	return &remote.ConnectionArgs{
-		Host:       pulumi.String(target.address),
-		User:       pulumi.String(cluster.vmSSHUser),
+		Host:       target.address,
+		User:       pulumi.String(target.sshUser),
 		PrivateKey: vmKey,
 		HostKey:    target.hostKey,
 		Proxy: &remote.ProxyConnectionArgs{
@@ -466,47 +396,6 @@ func connection(cluster clusterConfig, target node) *remote.ConnectionArgs {
 			HostKey:    target.jump.hostKey,
 		},
 	}
-}
-
-func runHostScript(ctx *pulumi.Context, name string, host jumpHost, script string, args []string, dependencies []pulumi.Resource, secretStdout bool) (*remote.Command, error) {
-	return runHostCommand(ctx, name, host, pulumi.String(hostScriptCommand(args)), pulumi.String(script), dependencies, secretStdout)
-}
-
-func configureHostWireGuard(ctx *pulumi.Context, name string, host jumpHost, script string, args []string, peerPublicKey pulumi.StringOutput, dependencies []pulumi.Resource) (*remote.Command, error) {
-	create := peerPublicKey.ApplyT(func(publicKey string) string {
-		commandArgs := append(append([]string(nil), args...), strings.TrimSpace(publicKey))
-		return hostScriptCommand(commandArgs)
-	}).(pulumi.StringOutput)
-	return runHostCommand(ctx, name, host, create, pulumi.String(script), dependencies, false)
-}
-
-func hostScriptCommand(args []string) string {
-	command := "sudo -n bash -s"
-	if len(args) != 0 {
-		quoted := make([]string, 0, len(args))
-		for _, arg := range args {
-			quoted = append(quoted, shellQuote(arg))
-		}
-		command += " -- " + strings.Join(quoted, " ")
-	}
-	return command
-}
-
-func runHostCommand(ctx *pulumi.Context, name string, host jumpHost, create pulumi.StringInput, script pulumi.StringInput, dependencies []pulumi.Resource, secretStdout bool) (*remote.Command, error) {
-	options := []pulumi.ResourceOption{pulumi.AdditionalSecretOutputs([]string{"stdout"})}
-	if !secretStdout {
-		options = nil
-	}
-	if len(dependencies) != 0 {
-		options = append(options, pulumi.DependsOn(dependencies))
-	}
-	return remote.NewCommand(ctx, name, &remote.CommandArgs{
-		Connection:             hostConnection(host),
-		Create:                 create,
-		Stdin:                  script,
-		AddPreviousOutputInEnv: pulumi.Bool(false),
-		Logging:                remote.LoggingNone,
-	}, options...)
 }
 
 func readScript(name string) (string, error) {

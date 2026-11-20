@@ -10,3 +10,4 @@
 !infra/vm/pulumi/sdks/
 !infra/vm/pulumi/sdks/libvirt/
 !infra/vm/pulumi/sdks/libvirt/**
+.DS_Store
