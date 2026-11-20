@@ -2,12 +2,15 @@
 **/sdks/
 **/.pulumi/
 
-# Compiled Go binaries.
-/infra/pulumi/voidlab
-/infra/pulumi/voidlab.exe
-
-# Keep the Libvirt Pulumi SDK in version control
+# Keep the Libvirt Pulumi SDK in version control.
 !infra/vm/pulumi/sdks/
 !infra/vm/pulumi/sdks/libvirt/
 !infra/vm/pulumi/sdks/libvirt/**
+
+# Compiled Go binaries.
+**/pulumi
+/infra/pulumi/voidlab
+/infra/pulumi/voidlab.exe
+
+# macOS.
 .DS_Store

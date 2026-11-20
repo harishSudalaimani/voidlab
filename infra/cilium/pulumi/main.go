@@ -60,6 +60,9 @@ func main() {
 				"relay": pulumi.Map{
 					"enabled": pulumi.Bool(true),
 				},
+				"ui": pulumi.Map{
+					"enabled": pulumi.Bool(true),
+				},
 			},
 			"clustermesh": pulumi.Map{
 				"useAPIServer": pulumi.Bool(false),
