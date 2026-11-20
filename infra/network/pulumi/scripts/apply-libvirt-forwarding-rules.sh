@@ -22,17 +22,21 @@ for remote_subnet in "${remote_subnets[@]}"; do
   [[ -n "$remote_subnet" ]] || continue
   input_comment="voidlab routed ingress ${local_subnet} from ${remote_subnet}"
   nat_comment="voidlab routed no-nat ${local_subnet} to ${remote_subnet}"
-  if ! nft list chain ip libvirt_network guest_input | grep -Fq -- "$input_comment"; then
+  input_rules="$(nft list chain ip libvirt_network guest_input)"
+  if ! grep -Fq -- "$input_comment" <<<"$input_rules"; then
     nft insert rule ip libvirt_network guest_input iifname "$wireguard_interface" ip saddr "$remote_subnet" ip daddr "$local_subnet" accept comment "\"$input_comment\""
   fi
-  if ! nft list chain ip libvirt_network guest_nat | grep -Fq -- "$nat_comment"; then
+  nat_rules="$(nft list chain ip libvirt_network guest_nat)"
+  if ! grep -Fq -- "$nat_comment" <<<"$nat_rules"; then
     nft insert rule ip libvirt_network guest_nat ip saddr "$local_subnet" ip daddr "$remote_subnet" return comment "\"$nat_comment\""
   fi
-  nft list chain ip libvirt_network guest_input | grep -Fq -- "$input_comment" || {
+  input_rules="$(nft list chain ip libvirt_network guest_input)"
+  grep -Fq -- "$input_comment" <<<"$input_rules" || {
     echo "libvirt guest_input rule is missing for ${remote_subnet} -> ${local_subnet}" >&2
     exit 1
   }
-  nft list chain ip libvirt_network guest_nat | grep -Fq -- "$nat_comment" || {
+  nat_rules="$(nft list chain ip libvirt_network guest_nat)"
+  grep -Fq -- "$nat_comment" <<<"$nat_rules" || {
     echo "libvirt guest_nat rule is missing for ${local_subnet} -> ${remote_subnet}" >&2
     exit 1
   }

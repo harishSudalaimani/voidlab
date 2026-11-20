@@ -4,13 +4,13 @@ This Pulumi project bootstraps Argo CD in the existing Kubernetes cluster and cr
 
 ## Placement
 
-Argo CD uses Kubernetes' normal scheduler, so its pods can run on any available worker. It does not depend on a particular host name or VM IP. Applications managed by Argo CD can schedule across the cluster unless their manifests set their own placement rules.
+All Argo CD chart components use the global node selector `kubernetes.io/hostname: worker-1`, configured by `nodeName` in `Pulumi.argocd.yaml`. The `worker-1` node must be Ready and schedulable when applying this stack. If that node is unavailable, Argo CD pods remain Pending instead of moving to another worker. Applications managed by Argo CD have their own scheduling and can run elsewhere unless their manifests set placement rules.
 
 The chart uses its single-replica, non-HA defaults. Its API and UI stay on a `ClusterIP`; access them with `kubectl port-forward` through the control-plane SSH tunnel.
 
 ## Configuration and ownership
 
-- `Pulumi.argocd.yaml` pins chart `10.18.0` and namespace `argocd`.
+- `Pulumi.argocd.yaml` pins chart `10.18.2`, Argo CD `v3.6.2`, namespace `argocd`, and node `worker-1`.
 - `main.go` manages the namespace, Helm release, and root `Application` only.
 - The root Application watches `gitops/argocd/applications` from `https://github.com/harishSudalaimani/voidlab.git`, revision `main`, with automated sync, pruning, and self-healing enabled. It allows an empty directory so the root app can start before the first child Application is added. Removing a child Application manifest from Git prunes that Application resource.
 - Put Argo CD `Application` manifests in `gitops/argocd/applications`. Those child Applications should point to workload manifests elsewhere in the repository. Do not add application workloads to this Pulumi project.
@@ -79,10 +79,10 @@ Change the initial password after first login. If the repository is private, add
 
 ## Pinned chart details
 
-The project pins the official Argo Helm chart `10.18.0` from `oci://ghcr.io/argoproj/argo-helm/argo-cd`. It leaves pod placement to Kubernetes so the project works with any worker names and host layout.
+The project pins the official Argo Helm chart `10.18.2` from the HTTPS repository `https://argoproj.github.io/argo-helm` and explicitly sets the Argo CD image tag to `v3.6.2`. Using the HTTPS Helm repository avoids the local Docker credential-helper dependency of OCI chart pulls. The chart's `global.nodeSelector` applies the selected hostname to Argo CD components; set `nodeName` to change the target node.
 
 References:
 
-- [Official Argo Helm chart values for 10.18.0](https://github.com/argoproj/argo-helm/blob/argo-cd-10.18.0/charts/argo-cd/values.yaml)
+- [Official Argo Helm chart values for 10.18.2](https://github.com/argoproj/argo-helm/blob/argo-cd-10.18.2/charts/argo-cd/values.yaml)
 - [Pulumi Kubernetes provider configuration](https://www.pulumi.com/registry/packages/kubernetes/installation-configuration/)
 - [Argo CD local access and initial password](https://argo-cd.readthedocs.io/en/stable/try_argo_cd_locally/)
