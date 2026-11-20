@@ -3,6 +3,7 @@ module github.com/harish/voidlab/infra/vm/pulumi
 go 1.26.6
 
 require (
+	github.com/harish/voidlab/infra/inventory v0.0.0
 	github.com/pulumi/pulumi-terraform-provider/sdks/go/libvirt v0.0.0-00010101000000-000000000000
 	github.com/pulumi/pulumi/sdk/v3 v3.272.0
 )
@@ -121,3 +122,5 @@ require (
 )
 
 replace github.com/pulumi/pulumi-terraform-provider/sdks/go/libvirt => ./sdks/libvirt
+
+replace github.com/harish/voidlab/infra/inventory => ../../inventory

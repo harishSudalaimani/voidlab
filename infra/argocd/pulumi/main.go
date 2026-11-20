@@ -15,7 +15,6 @@ import (
 const (
 	defaultChartVersion = "10.18.0"
 	defaultNamespace    = "argocd"
-	defaultNodeName     = "worker-3"
 	chartOCI            = "oci://ghcr.io/argoproj/argo-helm/argo-cd"
 )
 
@@ -24,12 +23,11 @@ func main() {
 		cfg := config.New(ctx, "voidlab-argocd")
 		chartVersion := configString(cfg, "chartVersion", defaultChartVersion)
 		namespaceName := configString(cfg, "namespace", defaultNamespace)
-		nodeName := configString(cfg, "nodeName", defaultNodeName)
 		repoURL := configString(cfg, "gitOpsRepoURL", "https://github.com/harishSudalaimani/voidlab.git")
 		repoRevision := configString(cfg, "gitOpsRevision", "main")
 		appsPath := configString(cfg, "gitOpsApplicationsPath", "gitops/argocd/applications")
-		if chartVersion == "" || namespaceName == "" || nodeName == "" || repoURL == "" || repoRevision == "" || appsPath == "" {
-			return fmt.Errorf("chartVersion, namespace, nodeName, gitOpsRepoURL, gitOpsRevision, and gitOpsApplicationsPath must not be empty")
+		if chartVersion == "" || namespaceName == "" || repoURL == "" || repoRevision == "" || appsPath == "" {
+			return fmt.Errorf("chartVersion, namespace, gitOpsRepoURL, gitOpsRevision, and gitOpsApplicationsPath must not be empty")
 		}
 
 		argocdNamespace, err := corev1.NewNamespace(ctx, "argocd-namespace", &corev1.NamespaceArgs{
@@ -42,11 +40,6 @@ func main() {
 		}
 
 		values := pulumi.Map{
-			"global": pulumi.Map{
-				"nodeSelector": pulumi.Map{
-					"kubernetes.io/hostname": pulumi.String(nodeName),
-				},
-			},
 			"server": pulumi.Map{
 				"service": pulumi.Map{
 					"type": pulumi.String("ClusterIP"),
@@ -105,7 +98,6 @@ func main() {
 		ctx.Export("argocdNamespace", pulumi.String(namespaceName))
 		ctx.Export("argocdReleaseName", argocd.Status.Name())
 		ctx.Export("argocdChartVersion", pulumi.String(chartVersion))
-		ctx.Export("scheduledNode", pulumi.String(nodeName))
 		ctx.Export("gitOpsRootApplication", rootApplication.Metadata.Name())
 		ctx.Export("gitOpsApplicationsPath", pulumi.String(appsPath))
 		ctx.Export("serverService", pulumi.String(namespaceName+"/argocd-server"))

@@ -1,0 +1,5 @@
+name: voidlab-network
+runtime: go
+description: VoidLab routed network between the two libvirt VM subnets
+backend:
+  url: https://api.pulumi.com

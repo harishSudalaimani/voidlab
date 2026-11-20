@@ -1,23 +1,46 @@
 config:
-  libvirt:uri: "qemu+sshcmd://void@192.168.29.52/system?keyfile=/Users/harish/.ssh/voidlab&knownhosts=/Users/harish/.ssh/known_hosts&proxy=native"
-  voidlab-vm:networkName: voidlab-network
-  voidlab-vm:networkCIDR: 10.20.0.0/24
-  voidlab-vm:gateway: 10.20.0.1
-  voidlab-vm:dhcpRangeStart: 10.20.0.100
-  voidlab-vm:dhcpRangeEnd: 10.20.0.254
-  voidlab-vm:cpIP: 10.20.0.10
-  voidlab-vm:worker1IP: 10.20.0.11
-  voidlab-vm:worker2IP: 10.20.0.12
-  voidlab-vm:poolName: voidlab-pool
-  voidlab-vm:poolPath: /var/lib/libvirt/images/voidlab
-  voidlab-vm:ubuntuImageURL: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
-  voidlab-vm:sshPublicKeyPath: /Users/harish/.ssh/voidlab.pub
-  voidlab-vm:timezone: Asia/Kolkata
-  voidlab-vm:controlPlaneCount: 1
-  voidlab-vm:workerCount: 2
-  voidlab-vm:cpVCPU: 2
-  voidlab-vm:workerVCPU: 1
-  voidlab-vm:cpMemoryMiB: 3072
-  voidlab-vm:workerMemoryMiB: 6144
-  voidlab-vm:cpDiskGiB: 30
-  voidlab-vm:workerDiskGiB: 40
+  voidlab-vm:host:
+    name: host1
+    address: 192.168.29.81
+    sshUser: dark
+    sshPrivateKeyPath: /Users/harish/.ssh/dark
+    sshAlias: k1
+    tunnelAddress: 10.254.29.1
+    networkName: voidlab-network
+    networkCIDR: 10.20.0.0/24
+    gateway: 10.20.0.1
+    dhcpRangeStart: 10.20.0.100
+    dhcpRangeEnd: 10.20.0.254
+    poolName: voidlab-pool
+    poolPath: /data/vms/voidlab
+    dataPoolName: voidlab-data-pool
+    dataPoolPath: /storage/voidlab
+    ubuntuImageURL: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
+    sshPublicKeyPath: /Users/harish/.ssh/voidlab.pub
+    vmSSHUser: void
+    vmSSHPrivateKeyPath: /Users/harish/.ssh/voidlab
+    timezone: Asia/Kolkata
+    nodes:
+      - name: cp
+        role: control-plane
+        ip: 10.20.0.10
+        mac: "52:54:00:20:00:10"
+        vcpus: 2
+        memoryMiB: 4096
+        diskGiB: 30
+      - name: worker-1
+        role: worker
+        ip: 10.20.0.11
+        mac: "52:54:00:20:00:11"
+        vcpus: 2
+        memoryMiB: 12288
+        diskGiB: 100
+        dataDiskGiB: 800
+      - name: worker-2
+        role: worker
+        ip: 10.20.0.12
+        mac: "52:54:00:20:00:12"
+        vcpus: 2
+        memoryMiB: 12288
+        diskGiB: 100
+        dataDiskGiB: 800

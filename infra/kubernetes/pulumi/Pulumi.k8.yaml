@@ -1,23 +1,4 @@
 config:
-  voidlab-kubernetes:hypervisorHost1: 192.168.29.52
-  voidlab-kubernetes:hypervisorHost1User: void
-  voidlab-kubernetes:hypervisorHost2: 192.168.29.81
-  voidlab-kubernetes:hypervisorHost2User: dark
-  voidlab-kubernetes:vmSSHUser: void
-  voidlab-kubernetes:vmSSHPrivateKeyPath: /Users/harish/.ssh/voidlab
-  voidlab-kubernetes:host1SSHPrivateKeyPath: /Users/harish/.ssh/voidlab
-  voidlab-kubernetes:host2SSHPrivateKeyPath: /Users/harish/.ssh/dark
-  voidlab-kubernetes:host1VMSubnet: 10.20.0.0/24
-  voidlab-kubernetes:host2VMSubnet: 10.21.0.0/24
-  voidlab-kubernetes:host1TunnelAddress: 10.254.29.1
-  voidlab-kubernetes:host2TunnelAddress: 10.254.29.2
-  voidlab-kubernetes:controlPlaneIP: 10.20.0.10
-  voidlab-kubernetes:worker1IP: 10.20.0.11
-  voidlab-kubernetes:worker2IP: 10.20.0.12
-  voidlab-kubernetes:worker3IP: 10.21.0.13
-  voidlab-kubernetes:worker4IP: 10.21.0.14
-  voidlab-kubernetes:worker5IP: 10.21.0.15
-  voidlab-kubernetes:allowSingleCPUControlPlane: true
+  voidlab-kubernetes:vmConfigDirectory: ../../vm/pulumi
+  voidlab-kubernetes:networkStack: snharish85-gmail-com-org/voidlab-network/network
   voidlab-kubernetes:joinTokenGeneration: "1"
-  voidlab-kubernetes:ciliumVersion: 1.21.0-pre.4
-  voidlab-kubernetes:ciliumCLIVersion: v0.20.1

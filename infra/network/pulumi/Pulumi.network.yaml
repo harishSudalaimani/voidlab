@@ -1,0 +1,4 @@
+config:
+  voidlab-network:wireGuardInterface: wg-voidlab
+  voidlab-network:wireGuardCIDR: 10.254.29.0/24
+  voidlab-network:vmConfigDirectory: ../../vm/pulumi

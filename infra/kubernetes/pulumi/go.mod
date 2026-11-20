@@ -3,9 +3,12 @@ module github.com/harish/voidlab/infra/kubernetes/pulumi
 go 1.26.6
 
 require (
+	github.com/harish/voidlab/infra/inventory v0.0.0
 	github.com/pulumi/pulumi-command/sdk v1.3.0
 	github.com/pulumi/pulumi/sdk/v3 v3.272.0
 )
+
+replace github.com/harish/voidlab/infra/inventory => ../../inventory
 
 require (
 	github.com/BurntSushi/toml v1.6.0 // indirect
