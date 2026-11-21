@@ -1,4 +1,4 @@
-hostAPI: http://infisical.infisical.svc.cluster.local:8080/api
+hostAPI: http://infisical.database.svc.cluster.local:8080/api
 
 controllerManager:
   serviceAccount:
@@ -13,4 +13,4 @@ defaultResourcesHelmHooks: false
 
 defaultInfisicalConnection:
   enabled: true
-  address: http://infisical.infisical.svc.cluster.local:8080/api
+  address: http://infisical.database.svc.cluster.local:8080/api

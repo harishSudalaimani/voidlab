@@ -18,7 +18,7 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: cnpg-system
     - server: https://kubernetes.default.svc
-      namespace: infisical
+      namespace: database
     - server: https://kubernetes.default.svc
       namespace: minio-operator
     - server: https://kubernetes.default.svc
@@ -32,7 +32,7 @@ spec:
       name: cnpg-system
     - group: ""
       kind: Namespace
-      name: infisical
+      name: database
     - group: ""
       kind: Namespace
       name: minio-operator

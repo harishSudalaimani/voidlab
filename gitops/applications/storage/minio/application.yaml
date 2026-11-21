@@ -22,11 +22,11 @@ spec:
         releaseName: minio
         namespace: minio-tenant
         valueFiles:
-          - $values/gitops/values/storage/minio-tenant.yaml
+          - $values/gitops/values/storage/minio/tenant-values.yaml
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       ref: values
-      path: gitops/values/storage/minio-resources
+      path: gitops/values/storage/minio/resources
   destination:
     server: https://kubernetes.default.svc
     namespace: minio-tenant

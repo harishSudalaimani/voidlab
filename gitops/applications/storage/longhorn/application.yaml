@@ -1,29 +1,31 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: infisical
+  name: longhorn
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "4"
+    argocd.argoproj.io/sync-wave: "0"
 spec:
-  project: security
+  project: storage
   sources:
-    - repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
-      chart: infisical-standalone-postgres
-      targetRevision: 1.11.0
+    - repoURL: https://charts.longhorn.io
+      chart: longhorn
+      targetRevision: 1.13.0
       helm:
-        releaseName: infisical
+        releaseName: longhorn
         valueFiles:
-          - $values/gitops/values/security/infisical.yaml
+          - $values/gitops/values/storage/longhorn/values.yaml
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       ref: values
+      path: gitops/values/storage/longhorn/resources
   destination:
     server: https://kubernetes.default.svc
-    namespace: infisical
+    namespace: longhorn-system
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true

@@ -5,16 +5,21 @@ infisical:
   nodeSelector:
     kubernetes.io/hostname: worker-1
   rolloutOnEveryRender: false
-  kubeSecretRef: infisical-secrets
+  kubeSecretRef: platform-secrets
   extraEnv:
     # CloudNativePG generates this secret after the database cluster is ready.
     - name: DB_CONNECTION_URI
       valueFrom:
         secretKeyRef:
-          name: infisical-db-app
+          name: postgresql-app
           key: uri
+    - name: REDIS_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: platform-secrets
+          key: REDIS_PASSWORD
     - name: REDIS_URL
-      value: redis://infisical-redis:6379
+      value: redis://default:$(REDIS_PASSWORD)@redis.database.svc.cluster.local:6379/0
     - name: SITE_URL
       value: http://localhost:8081
 
@@ -28,5 +33,5 @@ postgresql:
   enabled: false
 
 redis:
-  # Redis runs as a separate workload with network policy in this namespace.
+  # Redis is a shared storage service deployed separately in the database namespace.
   enabled: false

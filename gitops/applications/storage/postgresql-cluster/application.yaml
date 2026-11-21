@@ -1,24 +1,28 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: infisical-redis
+  name: postgresql-cluster
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "2"
 spec:
-  project: security
+  project: storage
   source:
     repoURL: https://github.com/harishSudalaimani/voidlab.git
     targetRevision: main
-    path: gitops/values/security/infisical-redis
+    path: gitops/values/storage/postgresql-cluster/resources
     directory:
       recurse: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: infisical
+    namespace: database
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true
+    managedNamespaceMetadata:
+      labels:
+        platform.voidlab.io/shared-redis-client: "true"

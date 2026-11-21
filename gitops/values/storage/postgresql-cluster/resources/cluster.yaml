@@ -1,8 +1,8 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: infisical-db
-  namespace: infisical
+  name: postgresql
+  namespace: database
 spec:
   instances: 2
   primaryUpdateStrategy: unsupervised

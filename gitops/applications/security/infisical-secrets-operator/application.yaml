@@ -1,31 +1,29 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: longhorn
+  name: infisical-secrets-operator
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
-  project: storage
+  project: security
   sources:
-    - repoURL: https://charts.longhorn.io
-      chart: longhorn
-      targetRevision: 1.13.0
+    - repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+      chart: secrets-operator
+      targetRevision: 0.11.16
       helm:
-        releaseName: longhorn
+        releaseName: infisical-secrets-operator
         valueFiles:
-          - $values/gitops/values/storage/longhorn.yaml
+          - $values/gitops/values/security/infisical-secrets-operator/values.yaml
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       ref: values
-      path: gitops/values/storage/longhorn-resources
   destination:
     server: https://kubernetes.default.svc
-    namespace: longhorn-system
+    namespace: database
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
       - ServerSideApply=true
