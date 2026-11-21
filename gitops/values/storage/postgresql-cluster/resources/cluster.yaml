@@ -5,6 +5,8 @@ metadata:
   namespace: database
 spec:
   instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.7-system-trixie
+  imagePullPolicy: IfNotPresent
   primaryUpdateStrategy: unsupervised
   bootstrap:
     initdb:
