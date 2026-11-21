@@ -1,6 +1,6 @@
 # VoidLab Argo CD bootstrap
 
-This Pulumi project bootstraps Argo CD in the existing Kubernetes cluster and creates one root Argo CD `Application`. The Helm release installs Argo CD; the root Application watches `gitops/argocd/applications` in this repository so that future application definitions can be delivered through Argo CD.
+This Pulumi project bootstraps Argo CD in the existing Kubernetes cluster and creates one root Argo CD `Application`. The Helm release installs Argo CD; the root Application watches the `gitops` directory so projects, child Applications, and cluster policies are delivered through Argo CD.
 
 ## Placement
 
@@ -11,9 +11,9 @@ The chart uses its single-replica, non-HA defaults. Its API and UI stay on a `Cl
 ## Configuration and ownership
 
 - `Pulumi.argocd.yaml` pins chart `10.18.2`, Argo CD `v3.6.2`, namespace `argocd`, and node `worker-1`.
-- `main.go` manages the namespace, Helm release, and root `Application` only.
-- The root Application watches `gitops/argocd/applications` from `https://github.com/harishSudalaimani/voidlab.git`, revision `main`, with automated sync, pruning, and self-healing enabled. It allows an empty directory so the root app can start before the first child Application is added. Removing a child Application manifest from Git prunes that Application resource.
-- Put Argo CD `Application` manifests in `gitops/argocd/applications`. Those child Applications should point to workload manifests elsewhere in the repository. Do not add application workloads to this Pulumi project.
+- `main.go` manages the namespace, Helm release, bootstrap `AppProject`, and root `Application`. Pulumi creates the bootstrap project before the root app so that the root app can use `spec.project: bootstrap` on first install; GitOps then reconciles the matching manifest at `gitops/projects/bootstrap/bootstrap.yaml`.
+- The root Application watches `gitops` from `https://github.com/harishSudalaimani/voidlab.git`, revision `main`, with automated sync, pruning, and self-healing enabled. Its include pattern applies YAML under `projects/`, `applications/`, and `policies/`; it does not apply Helm values under `values/` or the bootstrap copy under `bootstrap/`. Removing an Application manifest from Git prunes that Application resource.
+- Keep Argo CD `AppProject` manifests in `gitops/projects/<project>/`, child `Application` manifests in `gitops/applications/<project>/`, Helm values in `gitops/values/<project>/`, and Cilium policy manifests in `gitops/policies/cilium`. The declarative copy of the root Application is `gitops/bootstrap/root-application.yaml`. Do not add application workloads to this Pulumi project.
 - If the GitHub repository is private, configure repository credentials in Argo CD before the root Application can sync. Do not commit a token or deploy key.
 - The Kubernetes Pulumi stack remains the one-time cluster bootstrap. Cilium, including Hubble Relay, is managed separately by `infra/cilium/pulumi`; do not add the Cilium release to Argo CD. Argo CD manages other platform and application deployments.
 
@@ -58,7 +58,7 @@ After reviewing the preview, apply it:
 pulumi up --stack snharish85-gmail-com-org/voidlab-argocd/argocd
 ```
 
-The preview should create the `argocd` namespace, Argo CD Helm release, and `voidlab-applications` root Application. It should not create or modify VMs, Kubernetes nodes, Cilium, or workload resources. `Pulumi.argocd.yaml` configures the Argo CD stack; the kubeconfig/current context selects the Kubernetes cluster.
+The preview should create the `bootstrap` AppProject if needed and update `voidlab-applications` to use that project, watch `gitops`, and include only project, application, and policy YAML. It should not modify VMs, Kubernetes nodes, Cilium, or workload resources directly. After the update, Argo CD reads the storage project and Rook application from Git and applies them. `Pulumi.argocd.yaml` configures the Argo CD stack; the kubeconfig/current context selects the Kubernetes cluster.
 
 ## Access Argo CD
 

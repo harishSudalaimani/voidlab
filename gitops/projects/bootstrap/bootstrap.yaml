@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: bootstrap
+  namespace: argocd
+spec:
+  description: Root project for VoidLab GitOps configuration
+  sourceRepos:
+    - https://github.com/harishSudalaimani/voidlab.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: argocd
+  clusterResourceWhitelist:
+    - group: cilium.io
+      kind: CiliumClusterwideNetworkPolicy
+    - group: cilium.io
+      kind: CiliumCIDRGroup
