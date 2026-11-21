@@ -9,7 +9,7 @@ spec:
   project: security
   sources:
     - repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
-      chart: infisical-standalone-postgres
+      chart: infisical-standalone
       targetRevision: 1.11.0
       helm:
         releaseName: infisical
