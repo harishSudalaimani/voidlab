@@ -2,7 +2,7 @@
 
 Argo CD manages platform projects, application definitions, and cluster policies from this directory. `bootstrap/root-application.yaml` is the declarative copy of the root Application created by `infra/argocd/pulumi`; it uses the `bootstrap` AppProject, which Pulumi creates before the root app on first install and GitOps reconciles from `projects/bootstrap/bootstrap.yaml`. Networking, security, storage, and observability each have their own AppProject under `projects/<project>/`; applications must use the matching project and must not use Argo CD's built-in `default` project. The root directory Application includes only YAML under `projects/`, `applications/`, and `policies/`. Helm values under `values/` are read by child Applications and are not applied as Kubernetes resources.
 
-The first workload is Rook Ceph in `applications/storage/rook-ceph.yaml`. The application pins both official Rook charts to `1.21.2` and reads their values from `values/storage/rook-ceph.yaml`. It installs the operator and Ceph cluster charts in one Argo CD Application so Argo can order the chart CRDs before the Ceph custom resources.
+The first workload is Rook Ceph in `applications/storage/rook-ceph.yaml`. The application pins both official Rook charts to `1.21.2` and reads their values from `values/storage/rook-ceph.yaml`. It installs the operator and Ceph cluster charts in one Argo CD Application so Argo can order the chart CRDs before the Ceph custom resources. The storage AppProject explicitly permits the `Namespace` resource created by `CreateNamespace=true`.
 
 ## Storage layout
 

@@ -14,8 +14,10 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: rook-ceph
   clusterResourceWhitelist:
+    # Argo CD's CreateNamespace sync option creates this cluster-scoped resource.
     - group: ""
       kind: Namespace
+      name: rook-ceph
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
     - group: rbac.authorization.k8s.io
