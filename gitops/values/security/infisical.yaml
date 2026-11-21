@@ -2,6 +2,8 @@ infisical:
   enabled: true
   fullnameOverride: infisical
   replicaCount: 2
+  nodeSelector:
+    kubernetes.io/hostname: worker-1
   rolloutOnEveryRender: false
   kubeSecretRef: infisical-secrets
   extraEnv:
@@ -13,6 +15,8 @@ infisical:
           key: uri
     - name: REDIS_URL
       value: redis://infisical-redis:6379
+    - name: SITE_URL
+      value: http://localhost:8081
 
 ingress:
   enabled: false
