@@ -20,10 +20,14 @@ spec:
       ref: values
   destination:
     server: https://kubernetes.default.svc
-    namespace: database
+    namespace: security
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true
+    managedNamespaceMetadata:
+      labels:
+        platform.voidlab.io/shared-redis-client: "true"

@@ -13,12 +13,17 @@ spec:
     - https://openfga.github.io/helm-charts
   destinations:
     - server: https://kubernetes.default.svc
+      namespace: security
+    - server: https://kubernetes.default.svc
       namespace: database
     - server: https://kubernetes.default.svc
       namespace: minio-tenant
     - server: https://kubernetes.default.svc
       namespace: openfga
   clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+      name: security
     - group: ""
       kind: Namespace
       name: database
