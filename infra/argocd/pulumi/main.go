@@ -28,7 +28,7 @@ func main() {
 		namespaceName := configString(cfg, "namespace", defaultNamespace)
 		repoURL := configString(cfg, "gitOpsRepoURL", "https://github.com/harishSudalaimani/voidlab.git")
 		repoRevision := configString(cfg, "gitOpsRevision", "main")
-		appsPath := configString(cfg, "gitOpsApplicationsPath", "gitops/argocd/applications")
+		appsPath := configString(cfg, "gitOpsApplicationsPath", "gitops")
 		nodeName := configString(cfg, "nodeName", "worker-1")
 		if chartVersion == "" || appVersion == "" || namespaceName == "" || repoURL == "" || repoRevision == "" || appsPath == "" || nodeName == "" {
 			return fmt.Errorf("chartVersion, appVersion, namespace, gitOpsRepoURL, gitOpsRevision, gitOpsApplicationsPath, and nodeName must not be empty")
@@ -72,6 +72,32 @@ func main() {
 			return fmt.Errorf("install Argo CD Helm release: %w", err)
 		}
 
+		bootstrapProject, err := apiextensions.NewCustomResource(ctx, "voidlab-bootstrap-project", &apiextensions.CustomResourceArgs{
+			ApiVersion: pulumi.String("argoproj.io/v1alpha1"),
+			Kind:       pulumi.String("AppProject"),
+			Metadata: &metav1.ObjectMetaArgs{
+				Name:      pulumi.String("bootstrap"),
+				Namespace: pulumi.String(namespaceName),
+			},
+			OtherFields: kubernetes.UntypedArgs{
+				"spec": map[string]interface{}{
+					"description": "Root project for VoidLab GitOps configuration",
+					"sourceRepos": []string{repoURL},
+					"destinations": []map[string]interface{}{{
+						"server":    "https://kubernetes.default.svc",
+						"namespace": namespaceName,
+					}},
+					"clusterResourceWhitelist": []map[string]interface{}{
+						{"group": "cilium.io", "kind": "CiliumClusterwideNetworkPolicy"},
+						{"group": "cilium.io", "kind": "CiliumCIDRGroup"},
+					},
+				},
+			},
+		}, pulumi.DependsOn([]pulumi.Resource{argocd}))
+		if err != nil {
+			return fmt.Errorf("create Argo CD bootstrap AppProject: %w", err)
+		}
+
 		rootApplication, err := apiextensions.NewCustomResource(ctx, "voidlab-applications", &apiextensions.CustomResourceArgs{
 			ApiVersion: pulumi.String("argoproj.io/v1alpha1"),
 			Kind:       pulumi.String("Application"),
@@ -81,13 +107,14 @@ func main() {
 			},
 			OtherFields: kubernetes.UntypedArgs{
 				"spec": map[string]interface{}{
-					"project": "default",
+					"project": "bootstrap",
 					"source": map[string]interface{}{
 						"repoURL":        repoURL,
 						"targetRevision": repoRevision,
 						"path":           appsPath,
 						"directory": map[string]interface{}{
 							"recurse": true,
+							"include": "{projects/**/*.yaml,applications/**/*.yaml,policies/**/*.yaml}",
 						},
 					},
 					"destination": map[string]interface{}{
@@ -103,7 +130,7 @@ func main() {
 					},
 				},
 			},
-		}, pulumi.DependsOn([]pulumi.Resource{argocd}))
+		}, pulumi.DependsOn([]pulumi.Resource{argocd, bootstrapProject}))
 		if err != nil {
 			return fmt.Errorf("create Argo CD GitOps root Application: %w", err)
 		}

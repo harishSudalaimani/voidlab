@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: security
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Security platform services managed by Argo CD
+  sourceRepos:
+    - https://github.com/harishSudalaimani/voidlab.git
+    - https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+    - https://openfga.github.io/helm-charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: infisical
+    - server: https://kubernetes.default.svc
+      namespace: openfga

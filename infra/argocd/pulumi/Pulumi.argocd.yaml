@@ -5,4 +5,4 @@ config:
   voidlab-argocd:nodeName: worker-1
   voidlab-argocd:gitOpsRepoURL: https://github.com/harishSudalaimani/voidlab.git
   voidlab-argocd:gitOpsRevision: main
-  voidlab-argocd:gitOpsApplicationsPath: gitops/argocd/applications
+  voidlab-argocd:gitOpsApplicationsPath: gitops

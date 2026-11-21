@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: voidlab-applications
+  namespace: argocd
+spec:
+  project: bootstrap
+  source:
+    repoURL: https://github.com/harishSudalaimani/voidlab.git
+    targetRevision: main
+    path: gitops
+    directory:
+      recurse: true
+      include: "{projects/**/*.yaml,applications/**/*.yaml,policies/**/*.yaml}"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
