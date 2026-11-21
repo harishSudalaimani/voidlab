@@ -28,8 +28,7 @@ tenant:
                   - key: kubernetes.io/hostname
                     operator: In
                     values:
-                      - worker-1
-                      - worker-2
+                      - worker
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname

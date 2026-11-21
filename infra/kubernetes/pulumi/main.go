@@ -4,45 +4,46 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"github.com/harish/voidlab/infra/inventory"
 	"github.com/pulumi/pulumi-command/sdk/go/command/remote"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
 const (
-	defaultVMConfigDirectory = "../../vm/pulumi"
-	defaultPodCIDR           = "10.244.0.0/16"
+	defaultPodCIDR  = "10.244.0.0/16"
+	kubernetesMinor = "1.37"
 )
 
-type node struct {
-	name         string
-	role         string
-	address      pulumi.StringOutput
-	hostKey      pulumi.StringPtrInput
-	jump         jumpHost
-	sshUser      string
-	vmPrivateKey string
+type serverConfig struct {
+	Name              string `json:"name"`
+	Role              string `json:"role"`
+	Address           string `json:"address"`
+	SSHAddress        string `json:"sshAddress"`
+	SSHUser           string `json:"sshUser"`
+	SSHPrivateKeyPath string `json:"sshPrivateKeyPath"`
 }
 
-type jumpHost struct {
-	address    string
-	user       string
-	privateKey string
-	hostKey    pulumi.StringPtrInput
+type node struct {
+	name           string
+	role           string
+	address        pulumi.StringOutput
+	sshAddress     pulumi.StringOutput
+	hostKey        pulumi.StringPtrInput
+	sshUser        string
+	privateKey     string
+	privateKeyPath string
 }
 
 type clusterConfig struct {
 	controlPlane        node
 	workers             []node
-	tunnelTarget        string
-	tunnelKeyPath       string
 	podCIDR             string
 	allowOneCPU         bool
 	joinTokenGeneration string
@@ -51,76 +52,43 @@ type clusterConfig struct {
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := config.New(ctx, "voidlab-kubernetes")
-		hosts, err := inventory.LoadHosts(configString(cfg, "vmConfigDirectory", defaultVMConfigDirectory))
-		if err != nil {
+		var servers []serverConfig
+		if err := cfg.GetObject("servers", &servers); err != nil {
+			return fmt.Errorf("read Kubernetes server configuration: %w", err)
+		}
+		if err := validateServers(servers); err != nil {
 			return err
 		}
-		// The network stack owns the node IP list and only publishes routingVerified after peer checks pass.
-		networkStack, err := pulumi.NewStackReference(ctx, "network-stack", &pulumi.StackReferenceArgs{
-			Name: pulumi.String(configString(cfg, "networkStack", "snharish85-gmail-com-org/voidlab-network/network")),
-		})
-		if err != nil {
-			return fmt.Errorf("reference network stack: %w", err)
-		}
-		routingVerified := networkStack.GetOutput(pulumi.String("routingVerified")).ApplyT(func(value interface{}) (bool, error) {
-			verified, ok := value.(bool)
-			if !ok {
-				return false, fmt.Errorf("network stack routingVerified output has type %T, expected bool", value)
-			}
-			return verified, nil
-		}).(pulumi.BoolOutput)
+
 		cluster := clusterConfig{
 			podCIDR:             configString(cfg, "podCIDR", defaultPodCIDR),
 			allowOneCPU:         cfg.GetBool("allowSingleCPUControlPlane"),
 			joinTokenGeneration: configString(cfg, "joinTokenGeneration", "1"),
 		}
-		foundHub := false
-		for _, host := range hosts {
-			hostKeyPath, err := readPrivateKey(host.SSHPrivateKeyPath)
+		for _, server := range servers {
+			sshAddress := server.SSHAddress
+			if sshAddress == "" {
+				sshAddress = server.Address
+			}
+			privateKey, err := readPrivateKey(server.SSHPrivateKeyPath)
 			if err != nil {
-				return fmt.Errorf("read %s hypervisor SSH key: %w", host.Name, err)
+				return fmt.Errorf("read %s SSH key: %w", server.Name, err)
 			}
-			hostKey, err := readKnownHostKey(host.Address, host.SSHAlias)
+			hostKey, err := readKnownHostKey(sshAddress)
 			if err != nil {
-				return fmt.Errorf("resolve %s SSH host key: %w", host.Name, err)
+				return fmt.Errorf("resolve %s SSH host key: %w", server.Name, err)
 			}
-			vmPrivateKey, err := readPrivateKey(host.VMSSHPrivateKeyPath)
-			if err != nil {
-				return fmt.Errorf("read %s VM SSH key: %w", host.Name, err)
+			current := node{
+				name: server.Name, role: server.Role, address: pulumi.String(server.Address).ToStringOutput(),
+				sshAddress: pulumi.String(sshAddress).ToStringOutput(),
+				hostKey:    pulumi.String(hostKey), sshUser: server.SSHUser, privateKey: privateKey,
+				privateKeyPath: expandHome(server.SSHPrivateKeyPath),
 			}
-			jump := jumpHost{address: host.Address, user: host.SSHUser, privateKey: hostKeyPath, hostKey: pulumi.String(hostKey)}
-			if host.Name == "host1" {
-				foundHub = true
-				cluster.tunnelTarget = host.SSHAlias
-				if cluster.tunnelTarget == "" {
-					cluster.tunnelTarget = host.SSHUser + "@" + host.Address
-				}
-				cluster.tunnelKeyPath = host.SSHPrivateKeyPath
+			if current.role == "control-plane" {
+				cluster.controlPlane = current
+			} else {
+				cluster.workers = append(cluster.workers, current)
 			}
-			addresses := make([]pulumi.StringOutput, len(host.Nodes))
-			for i, declaredNode := range host.Nodes {
-				addresses[i] = requireVerifiedNetworkAddress(declaredNode.Name, routingVerified,
-					networkStack.GetStringOutput(pulumi.String("nodeIP_"+inventory.OutputKey(declaredNode.Name))))
-			}
-			scan, err := discoverVMHostKeys(ctx, host.Name, jump, addresses)
-			if err != nil {
-				return fmt.Errorf("register %s VM host-key discovery: %w", host.Name, err)
-			}
-			for i, declaredNode := range host.Nodes {
-				current := node{
-					name: declaredNode.Name, role: declaredNode.Role, address: addresses[i],
-					hostKey: hostKeyOutput(scan.Stdout, addresses[i]), jump: jump,
-					sshUser: host.VMSSHUser, vmPrivateKey: vmPrivateKey,
-				}
-				if current.role == "control-plane" {
-					cluster.controlPlane = current
-				} else {
-					cluster.workers = append(cluster.workers, current)
-				}
-			}
-		}
-		if !foundHub {
-			return fmt.Errorf("host1 must exist because it is the WireGuard hub and SSH tunnel entry point")
 		}
 		allNodes := cluster.nodes()
 
@@ -133,13 +101,17 @@ func main() {
 			return err
 		}
 		preflights := make([]pulumi.Resource, 0, len(allNodes))
-		for _, current := range cluster.nodes() {
+		for _, current := range allNodes {
+			peer := allNodes[1]
+			if current.name == allNodes[1].name {
+				peer = allNodes[0]
+			}
 			allowOneCPU := "false"
 			if current.role == "control-plane" && cluster.allowOneCPU {
 				allowOneCPU = "true"
 			}
 			check, err := runScript(ctx, "preflight-"+current.name, current, preflightScript,
-				[]pulumi.StringInput{pulumi.String(current.name), pulumi.String(current.role), pulumi.String(allowOneCPU)}, nil, false)
+				[]pulumi.StringInput{pulumi.String(current.name), pulumi.String(current.role), pulumi.String(allowOneCPU), peer.address}, nil, false)
 			if err != nil {
 				return fmt.Errorf("register %s preflight: %w", current.name, err)
 			}
@@ -147,9 +119,13 @@ func main() {
 		}
 
 		setupResources := make([]pulumi.Resource, 0, len(allNodes))
-		for _, current := range cluster.nodes() {
+		for _, current := range allNodes {
+			containerdRoot := "/var/lib/containerd"
+			if current.role == "control-plane" {
+				containerdRoot = "/data/vms/containerd"
+			}
 			setup, err := runScript(ctx, "install-"+current.name, current, setupScript,
-				[]pulumi.StringInput{pulumi.String("v1.37")}, preflights, false)
+				[]pulumi.StringInput{pulumi.String(kubernetesMinor), pulumi.String(containerdRoot)}, preflights, false)
 			if err != nil {
 				return fmt.Errorf("register %s Kubernetes setup: %w", current.name, err)
 			}
@@ -199,21 +175,23 @@ func main() {
 			return fmt.Errorf("register kubeconfig export: %w", err)
 		}
 
-		names, addresses := pulumi.Map{}, pulumi.Map{}
-		roles := pulumi.Map{}
+		names, addresses, roles := pulumi.Map{}, pulumi.Map{}, pulumi.Map{}
 		for _, current := range allNodes {
 			names[current.name] = pulumi.String(current.name)
 			addresses[current.name] = current.address
 			roles[current.name] = pulumi.String(current.role)
+			ctx.Export("nodeIP_"+strings.ReplaceAll(current.name, "-", "_"), current.address)
+			ctx.Export("nodeRole_"+strings.ReplaceAll(current.name, "-", "_"), pulumi.String(current.role))
 		}
 		ctx.Export("nodeNames", names)
 		ctx.Export("nodeIPs", addresses)
 		ctx.Export("nodeRoles", roles)
 		ctx.Export("controlPlaneIP", cluster.controlPlane.address)
-		ctx.Export("kubernetesVersion", pulumi.String("1.37"))
+		ctx.Export("kubernetesVersion", pulumi.String(kubernetesMinor))
 		ctx.Export("podCIDR", pulumi.String(cluster.podCIDR))
-		ctx.Export("sshTunnel", pulumi.Sprintf("ssh -i %s -N -L 16443:%s:6443 %s",
-			shellQuote(cluster.tunnelKeyPath), cluster.controlPlane.address, shellQuote(cluster.tunnelTarget)))
+		controlPlane := cluster.controlPlane
+		ctx.Export("sshTunnel", pulumi.Sprintf("ssh -i %s -N -L 16443:%s:6443 %s@%s",
+			shellQuote(controlPlane.privateKeyPath), controlPlane.address, shellQuote(controlPlane.sshUser), controlPlane.sshAddress))
 		ctx.Export("kubeconfigBase64", kubeconfig.Stdout)
 		return nil
 	})
@@ -223,127 +201,51 @@ func (c clusterConfig) nodes() []node {
 	return append([]node{c.controlPlane}, c.workers...)
 }
 
-func discoverVMHostKeys(ctx *pulumi.Context, hostName string, host jumpHost, addresses []pulumi.StringOutput) (*remote.Command, error) {
-	scanScript := `#!/usr/bin/env bash
-set -uo pipefail
-command -v ssh-keyscan >/dev/null || { echo "ssh-keyscan is required on the hypervisor" >&2; exit 1; }
-for ip in "$@"; do
-  key_line=""
-  for attempt in $(seq 1 30); do
-    key_line="$(ssh-keyscan -T 3 -t ed25519 "$ip" 2>/dev/null | awk -v ip="$ip" '$2 == "ssh-ed25519" { print ip " " $2 " " $3; exit }')"
-    if [[ -n "$key_line" ]]; then
-      break
-    fi
-    sleep 2
-  done
-  if [[ -z "$key_line" ]]; then
-    echo "could not discover the ed25519 SSH host key for $ip" >&2
-    exit 1
-  fi
-  printf '%s\n' "$key_line"
-done
-`
-
-	args := make([]pulumi.StringInput, len(addresses))
-	for i, address := range addresses {
-		args[i] = address
+func validateServers(servers []serverConfig) error {
+	if len(servers) == 0 {
+		return fmt.Errorf("no servers are configured; set voidlab-kubernetes:servers[0] and [1] with the commands in README.md")
 	}
-	command := pulumi.Sprintf("bash -s -- %s", shellQuoteInputs(args))
-	return remote.NewCommand(ctx, "discover-vm-host-keys-"+hostName, &remote.CommandArgs{
-		Connection: hostConnection(host), Create: command, Stdin: pulumi.String(scanScript),
-		AddPreviousOutputInEnv: pulumi.Bool(false), Logging: remote.LoggingNone,
-	})
-}
-
-func hostConnection(host jumpHost) *remote.ConnectionArgs {
-	return &remote.ConnectionArgs{
-		Host:       pulumi.String(host.address),
-		User:       pulumi.String(host.user),
-		PrivateKey: pulumi.ToSecret(pulumi.String(host.privateKey)).(pulumi.StringOutput),
-		HostKey:    host.hostKey,
+	if len(servers) != 2 {
+		return fmt.Errorf("servers must contain exactly two entries: one control-plane and one worker")
 	}
-}
-
-func readKnownHostKey(address, alias string) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("locate home directory: %w", err)
-	}
-	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
-	for _, candidate := range []string{address, alias} {
-		if candidate == "" {
-			continue
+	seenNames, seenAddresses := map[string]bool{}, map[string]bool{}
+	controlPlanes, workers := 0, 0
+	for _, server := range servers {
+		if server.Name == "" || server.SSHUser == "" || server.SSHPrivateKeyPath == "" {
+			return fmt.Errorf("each server must set name, sshUser, and sshPrivateKeyPath")
 		}
-		output, commandErr := exec.Command("ssh-keygen", "-F", candidate, "-f", knownHostsPath).Output()
-		if commandErr != nil {
-			continue
+		if seenNames[server.Name] {
+			return fmt.Errorf("server name %q is configured more than once", server.Name)
 		}
-		for _, line := range strings.Split(string(output), "\n") {
-			fields := strings.Fields(line)
-			if len(fields) < 3 || strings.HasPrefix(fields[0], "#") {
-				continue
-			}
-			key := fields[1] + " " + fields[2]
-			if isSSHKey(key) {
-				return key, nil
-			}
+		seenNames[server.Name] = true
+		address, err := netip.ParseAddr(server.Address)
+		if err != nil || !address.Is4() {
+			return fmt.Errorf("server %s address %q must be an IPv4 address", server.Name, server.Address)
+		}
+		if seenAddresses[server.Address] {
+			return fmt.Errorf("server address %q is configured more than once", server.Address)
+		}
+		seenAddresses[server.Address] = true
+		sshAddress := server.SSHAddress
+		if sshAddress == "" {
+			sshAddress = server.Address
+		}
+		if address, err := netip.ParseAddr(sshAddress); err != nil || !address.Is4() {
+			return fmt.Errorf("server %s sshAddress %q must be an IPv4 address", server.Name, sshAddress)
+		}
+		switch server.Role {
+		case "control-plane":
+			controlPlanes++
+		case "worker":
+			workers++
+		default:
+			return fmt.Errorf("server %s role must be control-plane or worker", server.Name)
 		}
 	}
-	return "", fmt.Errorf("no OpenSSH host key for %q (or alias %q) in %s; first connect to the hypervisor using its trusted SSH shortcut", address, alias, knownHostsPath)
-}
-
-func scannedHostKey(output, address string) (string, error) {
-	for _, line := range strings.Split(output, "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 3 || fields[0] != address {
-			continue
-		}
-		key := fields[1] + " " + fields[2]
-		if isSSHKey(key) {
-			return key, nil
-		}
+	if controlPlanes != 1 || workers != 1 {
+		return fmt.Errorf("configure exactly one control-plane and one worker; found %d control-plane and %d worker", controlPlanes, workers)
 	}
-	return "", fmt.Errorf("host-key discovery output did not contain a valid ed25519 key for %s", address)
-}
-
-func hostKeyOutput(scanOutput, address pulumi.StringOutput) pulumi.StringOutput {
-	return pulumi.All(scanOutput, address).ApplyT(func(values []interface{}) (string, error) {
-		return scannedHostKey(values[0].(string), values[1].(string))
-	}).(pulumi.StringOutput)
-}
-
-func requireVerifiedNetworkAddress(nodeName string, routingVerified pulumi.BoolOutput, address pulumi.StringOutput) pulumi.StringOutput {
-	// If routing is false, dependent Kubernetes commands receive an error instead of an IP.
-	return pulumi.All(routingVerified, address).ApplyT(func(values []interface{}) (string, error) {
-		verified, ok := values[0].(bool)
-		if !ok || !verified {
-			return "", fmt.Errorf("network stack has not verified routing for node %s", nodeName)
-		}
-		ip, ok := values[1].(string)
-		if !ok || ip == "" {
-			return "", fmt.Errorf("network stack did not export an IP address for node %s", nodeName)
-		}
-		return ip, nil
-	}).(pulumi.StringOutput)
-}
-
-func shellQuoteInputs(args []pulumi.StringInput) pulumi.StringOutput {
-	// Some arguments come from another Pulumi stack and are only known when Pulumi resolves its outputs.
-	inputs := make([]any, len(args))
-	for i, arg := range args {
-		inputs[i] = arg
-	}
-	return pulumi.All(inputs...).ApplyT(func(values []interface{}) (string, error) {
-		quoted := make([]string, len(values))
-		for i, value := range values {
-			argument, ok := value.(string)
-			if !ok {
-				return "", fmt.Errorf("command argument %d has type %T, expected string", i, value)
-			}
-			quoted[i] = shellQuote(argument)
-		}
-		return strings.Join(quoted, " "), nil
-	}).(pulumi.StringOutput)
+	return nil
 }
 
 func runScript(ctx *pulumi.Context, name string, target node, script string, args []pulumi.StringInput, dependencies []pulumi.Resource, secretStdout bool) (*remote.Command, error) {
@@ -358,43 +260,25 @@ func runScript(ctx *pulumi.Context, name string, target node, script string, arg
 	if len(dependencies) != 0 {
 		options = append(options, pulumi.DependsOn(dependencies))
 	}
-	commandArgs := &remote.CommandArgs{
-		Connection: connection(target),
-		Create:     command,
-		Stdin:      pulumi.String(script),
-		Logging:    remote.LoggingNone,
-	}
-	return remote.NewCommand(ctx, name, commandArgs, options...)
+	return remote.NewCommand(ctx, name, &remote.CommandArgs{
+		Connection: connection(target), Create: command, Stdin: pulumi.String(script), Logging: remote.LoggingNone,
+	}, options...)
 }
 
 func registerWorkerJoin(ctx *pulumi.Context, worker node, joinCommand pulumi.StringOutput, dependencies []pulumi.Resource) (*remote.Command, error) {
 	create := joinCommand.ApplyT(func(join string) string {
 		join = strings.TrimSpace(join)
-		script := "if test -s /etc/kubernetes/kubelet.conf; then echo already-joined; else " + join + "; fi"
-		return "sudo -n bash -lc " + shellQuote(script)
+		return "sudo -n bash -lc " + shellQuote("if test -s /etc/kubernetes/kubelet.conf; then echo already-joined; else "+join+"; fi")
 	}).(pulumi.StringOutput)
 	return remote.NewCommand(ctx, "join-"+worker.name, &remote.CommandArgs{
-		Connection:             connection(worker),
-		Create:                 create,
-		AddPreviousOutputInEnv: pulumi.Bool(false),
-		Logging:                remote.LoggingNone,
+		Connection: connection(worker), Create: create, AddPreviousOutputInEnv: pulumi.Bool(false), Logging: remote.LoggingNone,
 	}, pulumi.DependsOn(dependencies))
 }
 
 func connection(target node) *remote.ConnectionArgs {
-	vmKey := pulumi.ToSecret(pulumi.String(target.vmPrivateKey)).(pulumi.StringOutput)
-	jumpKey := pulumi.ToSecret(pulumi.String(target.jump.privateKey)).(pulumi.StringOutput)
 	return &remote.ConnectionArgs{
-		Host:       target.address,
-		User:       pulumi.String(target.sshUser),
-		PrivateKey: vmKey,
-		HostKey:    target.hostKey,
-		Proxy: &remote.ProxyConnectionArgs{
-			Host:       pulumi.String(target.jump.address),
-			User:       pulumi.String(target.jump.user),
-			PrivateKey: jumpKey,
-			HostKey:    target.jump.hostKey,
-		},
+		Host: target.sshAddress, User: pulumi.String(target.sshUser),
+		PrivateKey: pulumi.ToSecret(pulumi.String(target.privateKey)).(pulumi.StringOutput), HostKey: target.hostKey,
 	}
 }
 
@@ -414,6 +298,7 @@ func configString(cfg *config.Config, key, fallback string) string {
 }
 
 func readPrivateKey(path string) (string, error) {
+	path = expandHome(path)
 	keyBytes, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("read SSH private key %q: %w", path, err)
@@ -423,6 +308,29 @@ func readPrivateKey(path string) (string, error) {
 		return "", fmt.Errorf("SSH private key %q is empty", path)
 	}
 	return privateKey, nil
+}
+
+func readKnownHostKey(address string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("locate home directory: %w", err)
+	}
+	knownHostsPath := filepath.Join(home, ".ssh", "known_hosts")
+	output, err := exec.Command("ssh-keygen", "-F", address, "-f", knownHostsPath).Output()
+	if err != nil {
+		return "", fmt.Errorf("no trusted SSH host key for %s in %s; connect to the server once first", address, knownHostsPath)
+	}
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || strings.HasPrefix(fields[0], "#") {
+			continue
+		}
+		key := fields[1] + " " + fields[2]
+		if isSSHKey(key) {
+			return key, nil
+		}
+	}
+	return "", fmt.Errorf("no usable SSH host key for %s in %s", address, knownHostsPath)
 }
 
 func isSSHKey(value string) bool {
@@ -445,6 +353,32 @@ func isSSHKey(value string) bool {
 	return string(blob[4:4+int(typeLength)]) == keyType
 }
 
+func shellQuoteInputs(args []pulumi.StringInput) pulumi.StringOutput {
+	inputs := make([]any, len(args))
+	for i, arg := range args {
+		inputs[i] = arg
+	}
+	return pulumi.All(inputs...).ApplyT(func(values []interface{}) (string, error) {
+		quoted := make([]string, len(values))
+		for i, value := range values {
+			argument, ok := value.(string)
+			if !ok {
+				return "", fmt.Errorf("command argument %d has type %T, expected string", i, value)
+			}
+			quoted[i] = shellQuote(argument)
+		}
+		return strings.Join(quoted, " "), nil
+	}).(pulumi.StringOutput)
+}
+
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+func expandHome(path string) string {
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		home, _ := os.UserHomeDir()
+		return filepath.Join(home, strings.TrimPrefix(path, "~/"))
+	}
+	return path
 }

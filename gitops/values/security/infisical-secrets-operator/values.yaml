@@ -1,6 +1,12 @@
 hostAPI: http://infisical.database.svc.cluster.local:8080/api
 
 controllerManager:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
   serviceAccount:
     create: true
     name: infisical-secrets-operator

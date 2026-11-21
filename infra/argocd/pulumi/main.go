@@ -29,9 +29,8 @@ func main() {
 		repoURL := configString(cfg, "gitOpsRepoURL", "https://github.com/harishSudalaimani/voidlab.git")
 		repoRevision := configString(cfg, "gitOpsRevision", "main")
 		appsPath := configString(cfg, "gitOpsApplicationsPath", "gitops")
-		nodeName := configString(cfg, "nodeName", "worker-1")
-		if chartVersion == "" || appVersion == "" || namespaceName == "" || repoURL == "" || repoRevision == "" || appsPath == "" || nodeName == "" {
-			return fmt.Errorf("chartVersion, appVersion, namespace, gitOpsRepoURL, gitOpsRevision, gitOpsApplicationsPath, and nodeName must not be empty")
+		if chartVersion == "" || appVersion == "" || namespaceName == "" || repoURL == "" || repoRevision == "" || appsPath == "" {
+			return fmt.Errorf("chartVersion, appVersion, namespace, gitOpsRepoURL, gitOpsRevision, and gitOpsApplicationsPath must not be empty")
 		}
 
 		argocdNamespace, err := corev1.NewNamespace(ctx, "argocd-namespace", &corev1.NamespaceArgs{
@@ -49,7 +48,14 @@ func main() {
 					"tag": pulumi.String(appVersion),
 				},
 				"nodeSelector": pulumi.Map{
-					"kubernetes.io/hostname": pulumi.String(nodeName),
+					"kubernetes.io/hostname": pulumi.String("cp"),
+				},
+				"tolerations": pulumi.Array{
+					pulumi.Map{
+						"key":      pulumi.String("node-role.kubernetes.io/control-plane"),
+						"operator": pulumi.String("Exists"),
+						"effect":   pulumi.String("NoSchedule"),
+					},
 				},
 			},
 			"server": pulumi.Map{
@@ -171,7 +177,6 @@ return hs
 		}
 
 		ctx.Export("argocdNamespace", pulumi.String(namespaceName))
-		ctx.Export("argocdNodeName", pulumi.String(nodeName))
 		ctx.Export("argocdAppVersion", pulumi.String(appVersion))
 		ctx.Export("argocdReleaseName", argocd.Status.Name())
 		ctx.Export("argocdChartVersion", pulumi.String(chartVersion))

@@ -1,11 +1,11 @@
 apiVersion: v1
 kind: Node
 metadata:
-  name: worker-1
+  name: cp
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
     argocd.argoproj.io/sync-options: Prune=false
-    node.longhorn.io/default-disks-config: '[{"name":"longhorn-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":53687091200,"tags":[]}]'
+    node.longhorn.io/default-disks-config: '[{"name":"data-ssd","path":"/data/vms/longhorn","allowScheduling":true,"storageReserved":0,"tags":[]},{"name":"bulk-hdd","path":"/storage/longhorn","allowScheduling":true,"storageReserved":0,"tags":[]}]'
   labels:
     node.longhorn.io/create-default-disk: config
     storage.voidlab.io/longhorn: "true"
@@ -13,35 +13,11 @@ metadata:
 apiVersion: v1
 kind: Node
 metadata:
-  name: worker-2
+  name: worker
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
     argocd.argoproj.io/sync-options: Prune=false
-    node.longhorn.io/default-disks-config: '[{"name":"longhorn-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":53687091200,"tags":[]}]'
-  labels:
-    node.longhorn.io/create-default-disk: config
-    storage.voidlab.io/longhorn: "true"
----
-apiVersion: v1
-kind: Node
-metadata:
-  name: worker-3
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-    argocd.argoproj.io/sync-options: Prune=false
-    node.longhorn.io/default-disks-config: '[{"name":"longhorn-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":32212254720,"tags":[]}]'
-  labels:
-    node.longhorn.io/create-default-disk: config
-    storage.voidlab.io/longhorn: "true"
----
-apiVersion: v1
-kind: Node
-metadata:
-  name: worker-4
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
-    argocd.argoproj.io/sync-options: Prune=false
-    node.longhorn.io/default-disks-config: '[{"name":"longhorn-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":32212254720,"tags":[]}]'
+    node.longhorn.io/default-disks-config: '[{"name":"worker-root","path":"/var/lib/longhorn","allowScheduling":true,"storageReserved":0,"tags":[]}]'
   labels:
     node.longhorn.io/create-default-disk: config
     storage.voidlab.io/longhorn: "true"

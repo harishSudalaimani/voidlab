@@ -3,7 +3,7 @@ infisical:
   fullnameOverride: infisical
   replicaCount: 2
   nodeSelector:
-    kubernetes.io/hostname: worker-1
+    kubernetes.io/hostname: worker
   rolloutOnEveryRender: false
   kubeSecretRef: platform-secrets
   extraEnv:

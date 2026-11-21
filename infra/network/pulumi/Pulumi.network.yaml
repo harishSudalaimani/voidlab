@@ -1,4 +1,13 @@
 config:
-  voidlab-network:wireGuardInterface: wg-voidlab
-  voidlab-network:wireGuardCIDR: 10.254.29.0/24
-  voidlab-network:vmConfigDirectory: ../../vm/pulumi
+  voidlab-network:kubernetesStack: snharish85-gmail-com-org/voidlab-kubernetes/k8
+  voidlab-network:servers:
+    - name: cp
+      role: control-plane
+      address: 192.168.29.81
+      sshUser: dark
+      sshPrivateKeyPath: ~/.ssh/dark
+    - name: worker
+      role: worker
+      address: 192.168.29.52
+      sshUser: void
+      sshPrivateKeyPath: ~/.ssh/voidlab

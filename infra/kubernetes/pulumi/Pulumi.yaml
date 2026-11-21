@@ -1,5 +1,5 @@
 name: voidlab-kubernetes
 runtime: go
-description: VoidLab Kubernetes 1.37 kubeadm bootstrap on existing libvirt VMs
+description: VoidLab Kubernetes 1.37 kubeadm bootstrap on two physical Fedora servers
 backend:
   url: https://api.pulumi.com

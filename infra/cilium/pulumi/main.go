@@ -23,7 +23,6 @@ func main() {
 		chartVersion := configString(cfg, "chartVersion", defaultChartVersion)
 		namespace := configString(cfg, "namespace", defaultNamespace)
 		releaseName := configString(cfg, "releaseName", defaultReleaseName)
-		nodeName := configString(cfg, "nodeName", "worker-1")
 		// Kubernetes exports this address, so Cilium does not keep a second copy in config.
 		kubernetesStack, err := pulumi.NewStackReference(ctx, "kubernetes-stack", &pulumi.StackReferenceArgs{
 			Name: pulumi.String(configString(cfg, "kubernetesStack", "snharish85-gmail-com-org/voidlab-kubernetes/k8")),
@@ -32,10 +31,27 @@ func main() {
 			return fmt.Errorf("reference Kubernetes stack: %w", err)
 		}
 		apiServerIP := kubernetesStack.GetStringOutput(pulumi.String("controlPlaneIP"))
+		networkStack, err := pulumi.NewStackReference(ctx, "network-stack", &pulumi.StackReferenceArgs{
+			Name: pulumi.String(configString(cfg, "networkStack", "snharish85-gmail-com-org/voidlab-network/network")),
+		})
+		if err != nil {
+			return fmt.Errorf("reference network stack: %w", err)
+		}
+		networkReady := networkStack.GetOutput(pulumi.String("networkReady")).ApplyT(func(value interface{}) (bool, error) {
+			ready, ok := value.(bool)
+			if !ok {
+				return false, fmt.Errorf("network stack networkReady output has type %T, expected bool", value)
+			}
+			if !ready {
+				return false, fmt.Errorf("direct Kubernetes peer networking has not been verified")
+			}
+			return true, nil
+		}).(pulumi.BoolOutput)
+		routingMode := networkReady.ApplyT(func(bool) string { return "tunnel" }).(pulumi.StringOutput)
 		apiServerPort := configString(cfg, "apiServerPort", defaultAPIServerPort)
 		parsedPort, err := strconv.Atoi(apiServerPort)
-		if chartVersion == "" || namespace == "" || releaseName == "" || apiServerPort == "" || nodeName == "" {
-			return fmt.Errorf("chartVersion, namespace, releaseName, apiServerPort, and nodeName must not be empty")
+		if chartVersion == "" || namespace == "" || releaseName == "" || apiServerPort == "" {
+			return fmt.Errorf("chartVersion, namespace, releaseName, and apiServerPort must not be empty")
 		}
 		if err != nil || parsedPort < 1 || parsedPort > 65535 {
 			return fmt.Errorf("apiServerPort must be between 1 and 65535")
@@ -48,13 +64,14 @@ func main() {
 			"kubeProxyReplacement": pulumi.String("true"),
 			"k8sServiceHost":       apiServerIP,
 			"k8sServicePort":       pulumi.String(apiServerPort),
-			"routingMode":          pulumi.String("tunnel"),
+			"routingMode":          routingMode,
 			"tunnelProtocol":       pulumi.String("vxlan"),
 			"operator": pulumi.Map{
 				"replicas": pulumi.Int(1),
 				"nodeSelector": pulumi.Map{
-					"kubernetes.io/hostname": pulumi.String(nodeName),
+					"kubernetes.io/hostname": pulumi.String("cp"),
 				},
+				"tolerations": controlPlaneToleration(),
 			},
 			"envoy": pulumi.Map{
 				"enabled": pulumi.Bool(true),
@@ -64,14 +81,16 @@ func main() {
 				"relay": pulumi.Map{
 					"enabled": pulumi.Bool(true),
 					"nodeSelector": pulumi.Map{
-						"kubernetes.io/hostname": pulumi.String(nodeName),
+						"kubernetes.io/hostname": pulumi.String("cp"),
 					},
+					"tolerations": controlPlaneToleration(),
 				},
 				"ui": pulumi.Map{
 					"enabled": pulumi.Bool(true),
 					"nodeSelector": pulumi.Map{
-						"kubernetes.io/hostname": pulumi.String(nodeName),
+						"kubernetes.io/hostname": pulumi.String("cp"),
 					},
+					"tolerations": controlPlaneToleration(),
 				},
 			},
 			"clustermesh": pulumi.Map{
@@ -98,12 +117,21 @@ func main() {
 
 		ctx.Export("releaseName", cilium.Name)
 		ctx.Export("namespace", pulumi.String(namespace))
-		ctx.Export("controlComponentsNodeName", pulumi.String(nodeName))
 		ctx.Export("chartVersion", pulumi.String(chartVersion))
 		ctx.Export("hubbleRelayEnabled", pulumi.Bool(true))
 		ctx.Export("statusCommand", pulumi.String("cilium status --wait"))
 		return nil
 	})
+}
+
+func controlPlaneToleration() pulumi.Array {
+	return pulumi.Array{
+		pulumi.Map{
+			"key":      pulumi.String("node-role.kubernetes.io/control-plane"),
+			"operator": pulumi.String("Exists"),
+			"effect":   pulumi.String("NoSchedule"),
+		},
+	}
 }
 
 func configString(cfg *config.Config, key, fallback string) string {

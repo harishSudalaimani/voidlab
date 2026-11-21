@@ -32,9 +32,6 @@ if [[ ! -s /etc/kubernetes/admin.conf ]]; then
   kubeadm init "${init_args[@]}"
 fi
 
-install -d -m 0700 -o void -g void /home/void/.kube
-install -m 0600 -o void -g void /etc/kubernetes/admin.conf /home/void/.kube/config
-
 join_command="$(kubeadm token create --print-join-command)"
 if [[ "$join_command" != kubeadm\ join\ * ]]; then
   echo "kubeadm did not return a join command" >&2

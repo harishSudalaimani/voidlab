@@ -1,67 +1,49 @@
 # VoidLab Kubernetes bootstrap
 
-This Pulumi project configures Kubernetes on the VMs declared in `infra/vm/pulumi/Pulumi.host*.yaml`. It reads the network stack's VM IPs and verified routing result, prepares each node, initializes kubeadm on the node marked `role: control-plane`, and joins every node marked `role: worker`.
+This Pulumi project installs Kubernetes directly on the two physical Fedora 45 servers. `cp` (192.168.29.81, 8 CPUs/29 GiB RAM) is the control plane; `worker` (192.168.29.52, 4 CPUs/17 GiB RAM) is the application worker. Pulumi connects using the existing `dark` and `void` SSH accounts and keys, sets persistent hostnames to `cp` and `worker`, then uses kubeadm to initialize and join the cluster. Kubernetes reports each machine's CPU and memory capacity directly; this project adds no node-wide CPU or RAM limits. On `cp`, containerd image data is stored on the `/data/vms` SSD instead of the 15 GiB root filesystem.
 
-This project manages Kubernetes inside the VMs. VM creation and host networking belong to [`infra/vm/pulumi`](../../vm/pulumi/README.md) and [`infra/network/pulumi`](../../network/pulumi/README.md). Cilium and Hubble Relay belong to [`infra/cilium/pulumi`](../../cilium/pulumi/README.md). Argo CD follows Cilium.
+## Required server configuration
 
-## Stack order
+The current addresses, usernames, roles, and local key paths are configured in `Pulumi.k8.yaml`. Both servers are on `192.168.29.0/24`, so SSH and Kubernetes node traffic use their direct LAN addresses. Reserve these DHCP addresses in the router so the stack's node IPs remain stable. Both machines must accept key-based SSH with passwordless `sudo`.
 
-Run the VM stack for each host first, then the network stack, then Kubernetes, Cilium, and Argo CD. The network project checks TCP/22 reachability between all declared nodes and exports `routingVerified`. Kubernetes will not start node commands until that output is true.
+The stack config already has these values:
 
-## How nodes are chosen
+| Node | Role | Node IP | SSH login | Key |
+|---|---|---|---|---|
+| `cp` | control plane | `192.168.29.81` | `dark` | `~/.ssh/dark` |
+| `worker` | worker | `192.168.29.52` | `void` | `~/.ssh/voidlab` |
 
-Every host file lists its VMs under `nodes`. The `role` field determines how Kubernetes treats the VM:
+Both server host keys and local SSH keys were found in `~/.ssh`. The servers must stay on Fedora 45 and be able to reach one another on the LAN. The preflight sets their static hostnames, switches SELinux to permissive mode as required by kubeadm's Fedora instructions, and opens TCP/6443 and TCP/10250 between the peer addresses before bootstrap. Reserve these DHCP addresses in the router so the stack's node IPs remain stable.
 
-- One node must have `role: control-plane`.
-- All other cluster nodes should have `role: worker`.
+## Apply order
 
-The current kubeadm bootstrap supports one control plane. The inventory loader checks for exactly one. Adding a worker to a host file makes network and Kubernetes discover it on their next updates; no IP list or Go code needs editing. Follow the host-add steps in the VM and network READMEs, then update those stacks before this one.
-
-The same host entry supplies the SSH address, user, and key for the hypervisor jump connection, plus the VM SSH user and key. The Kubernetes program scans the VM SSH host keys from the corresponding hypervisor and verifies the host key before connecting.
-
-## What the Kubernetes stack does
-
-After all VM preflight checks pass, it installs the pinned Kubernetes packages and container runtime, initializes kubeadm, joins the workers, waits for the configured number of nodes to register, and exports a kubeconfig. It waits for node registration, not `Ready`: Cilium is installed separately afterward.
-
-The control plane and two 12 GiB workers are on host1 (server2). The control plane has a 30 GiB system disk and no data disk. Each worker has a 100 GiB system disk; host1's workers also have 800 GiB data disks. Host2 (server1) has two workers with 7 GiB RAM and no data disks. All workers have 2 vCPUs. The preflight checks each node's role and available CPU and memory.
-
-The Kubernetes version is currently set to `1.37` in the program. The Pod CIDR is a Kubernetes bootstrap setting in `Pulumi.k8.yaml`; it is not a host route or VM subnet.
-
-## Run manually
-
-From this directory, preview and apply the existing Kubernetes stack after the VM and network stacks have completed:
+Apply these stacks in order: Kubernetes, network, Cilium, then Argo CD. Kubernetes installs containerd and kubeadm, initializes the control plane, joins the worker, waits for both nodes to register, and exports a local-tunnel kubeconfig. Nodes remain `NotReady` until Cilium is installed.
 
 ```bash
 pulumi preview --stack snharish85-gmail-com-org/voidlab-kubernetes/k8
 pulumi up --stack snharish85-gmail-com-org/voidlab-kubernetes/k8
 ```
 
-The preview should show guest and kubeadm commands only. It should not show VM, libvirt, WireGuard, or hypervisor firewall resources.
+Then apply `infra/network/pulumi`, followed by `infra/cilium/pulumi`, then `infra/argocd/pulumi`. The network stack opens peer-specific TCP/6443, TCP/10250, and UDP/8472 in firewalld (or UFW) when active, and checks the direct path. It does not create an overlay or replace the servers' existing routes. Kubernetes' default control-plane taint keeps ordinary application pods on `worker`; Cilium and other required DaemonSets still run on both nodes.
 
 ## Connect kubectl
 
-After a successful update, save the secret kubeconfig output on your development machine:
+After Kubernetes completes, save its secret kubeconfig output locally:
 
 ```bash
 umask 077
 mkdir -p "$HOME/.kube"
 pulumi stack output kubeconfigBase64 --stack snharish85-gmail-com-org/voidlab-kubernetes/k8 --show-secrets | base64 -D > "$HOME/.kube/voidlab"
-```
-
-Keep the API tunnel open in one terminal. The stack exports the command as `sshTunnel`; it uses host1's SSH alias when configured, or its SSH username and address otherwise:
-
-```bash
 pulumi stack output sshTunnel --stack snharish85-gmail-com-org/voidlab-kubernetes/k8
 ```
 
-Run that printed command, then use another terminal:
+Run the printed SSH tunnel command in one terminal. In another terminal, keep `KUBECONFIG` set while applying Cilium and Argo CD:
 
 ```bash
-KUBECONFIG="$HOME/.kube/voidlab" kubectl get nodes -o wide
+export KUBECONFIG="$HOME/.kube/voidlab"
+kubectl get nodes -o wide
 ```
 
-Nodes may show `NotReady` until Cilium has been applied. Keep the tunnel and kubeconfig available when applying Cilium and Argo CD.
+## Reruns
 
-## Reruns and teardown
-
-Remote commands do not undo packages or kubeadm state when their Pulumi resources are removed. The `joinTokenGeneration` config value is a deliberate rerun trigger for the kubeadm bootstrap commands; increment it only when you need to rerun that sequence. Keep host files and the network stack while Kubernetes uses those nodes.
+Remote commands do not undo packages or kubeadm state when their Pulumi resources are removed. `joinTokenGeneration` is a deliberate rerun trigger for the bootstrap commands; increment it only when a worker join needs a fresh token. The Kubernetes stack owns cluster bootstrap; the network stack manages peer firewall rules; Cilium owns the CNI; Argo CD owns GitOps bootstrap.
