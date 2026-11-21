@@ -27,27 +27,12 @@ spec:
           imagePullPolicy: IfNotPresent
           command: [redis-server]
           args:
-            - --requirepass
-            - "$(REDIS_PASSWORD)"
             - --appendonly
             - "yes"
             - --maxmemory
             - 256mb
             - --maxmemory-policy
             - noeviction
-          env:
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: platform-secrets
-                  key: REDIS_PASSWORD
-                  optional: false
-            - name: REDISCLI_AUTH
-              valueFrom:
-                secretKeyRef:
-                  name: platform-secrets
-                  key: REDIS_PASSWORD
-                  optional: false
           ports:
             - name: redis
               containerPort: 6379

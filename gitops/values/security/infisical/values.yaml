@@ -13,13 +13,8 @@ infisical:
         secretKeyRef:
           name: postgresql-app
           key: uri
-    - name: REDIS_PASSWORD
-      valueFrom:
-        secretKeyRef:
-          name: platform-secrets
-          key: REDIS_PASSWORD
     - name: REDIS_URL
-      value: redis://default:$(REDIS_PASSWORD)@redis.database.svc.cluster.local:6379/0
+      value: redis://redis.database.svc.cluster.local:6379/0
     - name: SITE_URL
       value: http://localhost:8081
 
