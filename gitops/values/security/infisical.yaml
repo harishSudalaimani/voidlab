@@ -1,0 +1,28 @@
+infisical:
+  enabled: true
+  fullnameOverride: infisical
+  replicaCount: 2
+  rolloutOnEveryRender: false
+  kubeSecretRef: infisical-secrets
+  extraEnv:
+    # CloudNativePG generates this secret after the database cluster is ready.
+    - name: DB_CONNECTION_URI
+      valueFrom:
+        secretKeyRef:
+          name: infisical-db-app
+          key: uri
+    - name: REDIS_URL
+      value: redis://infisical-redis:6379
+
+ingress:
+  enabled: false
+  nginx:
+    enabled: false
+
+postgresql:
+  # PostgreSQL is provided by the CloudNativePG Application.
+  enabled: false
+
+redis:
+  # Redis runs as a separate workload with network policy in this namespace.
+  enabled: false

@@ -11,7 +11,7 @@ The chart uses its single-replica, non-HA defaults. Its API and UI stay on a `Cl
 ## Configuration and ownership
 
 - `Pulumi.argocd.yaml` pins chart `10.18.2`, Argo CD `v3.6.2`, namespace `argocd`, and node `worker-1`.
-- `main.go` manages the namespace, Helm release, bootstrap `AppProject`, and root `Application`. Pulumi creates the bootstrap project before the root app so that the root app can use `spec.project: bootstrap` on first install; GitOps then reconciles the matching manifest at `gitops/projects/bootstrap/bootstrap.yaml`.
+- `main.go` manages the namespace, Helm release, bootstrap `AppProject`, and root `Application`. It also configures Argo CD health checks for child `Application` resources and CloudNativePG `Cluster` resources. The child app waves depend on these checks so the next app waits until its dependency is healthy. Pulumi creates the bootstrap project before the root app so that the root app can use `spec.project: bootstrap` on first install; GitOps then reconciles the matching manifest at `gitops/projects/bootstrap/bootstrap.yaml`.
 - The root Application watches `gitops` from `https://github.com/harishSudalaimani/voidlab.git`, revision `main`, with automated sync, pruning, and self-healing enabled. Its include pattern applies YAML under `projects/`, `applications/`, and `policies/`; it does not apply Helm values under `values/` or the bootstrap copy under `bootstrap/`. Removing an Application manifest from Git prunes that Application resource.
 - Keep Argo CD `AppProject` manifests in `gitops/projects/<project>/`, child `Application` manifests in `gitops/applications/<project>/`, Helm values in `gitops/values/<project>/`, and Cilium policy manifests in `gitops/policies/cilium`. The declarative copy of the root Application is `gitops/bootstrap/root-application.yaml`. Do not add application workloads to this Pulumi project.
 - If the GitHub repository is private, configure repository credentials in Argo CD before the root Application can sync. Do not commit a token or deploy key.
@@ -58,7 +58,7 @@ After reviewing the preview, apply it:
 pulumi up --stack snharish85-gmail-com-org/voidlab-argocd/argocd
 ```
 
-The preview should create the `bootstrap` AppProject if needed and update `voidlab-applications` to use that project, watch `gitops`, and include only project, application, and policy YAML. It should not modify VMs, Kubernetes nodes, Cilium, or workload resources directly. After the update, Argo CD reads the storage project and Rook application from Git and applies them. `Pulumi.argocd.yaml` configures the Argo CD stack; the kubeconfig/current context selects the Kubernetes cluster.
+The preview should create the `bootstrap` AppProject if needed and update `voidlab-applications` to use that project, watch `gitops`, include only project, application, and policy YAML, and set the Argo CD health checks used by ordered app waves. It should not modify VMs, Kubernetes nodes, Cilium, or workload resources directly. After the update, Argo CD reads the project and Application manifests from Git and deploys them in their configured sync-wave order. `Pulumi.argocd.yaml` configures the Argo CD stack; the kubeconfig/current context selects the Kubernetes cluster.
 
 ## Access Argo CD
 

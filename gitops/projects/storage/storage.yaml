@@ -10,10 +10,15 @@ spec:
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
     - https://charts.longhorn.io
+    - https://cloudnative-pg.github.io/charts
     - https://operator.min.io/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: longhorn-system
+    - server: https://kubernetes.default.svc
+      namespace: cnpg-system
+    - server: https://kubernetes.default.svc
+      namespace: infisical
     - server: https://kubernetes.default.svc
       namespace: minio-operator
     - server: https://kubernetes.default.svc
@@ -22,6 +27,12 @@ spec:
     - group: ""
       kind: Namespace
       name: longhorn-system
+    - group: ""
+      kind: Namespace
+      name: cnpg-system
+    - group: ""
+      kind: Namespace
+      name: infisical
     - group: ""
       kind: Namespace
       name: minio-operator
@@ -46,6 +57,10 @@ spec:
       kind: ClusterRole
     - group: rbac.authorization.k8s.io
       kind: ClusterRoleBinding
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
     - group: storage.k8s.io
       kind: CSIDriver
     - group: storage.k8s.io
@@ -54,7 +69,3 @@ spec:
       kind: CSINode
     - group: scheduling.k8s.io
       kind: PriorityClass
-    - group: admissionregistration.k8s.io
-      kind: MutatingWebhookConfiguration
-    - group: admissionregistration.k8s.io
-      kind: ValidatingWebhookConfiguration

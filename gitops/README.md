@@ -2,22 +2,38 @@
 
 Argo CD manages platform projects, application definitions, and cluster policies from this directory. `bootstrap/root-application.yaml` uses the `bootstrap` AppProject. Networking, security, storage, and observability each have their own AppProject under `projects/<project>/`; applications use the matching project and never Argo CD's built-in `default` project. The root Application includes YAML under `projects/`, `applications/`, and `policies/`. Helm values under `values/` are read by child Applications and are not applied directly.
 
-## Storage
+## Storage and platform deployment order
 
-The `storage` project deploys Longhorn to the worker nodes and a MinIO tenant constrained to `worker-1` and `worker-2`. Longhorn's default `longhorn` StorageClass uses three replicas for general workloads. MinIO uses a separate `longhorn-minio` StorageClass with two replicas, and Longhorn disk and node tags restrict those volumes to the two 800 GB HDDs.
+Argo CD applies child Applications in sync-wave order and waits for each Application to become Healthy before starting the next wave:
 
-The MinIO tenant has four server pods, normally spread across the two HDD workers, with two 80 GiB PVCs per pod. The PVC requests total 640 GiB; Longhorn keeps two copies, one on each HDD, leaving capacity for filesystem overhead and recovery. The tenant is constrained to worker-1 and worker-2 but may move to the surviving worker if one goes down. Both hosts remain a shared failure domain.
+1. Longhorn (`storage`, wave 0)
+2. CloudNativePG operator (`storage`, wave 1)
+3. CloudNativePG cluster for Infisical (`storage`, wave 2)
+4. Redis prerequisite (`security`, wave 3)
+5. Self-hosted Infisical (`security`, wave 4)
+6. Infisical Secrets Operator (`security`, wave 5)
+7. MinIO (`storage`, wave 6, currently paused)
 
-### Worker disk preparation
+The ordering depends on Application and CloudNativePG Cluster health checks enabled in the Argo CD Helm values managed by `infra/argocd/pulumi`. Apply the Argo CD Pulumi update before relying on these waves. The CloudNativePG Cluster check waits for its `Ready=True` condition, so Infisical does not start until its database is ready.
 
-Before syncing the storage Applications, install and enable the Longhorn node prerequisites on all workers, including `open-iscsi`/`iscsid`. Prepare `/dev/vdb` on `worker-1` and `worker-2` as a filesystem and mount it persistently at `/var/lib/longhorn/`. Confirm the disks contain no data that must be kept before formatting them. The Longhorn node annotations in `values/storage/longhorn-resources/nodes.yaml` initialize the 800 GB mounts as `minio-hdd` disks; worker-3 and worker-4 use their root filesystems with 30 GiB reserved. Longhorn components run on all workers, while MinIO storage is constrained by node and disk tags to the two HDDs.
+Longhorn's default `longhorn` StorageClass uses three replicas for general workloads. Its pre-upgrade chart hook is disabled because that hook runs before the service account exists on a fresh Argo CD install; this is the cause of the reported `longhorn-pre-upgrade` service-account failure. The setting is in `values/storage/longhorn.yaml`.
 
-The MinIO tenant chart expects a Secret named `minio-env-configuration` in `minio-tenant`, containing the key `config.env` with `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD` exports. Supply it through the secrets platform before the tenant starts; credentials are intentionally not committed. The storage AppProject explicitly permits the namespaces and cluster-scoped resources required by Longhorn and the MinIO operator.
+### Longhorn worker disk preparation
 
-The MinIO operator chart is pinned to `7.1.1`. Its upstream repository was archived in March 2026, so this pin will not receive upstream operator maintenance. Review that lifecycle before using the tenant for important data.
+Before syncing Longhorn, install and enable its node prerequisites on all workers, including `open-iscsi`/`iscsid`. Prepare `/dev/vdb` on `worker-1` and `worker-2` as a filesystem and mount it persistently at `/var/lib/longhorn/`. Confirm those disks have no data to keep before formatting. The Longhorn node annotations in `values/storage/longhorn-resources/nodes.yaml` initialize the two 800 GB HDD mounts as `minio-hdd`; worker-3 and worker-4 use their root filesystems with 30 GiB reserved. Longhorn components run on all workers.
+
+### CloudNativePG and self-hosted Infisical
+
+The storage project installs CloudNativePG chart `0.29.2` (operator `1.30.2`) and creates a two-instance PostgreSQL cluster in the `infisical` namespace, using Longhorn volumes. The Infisical Helm chart uses that cluster and its generated `infisical-db-app` connection URI. A separate Redis StatefulSet provides Infisical's required Redis service, stores its data on Longhorn, and accepts connections only from Infisical pods through a Kubernetes NetworkPolicy. PostgreSQL backups are not configured yet; add an S3-compatible backup destination after MinIO is resumed or another target is chosen.
+
+The infrastructure code currently selects Kubernetes `1.37`. CloudNativePG `1.30.x` lists Kubernetes `1.34`–`1.36` as supported and `1.37` as tested, but not supported. The pinned operator is the latest stable release at this revision, but that Kubernetes support caveat still applies.
+
+Before the Infisical Application can become healthy, provide an `infisical-secrets` Secret in namespace `infisical` with `ENCRYPTION_KEY`, `AUTH_SECRET`, and `SITE_URL`. These values must be bootstrapped outside the Infisical instance itself; it cannot provide its own initial credentials. Keep them out of plaintext Git. The Infisical web endpoint currently stays internal (`ClusterIP`, no ingress) until a public/internal host and TLS route are chosen.
+
+The Infisical Secrets Operator is configured to connect to the self-hosted service through cluster DNS and is applied only after Infisical is healthy. MinIO's Application has automated sync disabled at your request; its current resources are left in place if already installed. Do not manually sync MinIO until its `minio-env-configuration` secret source is configured.
 
 ## Apply flow
 
-Argo CD itself is bootstrapped by `infra/argocd/pulumi`. The root Application creates the `storage` AppProject and the Longhorn and MinIO Applications from this repository. Argo CD needs read access to this Git repository, the Longhorn Helm repository, and the MinIO operator Helm repository.
+Argo CD itself is bootstrapped by `infra/argocd/pulumi`. The child Applications are created from this repository, each assigned to its matching AppProject; no application uses Argo CD's `default` project. Argo CD needs read access to this Git repository and the Longhorn, CloudNativePG, Infisical, and MinIO Helm repositories.
 
-Put each AppProject in `projects/<project>/`, Applications in `applications/<project>/`, Helm values and app-specific manifests in `values/<project>/`, and Cilium policies under `policies/cilium/`. Keep secrets out of committed values files.
+Put each AppProject in `projects/<project>/`, Applications in `applications/<project>/`, Helm values and app-specific manifests in `values/<project>/`, and Cilium policies under `policies/cilium/`. Keep secret values out of committed plaintext files.

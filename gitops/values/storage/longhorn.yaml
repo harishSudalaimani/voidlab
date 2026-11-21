@@ -10,3 +10,8 @@ defaultSettings:
 persistence:
   defaultClass: true
   defaultClassReplicaCount: 3
+
+# The chart's pre-upgrade Helm hook runs as Argo CD's PreSync hook, before
+# Longhorn's service account exists on a fresh GitOps install.
+preUpgradeChecker:
+  jobEnabled: false
