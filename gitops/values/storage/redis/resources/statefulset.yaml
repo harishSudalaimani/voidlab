@@ -16,6 +16,12 @@ spec:
       labels:
         app.kubernetes.io/name: redis
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: cp
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       securityContext:
         fsGroup: 999
         fsGroupChangePolicy: OnRootMismatch

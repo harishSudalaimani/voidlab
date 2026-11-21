@@ -15,6 +15,15 @@ spec:
       helm:
         releaseName: minio-operator
         namespace: minio-operator
+        valuesObject:
+          operator:
+            replicaCount: 1
+            nodeSelector:
+              kubernetes.io/hostname: cp
+            tolerations:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+                effect: NoSchedule
     - repoURL: https://operator.min.io/
       chart: tenant
       targetRevision: 7.1.1
