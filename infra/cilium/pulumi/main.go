@@ -71,7 +71,7 @@ func main() {
 				"nodeSelector": pulumi.Map{
 					"kubernetes.io/hostname": pulumi.String("cp"),
 				},
-				"tolerations": controlPlaneToleration(),
+				"tolerations": systemComponentTolerations(),
 			},
 			"envoy": pulumi.Map{
 				"enabled": pulumi.Bool(true),
@@ -83,14 +83,14 @@ func main() {
 					"nodeSelector": pulumi.Map{
 						"kubernetes.io/hostname": pulumi.String("cp"),
 					},
-					"tolerations": controlPlaneToleration(),
+					"tolerations": systemComponentTolerations(),
 				},
 				"ui": pulumi.Map{
 					"enabled": pulumi.Bool(true),
 					"nodeSelector": pulumi.Map{
 						"kubernetes.io/hostname": pulumi.String("cp"),
 					},
-					"tolerations": controlPlaneToleration(),
+					"tolerations": systemComponentTolerations(),
 				},
 			},
 			"clustermesh": pulumi.Map{
@@ -124,12 +124,16 @@ func main() {
 	})
 }
 
-func controlPlaneToleration() pulumi.Array {
+func systemComponentTolerations() pulumi.Array {
 	return pulumi.Array{
 		pulumi.Map{
 			"key":      pulumi.String("node-role.kubernetes.io/control-plane"),
 			"operator": pulumi.String("Exists"),
 			"effect":   pulumi.String("NoSchedule"),
+		},
+		pulumi.Map{
+			"key":      pulumi.String("node.kubernetes.io/not-ready"),
+			"operator": pulumi.String("Exists"),
 		},
 	}
 }

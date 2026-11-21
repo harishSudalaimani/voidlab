@@ -13,4 +13,14 @@ pulumi preview --stack snharish85-gmail-com-org/voidlab-network/network
 pulumi up --stack snharish85-gmail-com-org/voidlab-network/network
 ```
 
-When firewalld or UFW is active, the stack allows traffic from the other server on TCP ports 6443 and 10250, plus UDP 8472 for Cilium VXLAN. It verifies the direct route and the peer's Kubernetes listener. The two servers are on the same LAN, so no cloud firewall or overlay is involved.
+When firewalld or UFW is active, the stack applies this cluster network baseline:
+
+| Traffic | Allowed path | Purpose |
+| --- | --- | --- |
+| TCP 6443 | Peer server to control plane | Kubernetes API |
+| TCP 10250 | Between peer servers | Kubelet |
+| TCP 4240 | Between peer servers | Cilium health checks |
+| UDP 8472 | Between peer servers | Cilium VXLAN |
+| TCP 4244 | Peer server and Kubernetes Pod CIDR to each node | Hubble server and Relay |
+
+The Pod CIDR comes from the Kubernetes stack. Cilium's TCP health check port is included so `cilium-health` can report node connectivity; the network also verifies the direct route and peer Kubernetes listener. Argo CD uses in-cluster services and adds no node-to-node firewall port. Future components that require host-network listeners or direct node-to-node connections must add their documented ports here before deployment; ClusterIP-only components need no host firewall port.

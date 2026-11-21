@@ -54,6 +54,13 @@ func main() {
 		if err != nil {
 			return fmt.Errorf("reference Kubernetes stack: %w", err)
 		}
+		podCIDR := k8Stack.GetStringOutput(pulumi.String("podCIDR")).ApplyT(func(value string) (string, error) {
+			prefix, err := netip.ParsePrefix(value)
+			if err != nil || !prefix.Addr().Is4() {
+				return "", fmt.Errorf("Kubernetes stack podCIDR %q must be an IPv4 CIDR", value)
+			}
+			return prefix.Masked().String(), nil
+		}).(pulumi.StringOutput)
 
 		servers := make([]server, 0, len(configured))
 		for _, spec := range configured {
@@ -86,7 +93,7 @@ func main() {
 		changes := make([]*remote.Command, 0, len(servers))
 		for i := range servers {
 			peer := servers[1-i]
-			command, err := configureServer(ctx, servers[i], peer, script)
+			command, err := configureServer(ctx, servers[i], peer, podCIDR, script)
 			if err != nil {
 				return fmt.Errorf("register network configuration for %s: %w", servers[i].name, err)
 			}
@@ -159,7 +166,7 @@ func requireMatchingRole(name, expected string, actual pulumi.StringOutput) pulu
 	}).(pulumi.StringOutput)
 }
 
-func configureServer(ctx *pulumi.Context, current, peer server, script string) (*remote.Command, error) {
+func configureServer(ctx *pulumi.Context, current, peer server, podCIDR pulumi.StringOutput, script string) (*remote.Command, error) {
 	return remote.NewCommand(ctx, "configure-network-"+current.name, &remote.CommandArgs{
 		Connection: &remote.ConnectionArgs{
 			Host: pulumi.String(current.sshAddress), User: pulumi.String(current.sshUser),
@@ -169,6 +176,7 @@ func configureServer(ctx *pulumi.Context, current, peer server, script string) (
 			current.address,
 			peer.address,
 			peer.roleOutput,
+			podCIDR,
 		})),
 		Stdin:                  pulumi.String(script),
 		AddPreviousOutputInEnv: pulumi.Bool(false),
