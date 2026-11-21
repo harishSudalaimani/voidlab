@@ -16,7 +16,7 @@ Argo CD applies child Applications in sync-wave order and waits for each Applica
 
 The ordering depends on Application and CloudNativePG Cluster health checks enabled in the Argo CD Helm values managed by `infra/argocd/pulumi`. Apply the Argo CD Pulumi update before relying on these waves. The CloudNativePG Cluster check waits for its `Ready=True` condition, so the shared data services are ready before Infisical starts.
 
-Longhorn's default `longhorn` StorageClass uses three replicas for general workloads. Its pre-upgrade chart hook is disabled because that hook runs before the service account exists on a fresh Argo CD install; this is the cause of the reported `longhorn-pre-upgrade` service-account failure. The chart settings are in `values/storage/longhorn/values.yaml`.
+Longhorn's default `longhorn` StorageClass uses three replicas for general workloads. Its pre-upgrade chart hook is disabled in the values file and enforced as an Argo CD Helm parameter, because that hook can run before the service account exists on a fresh GitOps install. The chart settings are in `values/storage/longhorn/values.yaml`; the Argo-specific override is in `applications/storage/longhorn/application.yaml`.
 
 ### Longhorn worker disk preparation
 

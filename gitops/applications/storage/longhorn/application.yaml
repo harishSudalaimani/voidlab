@@ -13,6 +13,11 @@ spec:
       targetRevision: 1.13.0
       helm:
         releaseName: longhorn
+        # Longhorn recommends disabling this hook for Argo CD. Keep this
+        # as a Helm parameter so it overrides chart defaults and value files.
+        parameters:
+          - name: preUpgradeChecker.jobEnabled
+            value: "false"
         valueFiles:
           - $values/gitops/values/storage/longhorn/values.yaml
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
