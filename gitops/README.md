@@ -20,7 +20,7 @@ Longhorn's default `longhorn` StorageClass uses three replicas for general workl
 
 ### Longhorn worker disk preparation
 
-Before syncing Longhorn, install and enable its node prerequisites on all workers, including `open-iscsi`/`iscsid`. Prepare `/dev/vdb` on `worker-1` and `worker-2` as a filesystem and mount it persistently at `/var/lib/longhorn/`. Confirm those disks have no data to keep before formatting. The Longhorn node annotations in `values/storage/longhorn/resources/nodes.yaml` initialize the two 800 GB HDD mounts as `minio-hdd`; worker-3 and worker-4 use their root filesystems with 30 GiB reserved. Longhorn components run on all workers.
+Before syncing Longhorn, install and enable its node prerequisites on all workers, including `open-iscsi`/`iscsid`. Mount the 800 GB HDDs on `worker-1` and `worker-2` persistently at `/var/lib/longhorn/`; worker-3 and worker-4 use their root filesystems at that path with 30 GiB reserved. All four workers have an untagged `longhorn-disk` in `values/storage/longhorn/resources/nodes.yaml`, and the default StorageClass can place replicas across all four. Longhorn's control-plane components (including the UI and driver deployer) are pinned to `worker-1`; its manager DaemonSet and system-managed CSI/storage components remain available across all four workers.
 
 ### Shared PostgreSQL and Redis
 
@@ -34,7 +34,7 @@ The infrastructure code currently selects Kubernetes `1.37`. CloudNativePG `1.30
 
 Infisical's web UI and API run in the same service. The server pods are pinned to `worker-1`; the service remains internal (`ClusterIP`) with no ingress or NodePort. For initial UI access, run `kubectl -n database port-forward svc/infisical 8081:8080` and open `http://localhost:8081`. `SITE_URL` is set to that local address. Before the shared Redis service and Infisical can become healthy, provide a `platform-secrets` Secret in namespace `database` with `REDIS_PASSWORD`, `ENCRYPTION_KEY`, and `AUTH_SECRET`. The Redis password is shared platform configuration; the other two keys bootstrap Infisical, which cannot provide its own initial credentials. Keep these values out of plaintext Git. If you later expose Infisical through a hostname, update `SITE_URL` and configure the matching TLS route.
 
-The Infisical Secrets Operator is configured to connect to the self-hosted service through cluster DNS and is applied only after Infisical is healthy. It is currently scoped to `minio-tenant`; add each future workload namespace to its scope and RBAC before syncing secrets there. MinIO's Application has automated sync disabled at your request; its current resources are left in place if already installed. Do not manually sync MinIO until its `minio-env-configuration` secret source is configured.
+The Infisical Secrets Operator is configured to connect to the self-hosted service through cluster DNS and is applied only after Infisical is healthy. It is currently scoped to `minio-tenant`; add each future workload namespace to its scope and RBAC before syncing secrets there. MinIO's Application has automated sync disabled at your request; its current resources are left in place if already installed. The MinIO-specific Longhorn StorageClass and disk tags are removed for now. Recreate that StorageClass and disk selection before resuming MinIO; do not manually sync it until its `minio-env-configuration` secret source is configured.
 
 ## Apply flow
 

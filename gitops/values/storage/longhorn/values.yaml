@@ -15,3 +15,29 @@ persistence:
 # Longhorn's service account exists on a fresh GitOps install.
 preUpgradeChecker:
   jobEnabled: false
+
+# Pin Longhorn's user-deployed control-plane components to worker-1. The
+# manager DaemonSet overrides the global selector and runs on every labeled
+# worker; system-managed CSI and storage components retain Longhorn's default
+# all-node placement.
+global:
+  nodeSelector:
+    kubernetes.io/hostname: worker-1
+
+longhornManager:
+  nodeSelector:
+    storage.voidlab.io/longhorn: "true"
+
+longhornGlobalManager:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: worker-1
+
+longhornDriver:
+  nodeSelector:
+    kubernetes.io/hostname: worker-1
+
+longhornUI:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: worker-1

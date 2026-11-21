@@ -5,10 +5,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
     argocd.argoproj.io/sync-options: Prune=false
-    node.longhorn.io/default-node-tags: '["minio-hdd"]'
-    node.longhorn.io/default-disks-config: '[{"name":"minio-hdd","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":53687091200,"tags":["minio-hdd"]}]'
+    node.longhorn.io/default-disks-config: '[{"name":"longhorn-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":53687091200,"tags":[]}]'
   labels:
     node.longhorn.io/create-default-disk: config
+    storage.voidlab.io/longhorn: "true"
 ---
 apiVersion: v1
 kind: Node
@@ -17,10 +17,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
     argocd.argoproj.io/sync-options: Prune=false
-    node.longhorn.io/default-node-tags: '["minio-hdd"]'
-    node.longhorn.io/default-disks-config: '[{"name":"minio-hdd","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":53687091200,"tags":["minio-hdd"]}]'
+    node.longhorn.io/default-disks-config: '[{"name":"longhorn-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":53687091200,"tags":[]}]'
   labels:
     node.longhorn.io/create-default-disk: config
+    storage.voidlab.io/longhorn: "true"
 ---
 apiVersion: v1
 kind: Node
@@ -29,9 +29,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
     argocd.argoproj.io/sync-options: Prune=false
-    node.longhorn.io/default-disks-config: '[{"name":"system-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":32212254720,"tags":[]}]'
+    node.longhorn.io/default-disks-config: '[{"name":"longhorn-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":32212254720,"tags":[]}]'
   labels:
     node.longhorn.io/create-default-disk: config
+    storage.voidlab.io/longhorn: "true"
 ---
 apiVersion: v1
 kind: Node
@@ -40,6 +41,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
     argocd.argoproj.io/sync-options: Prune=false
-    node.longhorn.io/default-disks-config: '[{"name":"system-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":32212254720,"tags":[]}]'
+    node.longhorn.io/default-disks-config: '[{"name":"longhorn-disk","path":"/var/lib/longhorn/","allowScheduling":true,"storageReserved":32212254720,"tags":[]}]'
   labels:
     node.longhorn.io/create-default-disk: config
+    storage.voidlab.io/longhorn: "true"
