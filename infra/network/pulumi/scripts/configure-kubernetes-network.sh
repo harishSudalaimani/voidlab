@@ -3,8 +3,14 @@ set -euo pipefail
 
 local_ip="$1"
 peer_ip="$2"
-peer_role="$3"
-pod_cidr="$4"
+local_role="$3"
+peer_role="$4"
+pod_cidr="$5"
+
+if [[ "$local_role:$peer_role" != "control-plane:worker" && "$local_role:$peer_role" != "worker:control-plane" ]]; then
+  echo "Expected one control-plane and one worker; got ${local_role} and ${peer_role}" >&2
+  exit 1
+fi
 
 route="$(ip -4 route get "$peer_ip")"
 if [[ -z "$route" ]]; then
@@ -23,6 +29,10 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
     rule="rule family=\"ipv4\" source address=\"${peer_ip}\" port port=\"${port}\" protocol=\"tcp\" accept"
     firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
   done
+  if [[ "$local_role" == "control-plane" ]]; then
+    rule="rule family=\"ipv4\" source address=\"${pod_cidr}\" destination address=\"${local_ip}\" port port=\"6443\" protocol=\"tcp\" accept"
+    firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
+  fi
   for source in "$peer_ip" "$pod_cidr"; do
     rule="rule family=\"ipv4\" source address=\"${source}\" destination address=\"${local_ip}\" port port=\"4244\" protocol=\"tcp\" accept"
     firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
@@ -34,6 +44,9 @@ elif command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; t
   for port in 6443 10250 4240; do
     ufw allow proto tcp from "$peer_ip" to "$local_ip" port "$port"
   done
+  if [[ "$local_role" == "control-plane" ]]; then
+    ufw allow proto tcp from "$pod_cidr" to "$local_ip" port 6443
+  fi
   ufw allow proto tcp from "$peer_ip" to "$local_ip" port 4244
   ufw allow proto tcp from "$pod_cidr" to "$local_ip" port 4244
   ufw allow proto udp from "$peer_ip" to "$local_ip" port 8472

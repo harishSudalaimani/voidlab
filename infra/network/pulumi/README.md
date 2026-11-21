@@ -17,7 +17,7 @@ When firewalld or UFW is active, the stack applies this cluster network baseline
 
 | Traffic | Allowed path | Purpose |
 | --- | --- | --- |
-| TCP 6443 | Peer server to control plane | Kubernetes API |
+| TCP 6443 | Peer server and Kubernetes Pod CIDR to control plane | Kubernetes API, including in-cluster API clients |
 | TCP 10250 | Between peer servers | Kubelet |
 | TCP 4240 | Between peer servers | Cilium health checks |
 | UDP 8472 | Between peer servers | Cilium VXLAN |

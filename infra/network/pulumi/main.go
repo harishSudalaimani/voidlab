@@ -175,6 +175,7 @@ func configureServer(ctx *pulumi.Context, current, peer server, podCIDR pulumi.S
 		Create: pulumi.Sprintf("sudo -n bash -s -- %s", shellQuoteInputs([]pulumi.StringInput{
 			current.address,
 			peer.address,
+			pulumi.String(current.role),
 			peer.roleOutput,
 			podCIDR,
 		})),

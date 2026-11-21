@@ -1,6 +1,8 @@
 # VoidLab Argo CD bootstrap
 
-This Pulumi project installs Argo CD on the existing Kubernetes cluster and creates the root Application that watches `gitops/`. All Argo CD components are scheduled on the `cp` node (`192.168.29.81`) and tolerate its Kubernetes control-plane taint.
+This Pulumi project installs Argo CD on the existing Kubernetes cluster and creates the root Application that watches `gitops/`. The Helm chart's global node selector schedules all Argo CD components on `cp` (`192.168.29.81`); they tolerate its Kubernetes control-plane taint. The `argocdNodeName` stack output reports `cp`.
+
+The Helm release name is fixed as `argocd`, and Helm gets 15 minutes for first-install readiness while images are pulled and components start. Argo CD exposes a ClusterIP service, so it requires no additional node-to-node firewall ports.
 
 ## Apply after Cilium
 
