@@ -8,6 +8,8 @@ This independent Pulumi project manages the Cilium Helm release in `kube-system`
 
 This project owns the CNI configuration and version. The kubeadm bootstrap keeps the kube-proxy phase disabled so this release can run in full kube-proxy replacement mode. The cluster Pod CIDR remains a kubeadm setting in the Kubernetes bootstrap project; Cilium uses kubeadm's assigned per-node PodCIDRs.
 
+The Cilium operator, Hubble Relay, and Hubble UI are pinned to `worker-1` with the `kubernetes.io/hostname` label. The Cilium agent and Envoy remain DaemonSets and run on every node; they provide node networking and proxy support and must not be restricted to one worker.
+
 The chart keeps the existing cluster network settings:
 
 - Kubernetes PodCIDR IPAM (`ipam.mode=kubernetes`)
@@ -16,8 +18,9 @@ The chart keeps the existing cluster network settings:
 - One Cilium operator replica
 - Envoy enabled
 - Hubble and Hubble Relay enabled
+- Hubble UI enabled on `worker-1`
 
-Hubble Relay connects to Hubble servers on the Cilium agents using TCP port 4244. Keep that port reachable between cluster nodes; the network stack builds its routes and forwarding rules from the VM subnets in the host inventory. Hubble UI remains disabled.
+Hubble Relay connects to Hubble servers on the Cilium agents using TCP port 4244. Keep that port reachable between cluster nodes; the network stack builds its routes and forwarding rules from the VM subnets in the host inventory. Hubble UI is enabled and pinned to `worker-1` with the other control components.
 
 For VXLAN, the routed WireGuard link must pass overlay traffic between every VM subnet declared in the host inventory.
 
@@ -47,4 +50,4 @@ Verify the result with the Cilium CLI:
 cilium status --wait
 ```
 
-The status should report `Cilium: OK`, `Operator: OK`, `Envoy DaemonSet: OK`, and `Hubble Relay: OK`; ClusterMesh remains disabled.
+The status should report `Cilium: OK`, `Operator: OK`, `Envoy DaemonSet: OK`, and `Hubble Relay: OK`; ClusterMesh remains disabled. Check that the operator, Relay, and UI pods are on `worker-1`, while Cilium and Envoy agent pods appear on every node.

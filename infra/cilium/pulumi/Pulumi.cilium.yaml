@@ -1,5 +1,6 @@
 config:
   voidlab-cilium:chartVersion: 1.21.0-pre.4
   voidlab-cilium:namespace: kube-system
+  voidlab-cilium:nodeName: worker-1
   voidlab-cilium:kubernetesStack: snharish85-gmail-com-org/voidlab-kubernetes/k8
   voidlab-cilium:apiServerPort: "6443"

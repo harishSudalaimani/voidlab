@@ -23,6 +23,7 @@ func main() {
 		chartVersion := configString(cfg, "chartVersion", defaultChartVersion)
 		namespace := configString(cfg, "namespace", defaultNamespace)
 		releaseName := configString(cfg, "releaseName", defaultReleaseName)
+		nodeName := configString(cfg, "nodeName", "worker-1")
 		// Kubernetes exports this address, so Cilium does not keep a second copy in config.
 		kubernetesStack, err := pulumi.NewStackReference(ctx, "kubernetes-stack", &pulumi.StackReferenceArgs{
 			Name: pulumi.String(configString(cfg, "kubernetesStack", "snharish85-gmail-com-org/voidlab-kubernetes/k8")),
@@ -33,8 +34,8 @@ func main() {
 		apiServerIP := kubernetesStack.GetStringOutput(pulumi.String("controlPlaneIP"))
 		apiServerPort := configString(cfg, "apiServerPort", defaultAPIServerPort)
 		parsedPort, err := strconv.Atoi(apiServerPort)
-		if chartVersion == "" || namespace == "" || releaseName == "" || apiServerPort == "" {
-			return fmt.Errorf("chartVersion, namespace, releaseName, and apiServerPort must not be empty")
+		if chartVersion == "" || namespace == "" || releaseName == "" || apiServerPort == "" || nodeName == "" {
+			return fmt.Errorf("chartVersion, namespace, releaseName, apiServerPort, and nodeName must not be empty")
 		}
 		if err != nil || parsedPort < 1 || parsedPort > 65535 {
 			return fmt.Errorf("apiServerPort must be between 1 and 65535")
@@ -51,6 +52,9 @@ func main() {
 			"tunnelProtocol":       pulumi.String("vxlan"),
 			"operator": pulumi.Map{
 				"replicas": pulumi.Int(1),
+				"nodeSelector": pulumi.Map{
+					"kubernetes.io/hostname": pulumi.String(nodeName),
+				},
 			},
 			"envoy": pulumi.Map{
 				"enabled": pulumi.Bool(true),
@@ -59,9 +63,15 @@ func main() {
 				"enabled": pulumi.Bool(true),
 				"relay": pulumi.Map{
 					"enabled": pulumi.Bool(true),
+					"nodeSelector": pulumi.Map{
+						"kubernetes.io/hostname": pulumi.String(nodeName),
+					},
 				},
 				"ui": pulumi.Map{
 					"enabled": pulumi.Bool(true),
+					"nodeSelector": pulumi.Map{
+						"kubernetes.io/hostname": pulumi.String(nodeName),
+					},
 				},
 			},
 			"clustermesh": pulumi.Map{
@@ -88,6 +98,7 @@ func main() {
 
 		ctx.Export("releaseName", cilium.Name)
 		ctx.Export("namespace", pulumi.String(namespace))
+		ctx.Export("controlComponentsNodeName", pulumi.String(nodeName))
 		ctx.Export("chartVersion", pulumi.String(chartVersion))
 		ctx.Export("hubbleRelayEnabled", pulumi.Bool(true))
 		ctx.Export("statusCommand", pulumi.String("cilium status --wait"))
