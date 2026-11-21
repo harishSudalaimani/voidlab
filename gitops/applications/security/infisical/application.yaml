@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: infisical
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
   annotations:
     argocd.argoproj.io/sync-wave: "4"
 spec:
@@ -23,11 +25,8 @@ spec:
     namespace: security
   syncPolicy:
     automated:
+      allowEmpty: true
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
       - ServerSideApply=true
-    managedNamespaceMetadata:
-      labels:
-        platform.voidlab.io/shared-redis-client: "true"

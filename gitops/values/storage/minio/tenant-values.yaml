@@ -26,14 +26,6 @@ tenant:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
-      topologySpreadConstraints:
-        - maxSkew: 1
-          topologyKey: kubernetes.io/hostname
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchLabels:
-              v1.min.io/tenant: minio
-              v1.min.io/pool: pool-0
   certificate:
     requestAutoCert: true
   podManagementPolicy: Parallel

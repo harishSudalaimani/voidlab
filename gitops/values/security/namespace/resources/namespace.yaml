@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: security
+  labels:
+    platform.voidlab.io/shared-redis-client: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"

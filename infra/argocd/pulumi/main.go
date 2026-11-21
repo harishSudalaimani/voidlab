@@ -71,10 +71,44 @@ func main() {
 					"resource.customizations.health.argoproj.io_Application": pulumi.String(`
 hs = {}
 hs.status = "Progressing"
-hs.message = "Waiting for child Application health"
-if obj.status ~= nil and obj.status.health ~= nil then
-  hs.status = obj.status.health.status
-  hs.message = obj.status.health.message or ""
+hs.message = "Waiting for child Application to sync and become healthy"
+if obj.status ~= nil then
+  if obj.status.operationState ~= nil then
+    local phase = obj.status.operationState.phase or ""
+    if phase == "Failed" or phase == "Error" then
+      hs.status = "Degraded"
+      hs.message = obj.status.operationState.message or "Child Application sync failed"
+      return hs
+    end
+  end
+  if obj.status.conditions ~= nil then
+    for _, condition in ipairs(obj.status.conditions) do
+      if condition.type == "ComparisonError" or condition.type == "InvalidSpecError" then
+        hs.status = "Degraded"
+        hs.message = condition.message or condition.type
+        return hs
+      end
+    end
+  end
+  local syncStatus = ""
+  local healthStatus = ""
+  if obj.status.sync ~= nil then
+    syncStatus = obj.status.sync.status or ""
+  end
+  if obj.status.health ~= nil then
+    healthStatus = obj.status.health.status or ""
+  end
+  if healthStatus == "Degraded" then
+    hs.status = "Degraded"
+    hs.message = obj.status.health.message or "Child Application is degraded"
+  elseif syncStatus == "Synced" and healthStatus == "Healthy" then
+    hs.status = "Healthy"
+    hs.message = obj.status.health.message or "Child Application is synced and healthy"
+  elseif syncStatus ~= "Synced" then
+    hs.message = "Waiting for child Application to sync"
+  else
+    hs.message = obj.status.health.message or "Waiting for child Application health"
+  end
 end
 return hs
 `),

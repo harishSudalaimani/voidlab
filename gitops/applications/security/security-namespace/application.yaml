@@ -1,21 +1,27 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: voidlab-applications
+  name: security-namespace
   namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
-  project: bootstrap
+  project: security
   source:
     repoURL: https://github.com/harishSudalaimani/voidlab.git
     targetRevision: main
-    path: gitops
+    path: gitops/values/security/namespace/resources
     directory:
       recurse: true
-      include: "{projects/**/*.yaml,applications/**/*.yaml,policies/**/*.yaml}"
   destination:
     server: https://kubernetes.default.svc
-    namespace: argocd
+    namespace: security
   syncPolicy:
     automated:
+      allowEmpty: true
       prune: true
       selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
