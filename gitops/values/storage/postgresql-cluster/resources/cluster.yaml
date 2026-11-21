@@ -8,6 +8,14 @@ spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:18.7-system-trixie
   imagePullPolicy: IfNotPresent
   primaryUpdateStrategy: unsupervised
+  affinity:
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
   bootstrap:
     initdb:
       database: infisical
