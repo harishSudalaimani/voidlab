@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+spec:
+  project: storage
+  sources:
+    - repoURL: https://operator.min.io/
+      chart: operator
+      targetRevision: 7.1.1
+      helm:
+        releaseName: minio-operator
+        namespace: minio-operator
+        valueFiles:
+          - $values/gitops/values/storage/minio-operator.yaml
+    - repoURL: https://operator.min.io/
+      chart: tenant
+      targetRevision: 7.1.1
+      helm:
+        releaseName: minio
+        namespace: minio-tenant
+        valueFiles:
+          - $values/gitops/values/storage/minio-tenant.yaml
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      ref: values
+      path: gitops/values/storage/minio-resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minio-tenant
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

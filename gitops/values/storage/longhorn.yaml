@@ -1,0 +1,12 @@
+defaultSettings:
+  # Only nodes with an explicit disk definition from the GitOps source get a
+  # default disk. The worker node annotations define those disks before the
+  # Longhorn managers start.
+  createDefaultDiskLabeledNodes: true
+  defaultDataPath: /var/lib/longhorn/
+  defaultReplicaCount: 3
+  deletingConfirmationFlag: true
+
+persistence:
+  defaultClass: true
+  defaultClassReplicaCount: 3

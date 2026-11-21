@@ -9,15 +9,37 @@ spec:
   description: Storage platform services managed by Argo CD
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
-    - https://charts.rook.io/release
+    - https://charts.longhorn.io
+    - https://operator.min.io/
   destinations:
     - server: https://kubernetes.default.svc
-      namespace: rook-ceph
+      namespace: longhorn-system
+    - server: https://kubernetes.default.svc
+      namespace: minio-operator
+    - server: https://kubernetes.default.svc
+      namespace: minio-tenant
   clusterResourceWhitelist:
-    # Argo CD's CreateNamespace sync option creates this cluster-scoped resource.
     - group: ""
       kind: Namespace
-      name: rook-ceph
+      name: longhorn-system
+    - group: ""
+      kind: Namespace
+      name: minio-operator
+    - group: ""
+      kind: Namespace
+      name: minio-tenant
+    - group: ""
+      kind: Node
+      name: worker-1
+    - group: ""
+      kind: Node
+      name: worker-2
+    - group: ""
+      kind: Node
+      name: worker-3
+    - group: ""
+      kind: Node
+      name: worker-4
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
     - group: rbac.authorization.k8s.io
@@ -28,3 +50,11 @@ spec:
       kind: CSIDriver
     - group: storage.k8s.io
       kind: StorageClass
+    - group: storage.k8s.io
+      kind: CSINode
+    - group: scheduling.k8s.io
+      kind: PriorityClass
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration

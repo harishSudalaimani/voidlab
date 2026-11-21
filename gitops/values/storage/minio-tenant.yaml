@@ -1,0 +1,43 @@
+tenant:
+  name: minio
+  image:
+    repository: quay.io/minio/minio
+    tag: RELEASE.2025-04-08T15-41-24Z
+    pullPolicy: IfNotPresent
+  configSecret:
+    name: minio-env-configuration
+    existingSecret: true
+  pools:
+    - name: pool-0
+      servers: 4
+      volumesPerServer: 2
+      size: 80Gi
+      storageClassName: longhorn-minio
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - worker-1
+                      - worker-2
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              v1.min.io/tenant: minio
+              v1.min.io/pool: pool-0
+  certificate:
+    requestAutoCert: true
+  podManagementPolicy: Parallel

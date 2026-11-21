@@ -1,29 +1,23 @@
 # VoidLab GitOps
 
-Argo CD manages platform projects, application definitions, and cluster policies from this directory. `bootstrap/root-application.yaml` is the declarative copy of the root Application created by `infra/argocd/pulumi`; it uses the `bootstrap` AppProject, which Pulumi creates before the root app on first install and GitOps reconciles from `projects/bootstrap/bootstrap.yaml`. Networking, security, storage, and observability each have their own AppProject under `projects/<project>/`; applications must use the matching project and must not use Argo CD's built-in `default` project. The root directory Application includes only YAML under `projects/`, `applications/`, and `policies/`. Helm values under `values/` are read by child Applications and are not applied as Kubernetes resources.
+Argo CD manages platform projects, application definitions, and cluster policies from this directory. `bootstrap/root-application.yaml` uses the `bootstrap` AppProject. Networking, security, storage, and observability each have their own AppProject under `projects/<project>/`; applications use the matching project and never Argo CD's built-in `default` project. The root Application includes YAML under `projects/`, `applications/`, and `policies/`. Helm values under `values/` are read by child Applications and are not applied directly.
 
-The first workload is Rook Ceph in `applications/storage/rook-ceph.yaml`. The application pins both official Rook charts to `1.21.2` and reads their values from `values/storage/rook-ceph.yaml`. It installs the operator and Ceph cluster charts in one Argo CD Application so Argo can order the chart CRDs before the Ceph custom resources. The storage AppProject explicitly permits the `Namespace` resource created by `CreateNamespace=true`.
+## Storage
 
-## Storage layout
+The `storage` project deploys Longhorn to the worker nodes and a MinIO tenant constrained to `worker-1` and `worker-2`. Longhorn's default `longhorn` StorageClass uses three replicas for general workloads. MinIO uses a separate `longhorn-minio` StorageClass with two replicas, and Longhorn disk and node tags restrict those volumes to the two 800 GB HDDs.
 
-The current VM inventory attaches raw 800 GiB VirtIO data disks as `/dev/vdb` to `worker-1` and `worker-2`. The Ceph configuration names only those two nodes and devices; the OS disks and `worker-3`/`worker-4` are excluded. Before syncing Rook for the first time, verify both devices are empty and have no partitions or filesystems. Rook will initialize the selected raw disks for OSD use.
+The MinIO tenant has four server pods, normally spread across the two HDD workers, with two 80 GiB PVCs per pod. The PVC requests total 640 GiB; Longhorn keeps two copies, one on each HDD, leaving capacity for filesystem overhead and recovery. The tenant is constrained to worker-1 and worker-2 but may move to the surviving worker if one goes down. Both hosts remain a shared failure domain.
 
-The initial cluster uses three monitors across Kubernetes workers, two managers, and one replicated RBD block pool with two replicas across hosts. The `ceph-block` StorageClass is the default. CephFS and the S3 object store are disabled until their placement and capacity requirements are decided. With only two OSD hosts, the pool has no third failure domain; a host failure leaves it degraded and without a second surviving copy.
+### Worker disk preparation
 
-Do not remove the Ceph cluster configuration or the Rook Application to perform a routine upgrade. The chart leaves `cleanupPolicy.confirmation` empty, so uninstall does not authorize disk sanitization. Deleting Ceph resources can still interrupt or remove access to persistent volumes, and the raw devices retain Ceph metadata. Review Rook's teardown procedure before intentionally removing the cluster.
+Before syncing the storage Applications, install and enable the Longhorn node prerequisites on all workers, including `open-iscsi`/`iscsid`. Prepare `/dev/vdb` on `worker-1` and `worker-2` as a filesystem and mount it persistently at `/var/lib/longhorn/`. Confirm the disks contain no data that must be kept before formatting them. The Longhorn node annotations in `values/storage/longhorn-resources/nodes.yaml` initialize the 800 GB mounts as `minio-hdd` disks; worker-3 and worker-4 use their root filesystems with 30 GiB reserved. Longhorn components run on all workers, while MinIO storage is constrained by node and disk tags to the two HDDs.
+
+The MinIO tenant chart expects a Secret named `minio-env-configuration` in `minio-tenant`, containing the key `config.env` with `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD` exports. Supply it through the secrets platform before the tenant starts; credentials are intentionally not committed. The storage AppProject explicitly permits the namespaces and cluster-scoped resources required by Longhorn and the MinIO operator.
+
+The MinIO operator chart is pinned to `7.1.1`. Its upstream repository was archived in March 2026, so this pin will not receive upstream operator maintenance. Review that lifecycle before using the tenant for important data.
 
 ## Apply flow
 
-Argo CD itself remains bootstrapped by `infra/argocd/pulumi`. After the Argo CD root Application is updated to watch `gitops`, it creates the `storage` AppProject and then the Rook Ceph Application from this repository. Argo CD needs read access to this Git repository and to the public Rook Helm repository.
+Argo CD itself is bootstrapped by `infra/argocd/pulumi`. The root Application creates the `storage` AppProject and the Longhorn and MinIO Applications from this repository. Argo CD needs read access to this Git repository, the Longhorn Helm repository, and the MinIO operator Helm repository.
 
-Future platform applications should go under `applications/<project>/`; put each AppProject in `projects/<project>/`, values in `values/<project>/`, and Cilium policy manifests under `policies/cilium/`. Keep secrets out of committed values files; introduce an approved secrets integration before a workload requires secret values.
-
-## References
-
-- [Rook v1.21.2 release](https://github.com/rook/rook/releases/tag/v1.21.2)
-- [Rook operator Helm chart](https://rook.io/docs/rook/v1.21/Helm-Charts/operator-chart/)
-- [Rook Ceph cluster Helm chart](https://rook.io/docs/rook/v1.21/Helm-Charts/ceph-cluster-chart/)
-- [Rook prerequisites and raw device requirements](https://rook.io/docs/rook/v1.21/Getting-Started/Prerequisites/prerequisites/)
-- [Rook CephCluster device selection](https://rook.io/docs/rook/v1.21/CRDs/Cluster/ceph-cluster-crd/)
-- [Argo CD multi-source Applications](https://argo-cd.readthedocs.io/en/stable/user-guide/multiple_sources/)
-- [Argo CD sync ordering](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/)
+Put each AppProject in `projects/<project>/`, Applications in `applications/<project>/`, Helm values and app-specific manifests in `values/<project>/`, and Cilium policies under `policies/cilium/`. Keep secrets out of committed values files.
