@@ -7,5 +7,5 @@ metadata:
     argocd.argoproj.io/sync-wave: "1"
 spec:
   name: cp
-  # Keep the live Longhorn node represented in Git without app-specific tags.
+  # Clear the old MinIO scheduling tag without pruning Longhorn's active node.
   tags: []

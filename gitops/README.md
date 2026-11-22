@@ -2,28 +2,24 @@
 
 ## Current scope
 
-GitOps deploys Longhorn, Sealed Secrets, and Infisical in sequence. Pulumi bootstraps Argo CD, the `bootstrap` AppProject, and the root Application. The root Application reads project and child Application manifests from this directory.
+GitOps deploys Longhorn and Infisical in sequence. Pulumi installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `storage` or `security` project.
 
-Longhorn uses the `storage` AppProject and sync wave `0`. Sealed Secrets uses the `security` AppProject and sync wave `1`. Infisical uses the `security` project and sync wave `2`. Store the Infisical bootstrap credentials as an encrypted `SealedSecret` named `infisical-secrets` in Git. Sealed Secrets creates the Kubernetes Secret with that same name for Infisical. Never commit the plaintext Secret.
+Longhorn uses the `storage` AppProject and sync wave `0`. Infisical uses the `security` project and sync wave `1`. Create the one-time `security/infisical-secrets` bootstrap Secret directly in Kubernetes; Infisical reads it through `kubeSecretRef`. Keep its values out of Git. Use Infisical for application secrets after the service is initialized.
 
 Infisical uses the official `infisical-standalone` chart with its bundled PostgreSQL and Redis dependencies enabled. These are part of the Infisical Application, not separate platform apps. Infisical, PostgreSQL, and Redis are pinned to `cp`; their persistent data uses Longhorn. Ingress and the chart's bundled ingress controller are disabled; use `kubectl -n security port-forward svc/infisical 8081:8080` and open `http://localhost:8081` for initial setup.
 
 ### Infisical bootstrap secret
 
-Do not create the live Secret with `kubectl create`. After the Sealed Secrets controller is healthy, create an encrypted manifest locally and commit it. `--dry-run=client` keeps the plaintext out of the cluster; only the encrypted `SealedSecret` is written to Git:
+Run this once after the `security` namespace exists. It creates only the bootstrap Secret Infisical needs to start; do not commit its values:
 
 ```sh
 kubectl -n security create secret generic infisical-secrets \
-  --dry-run=client -o yaml \
   --from-literal=AUTH_SECRET="$(openssl rand -base64 32)" \
   --from-literal=ENCRYPTION_KEY="$(openssl rand -hex 16)" \
-  --from-literal=SITE_URL="http://localhost:8081" |
-kubeseal --controller-name sealed-secrets-controller \
-  --controller-namespace kube-system --format yaml \
-  > gitops/values/security/infisical/resources/infisical-secrets.yaml
+  --from-literal=SITE_URL="http://localhost:8081"
 ```
 
-Commit and push that encrypted file. Sealed Secrets creates `security/infisical-secrets`, and Infisical reads it directly. Back up the Sealed Secrets private key securely outside Git so the encrypted manifest remains recoverable after cluster loss.
+The Infisical chart already references `infisical-secrets`. After this Secret is created, the pod should start; later application credentials belong in Infisical.
 
 Longhorn control components are pinned to `cp`; Longhorn's node manager and storage workloads run on both configured storage nodes (`cp` and `worker`). The default StorageClass uses two replicas.
 
@@ -42,17 +38,14 @@ Keep each component in the existing project/application/values layout:
 ```text
 applications/
 ├── security/infisical/application.yaml
-├── security/sealed-secrets/application.yaml
 └── storage/longhorn/application.yaml
 
 projects/
-├── bootstrap/bootstrap.yaml
 ├── security/security.yaml
 └── storage/storage.yaml
 
 values/
 ├── security/infisical/values.yaml and resources/
-├── security/sealed-secrets/values.yaml
 └── storage/longhorn/values.yaml and resources/
 ```
 
