@@ -6,5 +6,6 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
+  name: cp
   # Clear the old MinIO scheduling tag without pruning Longhorn's active node.
   tags: []
