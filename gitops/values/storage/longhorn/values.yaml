@@ -5,8 +5,9 @@ defaultSettings:
   createDefaultDiskLabeledNodes: true
   defaultDataPath: /var/lib/longhorn/
   defaultReplicaCount: 2
-  # Permit scheduling against all filesystem capacity on the configured disks.
-  storageMinimalAvailablePercentage: 0
+  # Keep free filesystem space for Kubernetes and host workloads, especially
+  # because the worker's Longhorn disk is on its root filesystem.
+  storageMinimalAvailablePercentage: 15
   # Let system-managed Longhorn storage pods run on both nodes, including cp.
   taintToleration: node-role.kubernetes.io/control-plane:NoSchedule
   deletingConfirmationFlag: true

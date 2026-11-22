@@ -6,39 +6,17 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Storage platform services managed by Argo CD
+  description: Storage-related platform applications managed by Argo CD
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
     - https://charts.longhorn.io
-    - https://cloudnative-pg.github.io/charts
-    - https://operator.min.io/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: longhorn-system
-    - server: https://kubernetes.default.svc
-      namespace: cnpg-system
-    - server: https://kubernetes.default.svc
-      namespace: database
-    - server: https://kubernetes.default.svc
-      namespace: minio-operator
-    - server: https://kubernetes.default.svc
-      namespace: minio-tenant
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
       name: longhorn-system
-    - group: ""
-      kind: Namespace
-      name: cnpg-system
-    - group: ""
-      kind: Namespace
-      name: database
-    - group: ""
-      kind: Namespace
-      name: minio-operator
-    - group: ""
-      kind: Namespace
-      name: minio-tenant
     - group: ""
       kind: Node
       name: cp

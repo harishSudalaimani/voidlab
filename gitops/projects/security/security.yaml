@@ -6,20 +6,14 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Security platform services managed by Argo CD
+  description: Security-related platform applications managed by Argo CD
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
-    - https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
     - https://kyverno.github.io/kyverno/
   destinations:
     - server: https://kubernetes.default.svc
-      namespace: security
-    - server: https://kubernetes.default.svc
       namespace: kyverno
   clusterResourceWhitelist:
-    - group: ""
-      kind: Namespace
-      name: security
     - group: ""
       kind: Namespace
       name: kyverno
@@ -37,5 +31,3 @@ spec:
       kind: ValidatingAdmissionPolicy
     - group: admissionregistration.k8s.io
       kind: ValidatingAdmissionPolicyBinding
-    - group: policies.kyverno.io
-      kind: GeneratingPolicy

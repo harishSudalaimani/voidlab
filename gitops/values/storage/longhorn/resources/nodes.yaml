@@ -15,7 +15,7 @@ metadata:
   name: worker
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
-    node.longhorn.io/default-disks-config: '[{"name":"worker-root","path":"/var/lib/longhorn","allowScheduling":true,"storageReserved":0,"tags":[]}]'
+    node.longhorn.io/default-disks-config: '[{"name":"worker-root","path":"/var/lib/longhorn","allowScheduling":true,"tags":[]}]'
   labels:
     node.longhorn.io/create-default-disk: config
     storage.voidlab.io/longhorn: "true"
