@@ -1,6 +1,13 @@
 tenant:
   name: minio
 
+  # MinIO no longer serves public community images from Quay. Use the current
+  # Chainguard-maintained public MinIO image instead.
+  image:
+    repository: docker.io/chainguard/minio
+    tag: latest
+    pullPolicy: Always
+
   # This Secret is produced by the InfisicalStaticSecret resource, not Git.
   configSecret:
     name: minio-env-configuration
@@ -13,6 +20,14 @@ tenant:
       volumesPerServer: 1
       size: 1Ti
       storageClassName: longhorn-minio
+      # The Chainguard image runs as UID/GID 65532; grant that identity access
+      # to the Longhorn volume.
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        fsGroup: 65532
+        fsGroupChangePolicy: OnRootMismatch
       nodeSelector:
         kubernetes.io/hostname: cp
       tolerations:
