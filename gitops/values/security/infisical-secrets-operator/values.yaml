@@ -1,7 +1,7 @@
 # This installs the Infisical Kubernetes Secrets Operator separately from the
 # working Infisical server release. Argo CD must not use Helm hook resources
 # for the operator's default connection/auth resources.
-hostAPI: http://infisical.security.svc.cluster.local:8080/api
+hostAPI: http://infisical-infisical-standalone-infisical.security.svc.cluster.local:8080/api
 installCRDs: true
 defaultResourcesHelmHooks: false
 

@@ -14,7 +14,7 @@ MinIO's `InfisicalStaticSecret` is configured at `values/storage/minio/resources
 
 MinIO's community Operator and Tenant charts are pinned at `7.1.1`; the community repositories were archived in 2026. The tenant is configured as a single server and is not a distributed or highly available MinIO deployment.
 
-Infisical uses the official `infisical-standalone` chart with its bundled PostgreSQL and Redis dependencies enabled. These are part of the Infisical Application, not separate platform apps. Infisical, PostgreSQL, and Redis are pinned to `cp`; their persistent data uses Longhorn. Ingress and the chart's bundled ingress controller are disabled; use `kubectl -n security port-forward svc/infisical 8081:8080` and open `http://localhost:8081` for initial setup.
+Infisical uses the official `infisical-standalone` chart with its bundled PostgreSQL and Redis dependencies enabled. These are part of the Infisical Application, not separate platform apps. Infisical, PostgreSQL, and Redis are pinned to `cp`; their persistent data uses Longhorn. Ingress and the chart's bundled ingress controller are disabled; use `kubectl -n security port-forward svc/infisical-infisical-standalone-infisical 8082:8080` and open `http://localhost:8082` for initial setup.
 
 ### Infisical bootstrap secret
 
@@ -24,7 +24,7 @@ Run this once after the `security` namespace exists. It creates only the bootstr
 kubectl -n security create secret generic infisical-secrets \
   --from-literal=AUTH_SECRET="$(openssl rand -base64 32)" \
   --from-literal=ENCRYPTION_KEY="$(openssl rand -hex 16)" \
-  --from-literal=SITE_URL="http://localhost:8081"
+  --from-literal=SITE_URL="http://localhost:8082"
 ```
 
 The Infisical chart already references `infisical-secrets`. After this Secret is created, the pod should start; later application credentials belong in Infisical.

@@ -4,7 +4,7 @@ metadata:
   name: infisical-shared
   namespace: security
 spec:
-  address: http://infisical.security.svc.cluster.local:8080/api
+  address: http://infisical-infisical-standalone-infisical.security.svc.cluster.local:8080/api
 ---
 apiVersion: secrets.infisical.com/v1beta1
 kind: InfisicalAuth
