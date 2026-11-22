@@ -37,5 +37,5 @@ spec:
       kind: ValidatingAdmissionPolicy
     - group: admissionregistration.k8s.io
       kind: ValidatingAdmissionPolicyBinding
-    - group: kyverno.io
-      kind: ClusterPolicy
+    - group: policies.kyverno.io
+      kind: GeneratingPolicy

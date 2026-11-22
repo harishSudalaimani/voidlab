@@ -4,7 +4,7 @@
 
 GitOps now deploys Longhorn, Kyverno, and Infisical in sequence. Pulumi bootstraps Argo CD, the `bootstrap` AppProject, and the root Application. The root Application reads project and child Application manifests from this directory.
 
-Longhorn uses the `storage` AppProject and sync wave `0`. Kyverno uses the `security` AppProject and sync wave `1`. Infisical uses the `security` project and sync wave `2`, so it starts after Longhorn and Kyverno are healthy. Kyverno generates the initial `infisical-secrets` Secret only in the `security` namespace. No secret values are stored in Git.
+Longhorn uses the `storage` AppProject and sync wave `0`. Kyverno uses the `security` AppProject and sync wave `1`. Infisical uses the `security` project and sync wave `2`, so it starts after Longhorn and Kyverno are healthy. Kyverno's CEL `GeneratingPolicy` creates the initial `infisical-secrets` Secret only in the `security` namespace. No secret values are stored in Git.
 
 Infisical uses the official `infisical-standalone` chart with its bundled PostgreSQL and Redis dependencies enabled. These are part of the Infisical Application, not separate platform apps. Infisical, PostgreSQL, and Redis are pinned to `cp`; their persistent data uses Longhorn. Ingress and the chart's bundled ingress controller are disabled; use `kubectl -n security port-forward svc/infisical 8081:8080` and open `http://localhost:8081` for initial setup.
 
