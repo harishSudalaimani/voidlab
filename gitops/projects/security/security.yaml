@@ -10,13 +10,19 @@ spec:
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
     - https://kyverno.github.io/kyverno/
+    - https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: kyverno
+    - server: https://kubernetes.default.svc
+      namespace: security
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
       name: kyverno
+    - group: ""
+      kind: Namespace
+      name: security
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
     - group: rbac.authorization.k8s.io
@@ -31,3 +37,5 @@ spec:
       kind: ValidatingAdmissionPolicy
     - group: admissionregistration.k8s.io
       kind: ValidatingAdmissionPolicyBinding
+    - group: kyverno.io
+      kind: ClusterPolicy

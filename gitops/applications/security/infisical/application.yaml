@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: infisical
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: security
+  sources:
+    - repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
+      chart: infisical-standalone
+      targetRevision: 1.11.1
+      helm:
+        releaseName: infisical
+        valueFiles:
+          - $values/gitops/values/security/infisical/values.yaml
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/security/infisical/resources
+      directory:
+        recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: security
+  syncPolicy:
+    automated:
+      allowEmpty: true
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
