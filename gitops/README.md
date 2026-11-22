@@ -2,7 +2,9 @@
 
 ## Current scope
 
-GitOps deploys Longhorn and Infisical in sequence. Pulumi installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `storage` or `security` project.
+GitOps deploys Cilium network policies, Longhorn, and Infisical. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `storage`, or `security` project.
+
+The `networking` AppProject is limited to CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy resources. Add policy manifests under `policies/cilium-network-policies/` and list them in its `kustomization.yaml`; Argo CD applies those policies while Pulumi retains ownership of Cilium IPAM and pod networking. No traffic rules are included yet, so this app does not change workload traffic until policies are added.
 
 Longhorn uses the `storage` AppProject and sync wave `0`. Infisical uses the `security` project and sync wave `1`. Argo CD creates the `security` namespace; the one-time `security/infisical-secrets` Secret is created directly in Kubernetes and is deliberately absent from Git. Infisical reads it through `kubeSecretRef`. Keep its values out of Git. Use Infisical for application secrets after the service is initialized.
 
@@ -37,16 +39,21 @@ Keep each component in the existing project/application/values layout:
 
 ```text
 applications/
+├── networking/policies/application.yaml
 ├── security/infisical/application.yaml
 └── storage/longhorn/application.yaml
 
 projects/
+├── networking/networking.yaml
 ├── security/security.yaml
 └── storage/storage.yaml
 
 values/
 ├── security/infisical/values.yaml and resources/
 └── storage/longhorn/values.yaml and resources/
+
+policies/
+└── cilium-network-policies/kustomization.yaml and policy manifests
 ```
 
 Helm values and component manifests stay under `values/<project>/<application>/`. AppProjects and child Applications stay under `projects/` and `applications/`. Do not commit secret values as plaintext.

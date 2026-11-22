@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: networking
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Cilium network policies managed by Argo CD
+  sourceRepos:
+    - https://github.com/harishSudalaimani/voidlab.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  namespaceResourceWhitelist:
+    - group: cilium.io
+      kind: CiliumNetworkPolicy
+  clusterResourceWhitelist:
+    - group: cilium.io
+      kind: CiliumClusterwideNetworkPolicy
