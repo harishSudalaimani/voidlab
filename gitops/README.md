@@ -4,7 +4,7 @@
 
 GitOps deploys Longhorn and Infisical in sequence. Pulumi installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `storage` or `security` project.
 
-Longhorn uses the `storage` AppProject and sync wave `0`. Infisical uses the `security` project and sync wave `1`. Create the one-time `security/infisical-secrets` bootstrap Secret directly in Kubernetes; Infisical reads it through `kubeSecretRef`. Keep its values out of Git. Use Infisical for application secrets after the service is initialized.
+Longhorn uses the `storage` AppProject and sync wave `0`. Infisical uses the `security` project and sync wave `1`. Argo CD creates the `security` namespace; the one-time `security/infisical-secrets` Secret is created directly in Kubernetes and is deliberately absent from Git. Infisical reads it through `kubeSecretRef`. Keep its values out of Git. Use Infisical for application secrets after the service is initialized.
 
 Infisical uses the official `infisical-standalone` chart with its bundled PostgreSQL and Redis dependencies enabled. These are part of the Infisical Application, not separate platform apps. Infisical, PostgreSQL, and Redis are pinned to `cp`; their persistent data uses Longhorn. Ingress and the chart's bundled ingress controller are disabled; use `kubectl -n security port-forward svc/infisical 8081:8080` and open `http://localhost:8081` for initial setup.
 

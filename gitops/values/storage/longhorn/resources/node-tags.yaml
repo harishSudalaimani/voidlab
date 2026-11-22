@@ -1,0 +1,12 @@
+apiVersion: longhorn.io/v1beta2
+kind: Node
+metadata:
+  name: cp
+  namespace: longhorn-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    # Longhorn blocks removing active storage nodes; retain this resource.
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  name: cp
+  tags: []

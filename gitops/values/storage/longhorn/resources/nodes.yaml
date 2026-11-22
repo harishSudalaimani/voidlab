@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Node
+metadata:
+  name: cp
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # These are the real Kubernetes nodes; never prune them with this app.
+    argocd.argoproj.io/sync-options: Prune=false
+    node.longhorn.io/default-disks-config: '[{"name":"data-ssd","path":"/data/vms/longhorn","allowScheduling":true,"storageReserved":0,"tags":[]},{"name":"bulk-hdd","path":"/storage/longhorn","allowScheduling":true,"storageReserved":0,"tags":[]}]'
+  labels:
+    node.longhorn.io/create-default-disk: config
+    storage.voidlab.io/longhorn: "true"
+---
+apiVersion: v1
+kind: Node
+metadata:
+  name: worker
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # These are the real Kubernetes nodes; never prune them with this app.
+    argocd.argoproj.io/sync-options: Prune=false
+    node.longhorn.io/default-disks-config: '[{"name":"worker-root","path":"/var/lib/longhorn","allowScheduling":true,"tags":[]}]'
+  labels:
+    node.longhorn.io/create-default-disk: config
+    storage.voidlab.io/longhorn: "true"

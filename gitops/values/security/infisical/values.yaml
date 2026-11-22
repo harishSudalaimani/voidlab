@@ -1,0 +1,47 @@
+infisical:
+  rolloutOnEveryRender: false
+  replicaCount: 1
+  kubeSecretRef: infisical-secrets
+  service:
+    type: ClusterIP
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+ingress:
+  enabled: false
+  nginx:
+    enabled: false
+
+# Use the chart's bundled, single-instance PostgreSQL and Redis for this phase.
+postgresql:
+  enabled: true
+  primary:
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+    persistence:
+      enabled: true
+      storageClass: longhorn
+      size: 10Gi
+
+redis:
+  enabled: true
+  architecture: standalone
+  master:
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+    persistence:
+      enabled: true
+      storageClass: longhorn
+      size: 2Gi

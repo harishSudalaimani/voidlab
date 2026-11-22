@@ -1,0 +1,58 @@
+defaultSettings:
+  createDefaultDiskLabeledNodes: true
+  defaultDataPath: /var/lib/longhorn/
+  defaultReplicaCount: 2
+  storageMinimalAvailablePercentage: 15
+  taintToleration: node-role.kubernetes.io/control-plane:NoSchedule
+  deletingConfirmationFlag: true
+
+persistence:
+  defaultClass: true
+  defaultClassReplicaCount: 2
+
+preUpgradeChecker:
+  jobEnabled: false
+
+# Keep Longhorn control-plane components on cp.
+global:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+# Longhorn manager must run on both storage nodes.
+longhornManager:
+  nodeSelector:
+    storage.voidlab.io/longhorn: "true"
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+longhornGlobalManager:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+longhornDriver:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+longhornUI:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
