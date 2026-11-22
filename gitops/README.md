@@ -2,13 +2,17 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Longhorn, Infisical, and MinIO. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `storage`, or `security` project.
+GitOps deploys Cilium network policies, Longhorn, Infisical, MinIO, cert-manager, and Infisical's PKI issuer. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `storage`, or `security` project.
 
 The `networking` AppProject is limited to CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy resources. Add policy manifests under `policies/cilium-network-policies/` and list them in its `kustomization.yaml`; Argo CD applies those policies while Pulumi retains ownership of Cilium IPAM and pod networking. No traffic rules are included yet, so this app does not change workload traffic until policies are added.
 
 Longhorn and MinIO use the `storage` AppProject. One MinIO Application manages both the MinIO Operator and Tenant charts in the `minio` namespace. The tenant runs as a single server on `cp`, tolerates the control-plane taint, and requests a 1 TiB volume from a dedicated Longhorn StorageClass with two replicas and `WaitForFirstConsumer` (about 2 TiB of raw Longhorn capacity).
 
 The Infisical Kubernetes Secrets Operator is a shared add-on under the `security` project; its `InfisicalConnection` and `InfisicalAuth` are reusable by MinIO and future applications. Create a read-only Universal Auth machine identity in the Infisical UI, then create `security/infisical-universal-auth` in Kubernetes with its `clientId` and `clientSecret`. Keep those credentials out of Git. Each application adds only its own `InfisicalStaticSecret` resource and references `infisical-shared` in the `security` namespace. The existing Infisical server release is unchanged.
+
+The `cert-manager` Application installs cert-manager and the Infisical PKI Issuer together in the `cert-manager` namespace. cert-manager's CRDs are enabled and retained. The issuer image is pinned to `v1.1.0`; the Helm chart is pinned to `1.0.1`. Both controllers are scheduled on `cp` and tolerate its control-plane taint. The first sync is manual: the cluster bootstrap pins Kubernetes `1.37`, while cert-manager's latest stable `1.21.3` release is officially tested only through Kubernetes `1.36`; upstream lists `1.22` as upcoming. Do not sync this Application until a stable cert-manager release supports Kubernetes `1.37`, or after choosing to run the current version outside its tested range.
+
+Before enabling the Infisical issuer, create a dedicated Infisical Certificate Management application/profile and a Universal Auth machine identity that is granted certificate issuance access only. Do not reuse the Secrets Operator or MinIO identity; its secrets-only access is not sufficient for PKI issuance. Store the issuer identity credentials in a Kubernetes Secret in the controller's cluster-resource namespace (`cert-manager` by default), never in Git. The issuer should connect to the in-cluster Infisical service at `http://infisical-infisical-standalone-infisical.security.svc.cluster.local:8080`. Add the Infisical Issuer or ClusterIssuer manifest only after choosing the app/profile and confirming the fields supported by the installed issuer CRD; then reference that issuer from `cert-manager.io/v1` Certificate resources in workload namespaces. The PKI root/intermediate trust chain must also be distributed to clients that need to verify issued certificates.
 
 MinIO's `InfisicalStaticSecret` is configured at `values/storage/minio/resources/infisical-static-secret.yaml` to read project ID `60e9131c-3eef-403a-b2b1-94c393caf930` (project name `voidlab`), environment slug `prod`, path `/minio`, and write `minio-env-configuration`. Keep the MinIO Application on manual sync. After the shared operator and its CRDs are ready, apply this resource once with `kubectl` and wait for the target Secret; then sync the MinIO Application in Argo CD. Argo CD will adopt and manage the resource from that point on.
 
@@ -46,6 +50,7 @@ Keep each component in the existing project/application/values layout:
 ```text
 applications/
 ├── networking/policies/application.yaml
+├── security/cert-manager/application.yaml
 ├── security/infisical/application.yaml
 ├── security/infisical-secrets-operator/application.yaml
 ├── storage/longhorn/application.yaml
@@ -57,6 +62,7 @@ projects/
 └── storage/storage.yaml
 
 values/
+├── security/cert-manager/cert-manager-values.yaml and infisical-pki-issuer-values.yaml
 ├── security/infisical-secrets-operator/values.yaml and resources/
 ├── storage/minio/operator-values.yaml, tenant-values.yaml, and resources/
 ├── security/infisical/values.yaml and resources/

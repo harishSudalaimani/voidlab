@@ -1,0 +1,12 @@
+controllerManager:
+  manager:
+    replicas: 1
+    image:
+      repository: docker.io/infisical/pki-issuer
+      tag: v1.1.0
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule

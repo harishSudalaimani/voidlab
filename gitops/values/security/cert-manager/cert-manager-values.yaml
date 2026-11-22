@@ -1,0 +1,30 @@
+# cert-manager 1.21.3 is the latest stable release, but upstream's tested
+# Kubernetes range currently stops at 1.36. Keep this Application on manual
+# sync until a stable release supports the cluster's Kubernetes 1.37 version.
+crds:
+  enabled: true
+  keep: true
+
+nodeSelector:
+  kubernetes.io/hostname: cp
+
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+webhook:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+cainjector:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
