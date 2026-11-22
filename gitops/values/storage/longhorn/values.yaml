@@ -16,11 +16,6 @@ persistence:
   defaultClass: true
   defaultClassReplicaCount: 2
 
-# The chart's pre-upgrade Helm hook runs as Argo CD's PreSync hook, before
-# Longhorn's service account exists on a fresh GitOps install.
-preUpgradeChecker:
-  jobEnabled: false
-
 # Pin Longhorn's control components to cp. The manager DaemonSet overrides the
 # global selector and runs on both nodes that have configured storage disks.
 global:

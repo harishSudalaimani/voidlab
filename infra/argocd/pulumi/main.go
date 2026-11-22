@@ -112,27 +112,6 @@ if obj.status ~= nil then
 end
 return hs
 `),
-					"resource.customizations.health.postgresql.cnpg.io_Cluster": pulumi.String(`
-hs = {}
-hs.status = "Progressing"
-hs.message = "Waiting for CloudNativePG Ready condition"
-if obj.status ~= nil and obj.status.conditions ~= nil then
-  for _, condition in ipairs(obj.status.conditions) do
-    if condition.type == "Ready" then
-      if condition.status == "True" then
-        hs.status = "Healthy"
-        hs.message = condition.message or "CloudNativePG cluster is ready"
-        return hs
-      elseif condition.status == "False" then
-        hs.status = "Degraded"
-        hs.message = condition.message or condition.reason or "CloudNativePG cluster is not ready"
-        return hs
-      end
-    end
-  end
-end
-return hs
-`),
 				},
 			},
 		}
@@ -167,10 +146,6 @@ return hs
 						"server":    "https://kubernetes.default.svc",
 						"namespace": namespaceName,
 					}},
-					"clusterResourceWhitelist": []map[string]interface{}{
-						{"group": "cilium.io", "kind": "CiliumClusterwideNetworkPolicy"},
-						{"group": "cilium.io", "kind": "CiliumCIDRGroup"},
-					},
 				},
 			},
 		}, pulumi.DependsOn([]pulumi.Resource{argocd}))
@@ -194,7 +169,7 @@ return hs
 						"path":           appsPath,
 						"directory": map[string]interface{}{
 							"recurse": true,
-							"include": "{projects/**/*.yaml,applications/**/*.yaml,policies/**/*.yaml}",
+							"include": "{projects/**/*.yaml,applications/**/*.yaml}",
 						},
 					},
 					"destination": map[string]interface{}{

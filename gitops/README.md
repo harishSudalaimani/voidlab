@@ -35,8 +35,6 @@ The bundled PostgreSQL and Redis instances are single-instance proof-of-concept 
 
 Child Applications use automated sync, self-heal, prune, `allowEmpty`, and Argo CD's resources finalizer. Removing an Application manifest from Git removes the Application and cascades deletion to resources it manages. Removing a resource from an Application source prunes that resource.
 
-Removing an Application manifest from Git prunes its managed resources. PersistentVolume and data deletion depends on each volume's reclaim policy.
-
 ## Structure
 
 Keep each component in the existing project/application/values layout:
