@@ -20,6 +20,11 @@ spec:
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       ref: values
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/security/infisical/resources
+      directory:
+        recurse: true
   destination:
     server: https://kubernetes.default.svc
     namespace: security
@@ -29,4 +34,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       - ServerSideApply=true

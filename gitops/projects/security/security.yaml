@@ -9,17 +9,14 @@ spec:
   description: Security-related platform applications managed by Argo CD
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
-    - https://kyverno.github.io/kyverno/
+    - https://github.com/bitnami/sealed-secrets.git
     - https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
   destinations:
     - server: https://kubernetes.default.svc
-      namespace: kyverno
+      namespace: kube-system
     - server: https://kubernetes.default.svc
       namespace: security
   clusterResourceWhitelist:
-    - group: ""
-      kind: Namespace
-      name: kyverno
     - group: ""
       kind: Namespace
       name: security
@@ -29,13 +26,3 @@ spec:
       kind: ClusterRole
     - group: rbac.authorization.k8s.io
       kind: ClusterRoleBinding
-    - group: admissionregistration.k8s.io
-      kind: MutatingWebhookConfiguration
-    - group: admissionregistration.k8s.io
-      kind: ValidatingWebhookConfiguration
-    - group: admissionregistration.k8s.io
-      kind: ValidatingAdmissionPolicy
-    - group: admissionregistration.k8s.io
-      kind: ValidatingAdmissionPolicyBinding
-    - group: policies.kyverno.io
-      kind: GeneratingPolicy

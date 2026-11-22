@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: kyverno
+  name: sealed-secrets
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -10,24 +10,19 @@ metadata:
 spec:
   project: security
   sources:
-    - repoURL: https://kyverno.github.io/kyverno/
-      chart: kyverno
-      targetRevision: 3.10.0
+    - repoURL: https://github.com/bitnami/sealed-secrets.git
+      targetRevision: v0.41.2
+      path: helm/sealed-secrets
       helm:
-        releaseName: kyverno
+        releaseName: sealed-secrets-controller
         valueFiles:
-          - $values/gitops/values/security/kyverno/values.yaml
+          - $values/gitops/values/security/sealed-secrets/values.yaml
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       ref: values
-    - repoURL: https://github.com/harishSudalaimani/voidlab.git
-      targetRevision: main
-      path: gitops/values/security/kyverno/resources
-      directory:
-        recurse: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: kyverno
+    namespace: kube-system
   syncPolicy:
     automated:
       allowEmpty: true
