@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: infisical-bootstrap-trigger
+  namespace: security
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+immutable: true
+data:
+  create-once: "true"
