@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: storage
+  sources:
+    - repoURL: https://operator.min.io/
+      chart: operator
+      targetRevision: 7.1.1
+      helm:
+        releaseName: minio-operator
+        valueFiles:
+          - $values/gitops/values/storage/minio/operator-values.yaml
+    - repoURL: https://operator.min.io/
+      chart: tenant
+      targetRevision: 7.1.1
+      helm:
+        releaseName: minio
+        valueFiles:
+          - $values/gitops/values/storage/minio/tenant-values.yaml
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      ref: values
+      path: gitops/values/storage/minio/resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minio
+  # Keep sync manual: bootstrap the InfisicalStaticSecret after the shared
+  # operator is ready, then sync this Application to adopt it and deploy MinIO.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

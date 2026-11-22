@@ -10,13 +10,19 @@ spec:
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
     - https://charts.longhorn.io
+    - https://operator.min.io/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: longhorn-system
+    - server: https://kubernetes.default.svc
+      namespace: minio
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
       name: longhorn-system
+    - group: ""
+      kind: Namespace
+      name: minio
     - group: ""
       kind: Node
       name: cp

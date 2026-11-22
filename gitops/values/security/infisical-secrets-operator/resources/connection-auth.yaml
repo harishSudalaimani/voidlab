@@ -1,0 +1,27 @@
+apiVersion: secrets.infisical.com/v1beta1
+kind: InfisicalConnection
+metadata:
+  name: infisical-shared
+  namespace: security
+spec:
+  address: http://infisical.security.svc.cluster.local:8080/api
+---
+apiVersion: secrets.infisical.com/v1beta1
+kind: InfisicalAuth
+metadata:
+  name: infisical-shared
+  namespace: security
+spec:
+  infisicalConnectionRef:
+    name: infisical-shared
+    namespace: security
+  method: universal
+  universal:
+    clientIdRef:
+      name: infisical-universal-auth
+      namespace: security
+      key: clientId
+    clientSecretRef:
+      name: infisical-universal-auth
+      namespace: security
+      key: clientSecret

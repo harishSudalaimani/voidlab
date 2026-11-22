@@ -1,0 +1,28 @@
+tenant:
+  name: minio
+
+  # This Secret is produced by the InfisicalStaticSecret resource, not Git.
+  configSecret:
+    name: minio-env-configuration
+    existingSecret: true
+
+  pools:
+    - name: pool-0
+      # A single-node tenant suits this two-node lab. It is not distributed MinIO.
+      servers: 1
+      volumesPerServer: 1
+      size: 1Ti
+      storageClassName: longhorn-minio
+      nodeSelector:
+        kubernetes.io/hostname: cp
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+
+  certificate:
+    requestAutoCert: true
+
+# Keep the S3 API and Console internal; use port-forward until an ingress or
+# load balancer is configured deliberately.
+  exposeServices: {}

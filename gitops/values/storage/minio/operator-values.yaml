@@ -1,0 +1,8 @@
+operator:
+  replicaCount: 1
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule

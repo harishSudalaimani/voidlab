@@ -1,0 +1,15 @@
+# This installs the Infisical Kubernetes Secrets Operator separately from the
+# working Infisical server release. Argo CD must not use Helm hook resources
+# for the operator's default connection/auth resources.
+hostAPI: http://infisical.security.svc.cluster.local:8080/api
+installCRDs: true
+defaultResourcesHelmHooks: false
+
+controllerManager:
+  replicas: 1
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule

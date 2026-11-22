@@ -2,11 +2,17 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Longhorn, and Infisical. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `storage`, or `security` project.
+GitOps deploys Cilium network policies, Longhorn, Infisical, and MinIO. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `storage`, or `security` project.
 
 The `networking` AppProject is limited to CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy resources. Add policy manifests under `policies/cilium-network-policies/` and list them in its `kustomization.yaml`; Argo CD applies those policies while Pulumi retains ownership of Cilium IPAM and pod networking. No traffic rules are included yet, so this app does not change workload traffic until policies are added.
 
-Longhorn uses the `storage` AppProject and sync wave `0`. Infisical uses the `security` project and sync wave `1`. Argo CD creates the `security` namespace; the one-time `security/infisical-secrets` Secret is created directly in Kubernetes and is deliberately absent from Git. Infisical reads it through `kubeSecretRef`. Keep its values out of Git. Use Infisical for application secrets after the service is initialized.
+Longhorn and MinIO use the `storage` AppProject. One MinIO Application manages both the MinIO Operator and Tenant charts in the `minio` namespace. The tenant runs as a single server on `cp`, tolerates the control-plane taint, and requests a 1 TiB volume from a dedicated Longhorn StorageClass with two replicas and `WaitForFirstConsumer` (about 2 TiB of raw Longhorn capacity).
+
+The Infisical Kubernetes Secrets Operator is a shared add-on under the `security` project; its `InfisicalConnection` and `InfisicalAuth` are reusable by MinIO and future applications. Create a read-only Universal Auth machine identity in the Infisical UI, then create `security/infisical-universal-auth` in Kubernetes with its `clientId` and `clientSecret`. Keep those credentials out of Git. Each application adds only its own `InfisicalStaticSecret` resource and references `infisical-shared` in the `security` namespace. The existing Infisical server release is unchanged.
+
+MinIO's `InfisicalStaticSecret` is configured at `values/storage/minio/resources/infisical-static-secret.yaml` to read project `voidlab`, environment `production`, path `/minio`, and write `minio-env-configuration`. Keep the MinIO Application on manual sync. After the shared operator and its CRDs are ready, apply this resource once with `kubectl` and wait for the target Secret; then sync the MinIO Application in Argo CD. Argo CD will adopt and manage the resource from that point on.
+
+MinIO's community Operator and Tenant charts are pinned at `7.1.1`; the community repositories were archived in 2026. The tenant is configured as a single server and is not a distributed or highly available MinIO deployment.
 
 Infisical uses the official `infisical-standalone` chart with its bundled PostgreSQL and Redis dependencies enabled. These are part of the Infisical Application, not separate platform apps. Infisical, PostgreSQL, and Redis are pinned to `cp`; their persistent data uses Longhorn. Ingress and the chart's bundled ingress controller are disabled; use `kubectl -n security port-forward svc/infisical 8081:8080` and open `http://localhost:8081` for initial setup.
 
@@ -31,7 +37,7 @@ The bundled PostgreSQL and Redis instances are single-instance proof-of-concept 
 
 ## Pruning
 
-Child Applications use automated sync, self-heal, prune, `allowEmpty`, and Argo CD's resources finalizer. Removing an Application manifest from Git removes the Application and cascades deletion to resources it manages. Removing a resource from an Application source prunes that resource.
+Child Applications use automated sync, self-heal, prune, `allowEmpty`, and Argo CD's resources finalizer unless called out above. The MinIO Application stays manual until its Infisical secret source is configured. Removing an Application manifest from Git removes the Application and cascades deletion to resources it manages. Removing a resource from an Application source prunes that resource.
 
 ## Structure
 
@@ -41,7 +47,9 @@ Keep each component in the existing project/application/values layout:
 applications/
 ├── networking/policies/application.yaml
 ├── security/infisical/application.yaml
-└── storage/longhorn/application.yaml
+├── security/infisical-secrets-operator/application.yaml
+├── storage/longhorn/application.yaml
+└── storage/minio/application.yaml
 
 projects/
 ├── networking/networking.yaml
@@ -49,6 +57,8 @@ projects/
 └── storage/storage.yaml
 
 values/
+├── security/infisical-secrets-operator/values.yaml and resources/
+├── storage/minio/operator-values.yaml, tenant-values.yaml, and resources/
 ├── security/infisical/values.yaml and resources/
 └── storage/longhorn/values.yaml and resources/
 
