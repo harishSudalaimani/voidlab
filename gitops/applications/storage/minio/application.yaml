@@ -31,9 +31,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: minio
-  # Keep sync manual: bootstrap the InfisicalStaticSecret after the shared
-  # operator is ready, then sync this Application to adopt it and deploy MinIO.
   syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true

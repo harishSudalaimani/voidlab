@@ -29,5 +29,13 @@ spec:
       jsonPointers:
         - /webhooks/0/failurePolicy
   syncPolicy:
+    automated:
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
     syncOptions:
       - RespectIgnoreDifferences=true
