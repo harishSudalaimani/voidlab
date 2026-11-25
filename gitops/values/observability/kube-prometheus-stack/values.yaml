@@ -54,6 +54,11 @@ prometheusOperator:
 kubelet:
   namespace: observability
 
+# This cluster uses Cilium kube-proxy replacement, so the chart's kube-proxy
+# Service in kube-system is unnecessary and outside this project's namespace.
+kubeProxy:
+  enabled: false
+
 kube-state-metrics:
   nodeSelector:
     kubernetes.io/hostname: cp
