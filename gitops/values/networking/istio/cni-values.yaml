@@ -2,6 +2,11 @@ profile: ambient
 
 # Install the traffic-redirection plugin on all nodes, including cp. Cilium
 # remains the primary CNI and continues to assign Pod IPs.
+chained: true
+istioOwnedCNIConfig: true
+# Sort before Cilium's 05-cilium.conflist. Istio builds this owned chain from
+# the primary CNI config and appends its ambient redirection plugin.
+istioOwnedCNIConfigFileName: 02-istio-cni.conflist
 ambient:
   enabled: true
 tolerations:
