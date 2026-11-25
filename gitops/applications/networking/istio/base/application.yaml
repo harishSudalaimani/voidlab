@@ -21,8 +21,16 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: istio-system
+  # Istiod changes this policy to Fail after its validation webhook is healthy.
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      name: istio-validator-istio-system
+      jsonPointers:
+        - /webhooks/0/failurePolicy
   syncPolicy:
     syncOptions:
+      - RespectIgnoreDifferences=true
       - CreateNamespace=true
       - ServerSideApply=true
       - SkipDryRunOnMissingResource=true

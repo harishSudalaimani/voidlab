@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Istio ambient mesh, Gateway API, Prometheus, and Kiali
+  description: Istio ambient mesh, Gateway API, and Kiali
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
     - https://github.com/kubernetes-sigs/gateway-api
