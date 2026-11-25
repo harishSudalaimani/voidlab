@@ -1,0 +1,27 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: infisical-issuer-approver
+rules:
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - signers
+    verbs:
+      - approve
+    resourceNames:
+      - issuers.infisical-issuer.infisical.com/*
+      - clusterissuers.infisical-issuer.infisical.com/*
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: infisical-issuer-approver
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: infisical-issuer-approver
+subjects:
+  - kind: ServiceAccount
+    name: cert-manager
+    namespace: cert-manager
