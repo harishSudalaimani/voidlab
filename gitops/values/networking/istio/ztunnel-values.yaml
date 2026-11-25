@@ -1,0 +1,8 @@
+# ztunnel is a DaemonSet and must run on every node, including cp.
+tolerations:
+  - operator: Exists
+    effect: NoSchedule
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - operator: Exists
+    effect: NoExecute

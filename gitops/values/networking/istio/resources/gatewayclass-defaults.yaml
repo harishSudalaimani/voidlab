@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: istio-gateway-class-defaults
+  namespace: istio-system
+  labels:
+    gateway.istio.io/defaults-for-class: istio
+data:
+  deployment: |
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: cp
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: istio-waypoint-class-defaults
+  namespace: istio-system
+  labels:
+    gateway.istio.io/defaults-for-class: istio-waypoint
+data:
+  deployment: |
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: cp
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule

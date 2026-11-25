@@ -1,0 +1,12 @@
+profile: ambient
+
+# Istiod is a control-plane Deployment and stays on cp.
+nodeSelector:
+  kubernetes.io/hostname: cp
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+autoscaleEnabled: false
+replicaCount: 1

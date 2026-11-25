@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kiali
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: service-mesh
+  sources:
+    - repoURL: https://kiali.org/helm-charts
+      chart: kiali-operator
+      targetRevision: 2.34.1
+      helm:
+        releaseName: kiali-operator
+        valueFiles:
+          - $values/gitops/values/networking/istio/kiali-values.yaml
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system

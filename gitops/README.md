@@ -2,9 +2,31 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Longhorn, Infisical, MinIO, cert-manager, and Infisical's PKI issuer. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `storage`, or `security` project.
+GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager, and Infisical's PKI issuer. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, or `security` project.
 
 The `networking` AppProject is limited to CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy resources. Add policy manifests under `policies/cilium-network-policies/` and list them in its `kustomization.yaml`; Argo CD applies those policies while Pulumi retains ownership of Cilium IPAM and pod networking. No traffic rules are included yet, so this app does not change workload traffic until policies are added.
+
+The Istio stack uses ambient mode and Gateway API. It is kept separate from the narrow Cilium `networking` project under the `service-mesh` AppProject. Istio 1.32.0 and Gateway API v1.6.1 are pinned together because Istio 1.32 lists Gateway API v1.6.1 as its tested version and supports Kubernetes 1.37. The Gateway API CRDs are sourced from the upstream tagged repository, using its `config/crd/experimental` manifests. The Gateway API CRD Application uses server-side apply and does not prune CRDs, since deleting a CRD also deletes every Gateway API object.
+
+The two CNI components have separate roles: Cilium assigns Pod IPs and provides primary pod networking; Istio CNI is chained after Cilium to set up ambient traffic redirection through ztunnel. Istio CNI and ztunnel run as DaemonSets across every node, including `cp`. Cilium remains installed and managed by Pulumi; the added values only configure Cilium to coexist with Istio's chained plugin and redirection.
+
+**Apply the Pulumi Cilium compatibility update before syncing `istio-cni`.** This cluster uses Cilium kube-proxy replacement. The Pulumi stack now sets `cni.exclusive=false` and `socketLB.hostNamespaceOnly=true` for Istio chaining and redirection, and explicitly leaves `bpf.masquerade=false` for ambient health-probe compatibility. Run `pulumi preview` and apply the Cilium stack update before syncing the manual `istio-cni` Application. Do not enroll workloads before both node DaemonSets are healthy. [Cilium's Istio integration guide](https://docs.cilium.io/en/latest/network/servicemesh/istio/) [Istio's Cilium prerequisites](https://istio.io/latest/docs/ambient/install/platform-prerequisites/)
+
+The Istio controller and Kiali are pinned to `cp` and tolerate the control-plane taint. Istiod creates a waypoint when you add a Gateway API `Gateway` using class `istio-waypoint`; no waypoint is created until a namespace or service needs L7 processing. No application namespace is enrolled in ambient mode by default. Do not enroll workloads until Istio CNI and ztunnel are installed and verified on every node.
+
+Prometheus is not included in this phase. Kiali is configured to run without Prometheus, so its graph metrics and metric-based health views will be unavailable until the separate Prometheus deployment is connected. Kiali uses its default token authentication and stays internal; use `kubectl -n istio-system port-forward svc/kiali 20001:20001` to open the UI. No public Gateway, DNS name, or Let's Encrypt Certificate is created in this phase; those require the external hostname and public address/provider details.
+
+The Istio child Applications are manual-sync so the CRDs and components can be installed in dependency order. Sync these Applications in this order:
+
+1. `istio-base`
+2. `gateway-api-crds`
+3. `istiod`
+4. `istio-cni` (only after Cilium compatibility is in place)
+5. `ztunnel`
+6. `istio-gateway-placement`
+7. `kiali`
+
+Verify with `kubectl get ds -n istio-system` and `kubectl get pods -n istio-system -o wide`; there should be one Istio CNI and one ztunnel pod on each node. Also check `kubectl get gatewayclass`. Keep application namespaces unlabeled until both DaemonSets are healthy. Use a matching Istio 1.32 `istioctl` for diagnostics.
 
 Longhorn and MinIO use the `storage` AppProject. One MinIO Application manages both the MinIO Operator and Tenant charts in the `minio` namespace. The tenant runs as a single server on `cp`, tolerates the control-plane taint, and requests a 1 TiB volume from a dedicated Longhorn StorageClass with two replicas and `WaitForFirstConsumer` (about 2 TiB of raw Longhorn capacity).
 
@@ -50,6 +72,7 @@ Keep each component in the existing project/application/values layout:
 ```text
 applications/
 ├── networking/policies/application.yaml
+├── networking/istio/{gateway-api,base,istiod,cni,ztunnel,gateway-placement,kiali}/application.yaml
 ├── security/cert-manager/application.yaml
 ├── security/infisical/application.yaml
 ├── security/infisical-secrets-operator/application.yaml
@@ -58,10 +81,12 @@ applications/
 
 projects/
 ├── networking/networking.yaml
+├── service-mesh/service-mesh.yaml
 ├── security/security.yaml
 └── storage/storage.yaml
 
 values/
+├── networking/istio/*.yaml and resources/gatewayclass-defaults.yaml
 ├── security/cert-manager/cert-manager-values.yaml, infisical-pki-issuer-values.yaml, and resources/
 ├── security/infisical-secrets-operator/values.yaml and resources/
 ├── storage/minio/operator-values.yaml, tenant-values.yaml, and resources/

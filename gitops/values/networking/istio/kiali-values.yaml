@@ -1,0 +1,26 @@
+# Schedule the Kiali operator on cp.
+nodeSelector:
+  kubernetes.io/hostname: cp
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+cr:
+  create: true
+  name: kiali
+  namespace: istio-system
+  spec:
+    deployment:
+      cluster_wide_access: true
+      node_selector:
+        kubernetes.io/hostname: cp
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+    external_services:
+      istio:
+        istio_api_enabled: true
+      prometheus:
+        enabled: false

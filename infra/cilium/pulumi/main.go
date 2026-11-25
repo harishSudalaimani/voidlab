@@ -58,10 +58,22 @@ func main() {
 		}
 
 		values := pulumi.Map{
+			// Istio ambient chains its CNI plugin after Cilium. Keep Cilium from
+			// deleting the chained config and bypass pod-namespace socket LB so
+			// ambient redirection can see the original service address.
+			"cni": pulumi.Map{
+				"exclusive": pulumi.Bool(false),
+			},
 			"ipam": pulumi.Map{
 				"mode": pulumi.String("kubernetes"),
 			},
 			"kubeProxyReplacement": pulumi.String("true"),
+			"socketLB": pulumi.Map{
+				"hostNamespaceOnly": pulumi.Bool(true),
+			},
+			"bpf": pulumi.Map{
+				"masquerade": pulumi.Bool(false),
+			},
 			"k8sServiceHost":       apiServerIP,
 			"k8sServicePort":       pulumi.String(apiServerPort),
 			"routingMode":          routingMode,

@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-gateway-placement
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: service-mesh
+  source:
+    repoURL: https://github.com/harishSudalaimani/voidlab.git
+    targetRevision: main
+    path: gitops/values/networking/istio/resources
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system

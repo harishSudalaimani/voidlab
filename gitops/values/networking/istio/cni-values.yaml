@@ -1,0 +1,13 @@
+profile: ambient
+
+# Install the traffic-redirection plugin on all nodes, including cp. Cilium
+# remains the primary CNI and continues to assign Pod IPs.
+ambient:
+  enabled: true
+tolerations:
+  - operator: Exists
+    effect: NoSchedule
+  - key: CriticalAddonsOnly
+    operator: Exists
+  - operator: Exists
+    effect: NoExecute

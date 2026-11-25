@@ -1,0 +1,3 @@
+# Istio's Helm guidance requires this with server-side apply, which Argo CD
+# uses while rendering and applying Helm charts.
+validationFailurePolicy: Fail
