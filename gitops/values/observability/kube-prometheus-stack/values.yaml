@@ -34,6 +34,8 @@ grafana:
           datasourceUid: loki
 
 prometheusOperator:
+  kubeletService:
+    namespace: observability
   nodeSelector:
     kubernetes.io/hostname: cp
   tolerations:
@@ -48,6 +50,9 @@ prometheusOperator:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
           effect: NoSchedule
+
+kubelet:
+  namespace: observability
 
 kube-state-metrics:
   nodeSelector:

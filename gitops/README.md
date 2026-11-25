@@ -83,7 +83,12 @@ Create these buckets in MinIO before syncing Loki or Tempo: `loki-chunks`, `loki
 After the MinIO Tenant is healthy, sync `minio-observability-access` and wait for its first Job to report `Complete` (`kubectl -n minio get jobs`). This GitOps Application creates the service account and limits it to the three buckets above. Then sync the observability Applications manually in this order:
 
 1. `observability-credentials` (after the Infisical values and MinIO buckets are ready)
-2. `kube-prometheus-stack`
+2. `kube-prometheus-stack`; wait for it to sync successfully and for the Prometheus Operator CRDs to become established before syncing apps that create ServiceMonitors:
+
+   ```sh
+   kubectl wait --for=condition=Established --timeout=120s crd/servicemonitors.monitoring.coreos.com
+   ```
+
 3. `loki` and `tempo`
 4. `opentelemetry-collector`
 5. `kiali` (to apply its Prometheus endpoint setting)
