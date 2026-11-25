@@ -1,0 +1,43 @@
+tempo:
+  extraArgs:
+    config.expand-env: true
+  extraEnvFrom:
+    - secretRef:
+        name: observability-credentials
+  storage:
+    trace:
+      backend: s3
+      s3:
+        bucket: tempo-traces
+        endpoint: minio.minio.svc.cluster.local:443
+        region: us-east-1
+        insecure: false
+        tls_insecure_skip_verify: true
+        forcepathstyle: true
+        access_key: ${MINIO_ACCESS_KEY}
+        secret_key: ${MINIO_SECRET_KEY}
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  retention: 168h
+
+persistence:
+  enabled: true
+  storageClassName: longhorn
+  size: 10Gi
+
+nodeSelector:
+  kubernetes.io/hostname: cp
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+serviceMonitor:
+  enabled: true
+  additionalLabels:
+    release: kube-prometheus-stack

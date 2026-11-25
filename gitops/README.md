@@ -2,7 +2,7 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager, and Infisical's PKI issuer. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, or `security` project.
+GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager, Infisical's PKI issuer, and the observability stack. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, or `observability` project.
 
 The `networking` AppProject is limited to CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy resources. Add policy manifests under `policies/cilium-network-policies/` and list them in its `kustomization.yaml`; Argo CD applies those policies while Pulumi retains ownership of Cilium IPAM and pod networking. No traffic rules are included yet, so this app does not change workload traffic until policies are added.
 
@@ -14,7 +14,7 @@ The two CNI components have separate roles: Cilium assigns Pod IPs and provides 
 
 The Istio controller and Kiali are pinned to `cp` and tolerate the control-plane taint. Istiod creates a waypoint when you add a Gateway API `Gateway` using class `istio-waypoint`; no waypoint is created until a namespace or service needs L7 processing. No application namespace is enrolled in ambient mode by default. Do not enroll workloads until Istio CNI and ztunnel are installed and verified on every node.
 
-Prometheus is not included in this phase. Kiali is configured to run without Prometheus, so its graph metrics and metric-based health views will be unavailable until the separate Prometheus deployment is connected. Kiali uses its default token authentication and stays internal; use `kubectl -n istio-system port-forward svc/kiali 20001:20001` to open the UI. No public Gateway, DNS name, or Let's Encrypt Certificate is created in this phase; those require the external hostname and public address/provider details.
+Kiali uses the Prometheus service installed with the observability stack for graph metrics and metric-based health views. Kiali uses its default token authentication and stays internal; use `kubectl -n istio-system port-forward svc/kiali 20001:20001` to open the UI. No public Gateway, DNS name, or Let's Encrypt Certificate is created in this phase; those require the external hostname and public address/provider details.
 
 The Istio child Applications are manual-sync so the CRDs and components can be installed in dependency order. Sync these Applications in this order:
 
@@ -37,6 +37,8 @@ The `cert-manager` Application installs cert-manager and the Infisical PKI Issue
 Before enabling the Infisical issuer, create a Certificate Management application/profile with API enrollment and authorize a machine identity to issue certificates in that application. A dedicated Universal Auth identity is preferred; the existing Secrets Operator identity can only be reused if it is explicitly granted the application's Operator role, which also gives it certificate issuance access. Store the issuer identity credentials in a Kubernetes Secret in the controller's cluster-resource namespace (`cert-manager` by default), never in Git. The issuer should connect to the in-cluster Infisical service at `http://infisical-infisical-standalone-infisical.security.svc.cluster.local:8080`. The cert-manager Application includes the external-issuer approver RBAC at `values/security/cert-manager/resources/issuer-approver-rbac.yaml`; the security AppProject permits the Infisical `ClusterIssuer` kind. Add the actual ClusterIssuer manifest after choosing the Application/Profile names. Then reference it from `cert-manager.io/v1` Certificate resources in workload namespaces. The PKI root/intermediate trust chain must also be distributed to clients that need to verify issued certificates.
 
 MinIO's `InfisicalStaticSecret` is configured at `values/storage/minio/resources/infisical-static-secret.yaml` to read project ID `60e9131c-3eef-403a-b2b1-94c393caf930` (project name `voidlab`), environment slug `prod`, path `/minio`, and write `minio-env-configuration`. Keep the MinIO Application on manual sync. After the shared operator and its CRDs are ready, apply this resource once with `kubectl` and wait for the target Secret; then sync the MinIO Application in Argo CD. Argo CD will adopt and manage the resource from that point on.
+
+The `minio-observability-access` Application provisions the Loki/Tempo service account from the Infisical keys at `/observability`. Sync the `minio` Application once after this change so its `/minio` credentials Secret includes the root credential keys needed by the provisioner. After the MinIO Tenant is healthy and that Secret is refreshed, sync `minio-observability-access`. It creates a MinIO service account with an inline policy limited to `loki-chunks`, `loki-ruler`, and `tempo-traces`; a CronJob reapplies the credentials and policy every ten minutes so Infisical rotations are reconciled. The same Infisical credentials are synced into the `observability` namespace for Loki and Tempo.
 
 MinIO's community Operator and Tenant charts are pinned at `7.1.1`; the community repositories were archived in 2026. The Tenant uses Chainguard's public MinIO image (`docker.io/chainguard/minio:latest`) because anonymous pulls from MinIO's old Quay image now fail. Its pool security context matches the image's non-root UID/GID 65532. The `latest` tag follows Chainguard's current build on each pod start. The tenant is configured as a single server and is not a distributed or highly available MinIO deployment.
 
@@ -61,9 +63,38 @@ Longhorn stores data on `cp`'s `/data/vms/longhorn` SSD and `/storage/longhorn` 
 
 The bundled PostgreSQL and Redis instances are single-instance proof-of-concept dependencies, not HA services. Add other shared data services or application workloads later as separate GitOps Applications after this phase is confirmed healthy.
 
+## Observability
+
+The `observability` AppProject installs kube-prometheus-stack, Loki, Tempo, and an OpenTelemetry Collector gateway in the `observability` namespace. kube-prometheus-stack supplies Prometheus, Grafana, Alertmanager, kube-state-metrics, and node-exporter. Prometheus, Grafana, Alertmanager, kube-state-metrics, Loki, Tempo, and the Collector are pinned to `cp` and tolerate its control-plane taint. Node-exporter remains a DaemonSet on both `cp` and `worker` so Prometheus gets host metrics from each node. Prometheus, Grafana, Loki, and Tempo use Longhorn PVCs; Loki and Tempo store log and trace blocks in the existing MinIO tenant over HTTPS. The S3 clients skip verification of MinIO's operator-generated internal certificate.
+
+Add these four secrets to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94c393caf930`), environment `prod`, path `/observability`:
+
+| Infisical key | Purpose |
+| --- | --- |
+| `MINIO_ACCESS_KEY` | MinIO observability service account access key |
+| `MINIO_SECRET_KEY` | MinIO observability service account secret key |
+| `GRAFANA_ADMIN_USER` | Grafana administrator login |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana administrator password |
+
+Keep `MINIO_ACCESS_KEY` at 20 characters or fewer to satisfy MinIO's access-key limit.
+
+Create these buckets in MinIO before syncing Loki or Tempo: `loki-chunks`, `loki-ruler`, and `tempo-traces`. Do not use the MinIO root credentials for the stack. The `observability-credentials` Application syncs the InfisicalStaticSecret and creates the Kubernetes Secret consumed by Grafana, Loki, and Tempo. Wait for that Secret to appear before syncing the Helm applications.
+
+After the MinIO Tenant is healthy, sync `minio-observability-access` and wait for its first Job to report `Complete` (`kubectl -n minio get jobs`). This GitOps Application creates the service account and limits it to the three buckets above. Then sync the observability Applications manually in this order:
+
+1. `observability-credentials` (after the Infisical values and MinIO buckets are ready)
+2. `kube-prometheus-stack`
+3. `loki` and `tempo`
+4. `opentelemetry-collector`
+5. `kiali` (to apply its Prometheus endpoint setting)
+
+Grafana is included in kube-prometheus-stack; there is no separate Grafana release. Its Loki and Tempo data sources are provisioned automatically. Open Grafana with `kubectl -n observability port-forward svc/kube-prometheus-stack-grafana 3000:80` and sign in with the credentials from Infisical. The Collector accepts OTLP/gRPC on `opentelemetry-collector.observability.svc.cluster.local:4317` and OTLP/HTTP on port `4318`; configure instrumented applications to send there. It sends logs to Loki and traces to Tempo, and exposes received metrics on a Prometheus scrape endpoint. This gateway does not tail every pod's container log or instrument applications automatically; those require an agent or app-side instrumentation.
+
+The chart versions are pinned in their Argo CD Applications: kube-prometheus-stack `93.10.0`, Loki `21.6.0`, Tempo `3.2.1`, and OpenTelemetry Collector `0.178.2`. These are single-node lab deployments, not highly available services. Loki and Tempo each use one core process on `cp`; their PVCs preserve local WAL/state while MinIO stores their long-term blocks.
+
 ## Pruning
 
-Child Applications use automated sync, self-heal, prune, `allowEmpty`, and Argo CD's resources finalizer unless called out above. The MinIO Application stays manual until its Infisical secret source is configured. Removing an Application manifest from Git removes the Application and cascades deletion to resources it manages. Removing a resource from an Application source prunes that resource.
+Child Applications use automated sync, self-heal, prune, `allowEmpty`, and Argo CD's resources finalizer unless called out above. The MinIO Application stays manual until its Infisical secret source is configured. Observability Applications are manual so the MinIO credentials and buckets can be provisioned first and the Prometheus Operator CRDs are ready before related monitors are created. Removing an Application manifest from Git removes the Application and cascades deletion to resources it manages. Removing a resource from an Application source prunes that resource.
 
 ## Structure
 
@@ -77,13 +108,15 @@ applications/
 ├── security/infisical/application.yaml
 ├── security/infisical-secrets-operator/application.yaml
 ├── storage/longhorn/application.yaml
-└── storage/minio/application.yaml
+├── storage/{minio,minio-observability-access}/application.yaml
+└── observability/{observability-credentials,kube-prometheus-stack,loki,tempo,opentelemetry-collector}/application.yaml
 
 projects/
 ├── networking/networking.yaml
 ├── service-mesh/service-mesh.yaml
 ├── security/security.yaml
-└── storage/storage.yaml
+├── storage/storage.yaml
+└── observability/observability.yaml
 
 values/
 ├── networking/istio/*.yaml and resources/gatewayclass-defaults.yaml
@@ -91,7 +124,8 @@ values/
 ├── security/infisical-secrets-operator/values.yaml and resources/
 ├── storage/minio/operator-values.yaml, tenant-values.yaml, and resources/
 ├── security/infisical/values.yaml and resources/
-└── storage/longhorn/values.yaml and resources/
+├── storage/longhorn/values.yaml and resources/
+└── observability/{credentials,kube-prometheus-stack,loki,tempo,opentelemetry-collector}/values.yaml and resources/
 
 policies/
 └── cilium-network-policies/kustomization.yaml and policy manifests
