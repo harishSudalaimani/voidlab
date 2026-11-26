@@ -1,0 +1,21 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform-tools
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Cluster administration interfaces managed by Argo CD
+  sourceRepos:
+    - https://github.com/harishSudalaimani/voidlab.git
+    - https://kubernetes-sigs.github.io/headlamp/
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: headlamp
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+      name: headlamp
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding

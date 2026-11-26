@@ -13,6 +13,8 @@ cr:
   spec:
     deployment:
       cluster_wide_access: true
+      pod_labels:
+        istio.io/dataplane-mode: ambient
       node_selector:
         kubernetes.io/hostname: cp
       tolerations:

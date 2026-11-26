@@ -36,8 +36,9 @@ tenant:
           effect: NoSchedule
 
   certificate:
-    requestAutoCert: true
+    # MinIO speaks HTTP inside the ambient mesh; ztunnel provides transport mTLS.
+    requestAutoCert: false
 
-# Keep the S3 API and Console internal; use port-forward until an ingress or
-# load balancer is configured deliberately.
+# Keep the S3 API and Console internal; use port-forward until a Gateway API
+# route is added deliberately.
   exposeServices: {}

@@ -22,6 +22,9 @@ spec:
     server: https://kubernetes.default.svc
     namespace: observability
   syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        istio.io/dataplane-mode: ambient
     automated:
       prune: true
       selfHeal: true

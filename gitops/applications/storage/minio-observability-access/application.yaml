@@ -15,6 +15,9 @@ spec:
     server: https://kubernetes.default.svc
     namespace: minio
   syncPolicy:
+    managedNamespaceMetadata:
+      labels:
+        istio.io/dataplane-mode: ambient
     automated:
       prune: true
       selfHeal: true
@@ -26,4 +29,5 @@ spec:
         maxDuration: 5m
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
       - SkipDryRunOnMissingResource=true

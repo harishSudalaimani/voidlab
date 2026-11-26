@@ -1,0 +1,86 @@
+apiVersion: secrets.infisical.com/v1beta1
+kind: InfisicalStaticSecret
+metadata:
+  name: cloudflare-dns-credentials
+  namespace: cert-manager
+spec:
+  infisicalAuthRef:
+    name: infisical-shared
+    namespace: security
+  syncOptions:
+    refreshInterval: 60s
+  sources:
+    - projectId: 60e9131c-3eef-403a-b2b1-94c393caf930
+      environmentSlug: prod
+      secretPath: /cert-manager
+  targets:
+    - name: cloudflare-api-token-secret
+      namespace: cert-manager
+      kind: Secret
+      creationPolicy: Owner
+      template:
+        engineVersion: v1
+        data:
+          api-token: "{{ .CLOUDFLARE_API_TOKEN.Value }}"
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email: snharish85@gmail.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - selector:
+          dnsZones:
+            - kiroku.life
+        dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: snharish85@gmail.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - selector:
+          dnsZones:
+            - kiroku.life
+        dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token-secret
+              key: api-token
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-kiroku-life
+  namespace: istio-system
+spec:
+  secretName: wildcard-kiroku-life-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+    group: cert-manager.io
+  dnsNames:
+    - kiroku.life
+    - "*.kiroku.life"
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  usages:
+    - digital signature
+    - server auth

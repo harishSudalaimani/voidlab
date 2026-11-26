@@ -17,22 +17,15 @@ spec:
         releaseName: cert-manager
         valueFiles:
           - $values/gitops/values/security/cert-manager/cert-manager-values.yaml
-    - repoURL: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
-      chart: infisical-pki-issuer
-      targetRevision: 1.0.1
-      helm:
-        releaseName: infisical-pki-issuer
-        valueFiles:
-          - $values/gitops/values/security/cert-manager/infisical-pki-issuer-values.yaml
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       ref: values
-      path: gitops/values/security/cert-manager/resources
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager
   syncPolicy:
     automated:
+      prune: true
       selfHeal: true
     retry:
       limit: -1

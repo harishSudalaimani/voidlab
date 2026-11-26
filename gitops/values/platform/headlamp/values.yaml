@@ -1,0 +1,48 @@
+replicaCount: 1
+
+config:
+  inCluster: true
+  enableHelm: false
+  unsafeUseServiceAccountToken: false
+
+# Headlamp users authenticate with their own Kubernetes bearer tokens. Keep
+# the pod's identity read-only in case it performs in-cluster discovery.
+clusterRoleBinding:
+  create: true
+  clusterRoleName: view
+
+nodeSelector:
+  kubernetes.io/hostname: cp
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+securityContext:
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+
+ingress:
+  enabled: false
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: istio-system
+      sectionName: https
+  hostnames:
+    - headlamp.kiroku.life
