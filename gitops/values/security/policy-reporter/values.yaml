@@ -1,0 +1,55 @@
+replicaCount: 1
+nodeSelector:
+  kubernetes.io/hostname: cp
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: kube-prometheus-stack
+  grafana:
+    dashboards:
+      enabled: false
+
+plugin:
+  kyverno:
+    enabled: true
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+ui:
+  enabled: true
+  clusters:
+    - name: VoidLab
+      host: http://policy-reporter.policy-reporter.svc.cluster.local:8080
+      plugins:
+        - name: kyverno
+          host: http://policy-reporter-kyverno-plugin.policy-reporter.svc.cluster.local:8080
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  openIDConnect:
+    enabled: true
+    callbackUrl: https://policy-reporter.kiroku.life/callback
+    secretRef: policy-reporter-oidc
+    pkce: true
+  httproute:
+    enabled: true
+    parentRefs:
+      - name: public
+        namespace: istio-system
+        sectionName: https
+    hostnames:
+      - policy-reporter.kiroku.life
