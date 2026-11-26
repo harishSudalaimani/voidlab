@@ -4,7 +4,9 @@
 
 GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, and the observability stack. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, or `platform-tools` project.
 
-The `networking` AppProject is limited to CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy resources. Add policy manifests under `policies/cilium-network-policies/` and list them in its `kustomization.yaml`; Argo CD applies those policies while Pulumi retains ownership of Cilium IPAM and pod networking. No traffic rules are included yet, so this app does not change workload traffic until policies are added.
+The `networking` AppProject allows Cilium network policies, LB IP pools, and L2 announcement policies. Manifests under `policies/cilium-network-policies/` are applied by Argo CD; Pulumi retains ownership of the Cilium installation. The public Istio Gateway pool is restricted to `192.168.29.254/32` and the `istio-system/public-istio` Service. Its L2 announcement is restricted to the control-plane node's `enp8s0` interface.
+
+Before syncing the public Gateway pool, keep the router DHCP range at `192.168.29.2–192.168.29.199` so it cannot lease the VIP. Cilium's Pulumi Helm release enables `l2announcements.enabled=true` and already has `kubeProxyReplacement=true`. Cilium auto-detects devices because the node interfaces have different names; verify `enp8s0` is selected on `cp` before relying on the Gateway VIP. Apply the Cilium Pulumi update before the networking-policies Application syncs the announcement policy.
 
 The Istio stack uses ambient mode and Gateway API. It is kept separate from the narrow Cilium `networking` project under the `service-mesh` AppProject. Istio 1.32.0 and Gateway API v1.6.1 are pinned together because Istio 1.32 lists Gateway API v1.6.1 as its tested version and supports Kubernetes 1.37. The Gateway API CRDs are sourced from the upstream tagged repository, using its `config/crd/experimental` manifests. The Gateway API CRD Application uses server-side apply and does not prune CRDs, since deleting a CRD also deletes every Gateway API object.
 
@@ -115,7 +117,7 @@ values/
 └── observability/{credentials,kube-prometheus-stack,loki,tempo,opentelemetry-collector}/values.yaml and resources/
 
 policies/
-└── cilium-network-policies/kustomization.yaml and policy manifests
+└── cilium-network-policies/kustomization.yaml and Cilium policy/LB manifests
 ```
 
 Helm values and component manifests stay under `values/<project>/<application>/`. AppProjects and child Applications stay under `projects/` and `applications/`. Do not commit secret values as plaintext.

@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Cilium network policies managed by Argo CD
+  description: Cilium network policies and load-balancer configuration managed by Argo CD
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
   destinations:
@@ -18,3 +18,7 @@ spec:
   clusterResourceWhitelist:
     - group: cilium.io
       kind: CiliumClusterwideNetworkPolicy
+    - group: cilium.io
+      kind: CiliumLoadBalancerIPPool
+    - group: cilium.io
+      kind: CiliumL2AnnouncementPolicy

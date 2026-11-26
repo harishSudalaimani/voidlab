@@ -77,6 +77,9 @@ func main() {
 				"mode": pulumi.String("kubernetes"),
 			},
 			"kubeProxyReplacement": pulumi.String("true"),
+			"l2announcements": pulumi.Map{
+				"enabled": pulumi.Bool(true),
+			},
 			"socketLB": pulumi.Map{
 				"hostNamespaceOnly": pulumi.Bool(true),
 			},
