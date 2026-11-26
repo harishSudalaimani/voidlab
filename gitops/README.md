@@ -2,13 +2,17 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, standalone Redis, RedisInsight, Argo Rollouts, Keycloak, Kyverno, Policy Reporter, and Backstage. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, or `platform` project.
+GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, standalone Redis, RedisInsight, Argo Rollouts, Keycloak, Kyverno, Policy Reporter, Backstage, Technitium DNS, ExternalDNS, and the CoreDNS forwarding configuration. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, `platform`, or `dns` project.
 
 The `networking` AppProject allows Cilium network policies, LB IP pools, and L2 announcement policies. Manifests under `policies/cilium-network-policies/` are applied by Argo CD; Pulumi retains ownership of the Cilium installation. The public Istio Gateway pool is restricted to `192.168.29.254/32` and the `istio-system/public-istio` Service. Its L2 announcement is restricted to the control-plane node's `enp8s0` interface.
 
 Before syncing the public Gateway pool, keep the router DHCP range at `192.168.29.2–192.168.29.199` so it cannot lease the VIP. Cilium's Pulumi Helm release enables `l2announcements.enabled=true` and already has `kubeProxyReplacement=true`. Cilium auto-detects devices because the node interfaces have different names; verify `enp8s0` is selected on `cp` before relying on the Gateway VIP. Apply the Cilium Pulumi update before the networking-policies Application syncs the announcement policy.
 
 The Istio stack uses ambient mode and Gateway API. It is kept separate from the narrow Cilium `networking` project under the `service-mesh` AppProject. Istio 1.32.0 and Gateway API v1.6.1 are pinned together because Istio 1.32 lists Gateway API v1.6.1 as its tested version and supports Kubernetes 1.37. The Gateway API CRDs are sourced from the upstream tagged repository, using its `config/crd/experimental` manifests. The Gateway API CRD Application uses server-side apply and does not prune CRDs, since deleting a CRD also deletes every Gateway API object.
+
+DNS follows the route-driven design: Gateway API `HTTPRoute` hostnames are the desired names, ExternalDNS watches only the `gateway-httproute` source and writes records to Technitium through its webhook API, and the existing kubeadm CoreDNS service forwards queries to Technitium. Technitium forwards public lookups to `1.1.1.1` and `9.9.9.9`; it is the internal authority for the `kiroku.life` zone. The Gateway advertises its `192.168.29.254` VIP through an ExternalDNS target annotation. Technitium's web UI is available at `https://dns.kiroku.life`; both it and ExternalDNS are scheduled on `cp` with the control-plane toleration. The Technitium DNS Service is cluster-internal, so this configuration serves Kubernetes pods and does not change router DHCP or LAN clients' DNS settings.
+
+Before ExternalDNS can publish records, connect to the Technitium UI on first install with `kubectl -n dns port-forward svc/technitium 5380:5380` and open `http://localhost:5380`. Create the primary `kiroku.life` zone, then create an API token for a dedicated DNS automation user with permission to manage records in that zone. Store the admin password and API token in Infisical as described below. The webhook image currently uses the upstream `latest` tag because its README still shows a placeholder version; pin a published image tag when the project releases one. CoreDNS's existing `kube-system/coredns` ConfigMap is adopted by the `coredns-forwarding` Application. Compare it with the live ConfigMap before syncing and preserve any local Corefile customizations; this manifest manages the entire Corefile and uses the kubeadm default plugin chain.
 
 The two CNI components have separate roles: Cilium assigns Pod IPs and provides primary pod networking; Istio CNI is chained after Cilium to set up ambient traffic redirection through ztunnel. Istio CNI and ztunnel run as DaemonSets across every node, including `cp`. Cilium remains installed and managed by Pulumi; the added values only configure Cilium to coexist with Istio's chained plugin and redirection.
 
@@ -140,8 +144,10 @@ Add these values to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94
 | `/backstage` | `BACKSTAGE_DATABASE_USERNAME` | Set to `backstage` for the CNPG bootstrap user |
 | `/backstage` | `BACKSTAGE_DATABASE_PASSWORD` | PostgreSQL password for Backstage |
 | `/backstage` | `BACKSTAGE_BACKEND_SECRET` | Long random secret for Backstage backend tokens |
+| `/dns` | `TECHNITIUM_ADMIN_PASSWORD` | Strong initial password for the Technitium administrator account |
+| `/external-dns` | `TECHNITIUM_API_TOKEN` | Technitium API token for the dedicated DNS automation user; create it in Technitium after its first start |
 
-The four public Gateway routes use the existing wildcard certificate. The current host firewall restricts Gateway access to the LAN CIDR. Add DNS records for `rollouts`, `sso`, `policy-reporter`, and `backstage` pointing to the public Gateway VIP before using the hostnames. The GitOps routes alone do not create DNS records or widen the firewall.
+The public Gateway routes use the existing wildcard certificate. ExternalDNS creates the `rollouts`, `sso`, `policy-reporter`, `backstage`, and `dns` records from their `HTTPRoute` hostnames, pointing them to the public Gateway VIP. The current host firewall restricts Gateway access to the LAN CIDR; these hostnames do not make the Gateway reachable from the WAN.
 
 ## Pruning
 
@@ -155,6 +161,7 @@ Keep each component in the existing project/application/values layout:
 applications/
 ├── networking/policies/application.yaml
 ├── networking/istio/{gateway-api,base,istiod,cni,ztunnel,gateway-placement,kiali,public-gateway}/application.yaml
+├── dns/{technitium,external-dns,coredns}/application.yaml
 ├── security/{cert-manager,letsencrypt}/application.yaml
 ├── security/infisical/application.yaml
 ├── security/infisical-secrets-operator/application.yaml
@@ -174,11 +181,13 @@ projects/
 ├── platform/platform.yaml
 ├── database/database.yaml
 ├── storage/storage.yaml
-└── observability/observability.yaml
+├── observability/observability.yaml
+└── dns/dns.yaml
 
 values/
 ├── networking/istio/*.yaml and resources/gatewayclass-defaults.yaml
 ├── networking/istio/public-gateway/gateway.yaml
+├── dns/{technitium,external-dns,coredns}/
 ├── security/cert-manager/cert-manager-values.yaml
 ├── security/letsencrypt/resources/acme.yaml
 ├── security/infisical-secrets-operator/values.yaml and resources/

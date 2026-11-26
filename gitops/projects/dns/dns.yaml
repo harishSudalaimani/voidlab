@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: dns
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Internal DNS, Gateway hostname publishing, and cluster DNS forwarding
+  sourceRepos:
+    - https://github.com/harishSudalaimani/voidlab.git
+    - https://kubernetes-sigs.github.io/external-dns/
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: dns
+    - server: https://kubernetes.default.svc
+      namespace: external-dns
+    - server: https://kubernetes.default.svc
+      namespace: kube-system
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+      name: dns
+    - group: ""
+      kind: Namespace
+      name: external-dns
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding

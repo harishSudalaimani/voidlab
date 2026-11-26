@@ -1,0 +1,46 @@
+replicaCount: 1
+logLevel: info
+interval: 1m
+sources:
+  - gateway-httproute
+domainFilters:
+  - kiroku.life
+policy: sync
+registry: txt
+txtOwnerId: voidlab-k8s
+txtPrefix: external-dns-
+provider:
+  name: webhook
+  webhook:
+    image:
+      repository: ghcr.io/bugs5382/external-dns-technitium-webhook
+      # The webhook repository currently documents a placeholder version; replace
+      # this mutable tag when it publishes a versioned image.
+      tag: latest
+      pullPolicy: IfNotPresent
+    env:
+      - name: DOMAIN_FILTER
+        value: kiroku.life
+      - name: LOG_LEVEL
+        value: info
+      - name: TECHNITIUM_HOST
+        value: http://technitium.dns.svc.cluster.local
+      - name: TECHNITIUM_PORT
+        value: "5380"
+      - name: TECHNITIUM_TOKEN
+        valueFrom:
+          secretKeyRef:
+            name: technitium-api
+            key: token
+      - name: TECHNITIUM_DRY_RUN
+        value: "false"
+      - name: SERVER_PORT
+        value: "8888"
+      - name: HEALTH_CHECK_PORT
+        value: "8080"
+nodeSelector:
+  kubernetes.io/hostname: cp
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule

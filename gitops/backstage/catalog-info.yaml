@@ -41,6 +41,55 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
+  name: technitium-dns
+  title: Technitium DNS
+  description: Internal authoritative DNS and recursive forwarding for cluster workloads
+  annotations:
+    argocd/app-name: technitium
+    backstage.io/kubernetes-id: technitium
+  links:
+    - url: https://dns.kiroku.life
+      title: DNS Administration
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: external-dns
+  title: ExternalDNS
+  description: Publishes Gateway API HTTPRoute hostnames to Technitium DNS
+  annotations:
+    argocd/app-name: external-dns
+    backstage.io/kubernetes-id: external-dns
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: coredns
+  title: CoreDNS
+  description: Resolves Kubernetes service names and forwards other DNS queries to Technitium
+  annotations:
+    argocd/app-name: coredns-forwarding
+    backstage.io/kubernetes-id: coredns
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
   name: keycloak
   title: Keycloak
   description: Identity and access management
