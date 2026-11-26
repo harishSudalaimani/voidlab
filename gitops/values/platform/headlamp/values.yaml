@@ -2,8 +2,74 @@ replicaCount: 1
 
 config:
   inCluster: true
+  pluginsDir: /headlamp/plugins
   enableHelm: false
   unsafeUseServiceAccountToken: false
+
+podSecurityContext:
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+
+initContainers:
+  - name: install-cnpg-plugin
+    image: ghcr.io/cloudnative-pg/cnpg-headlamp-plugin:v0.1.6
+    imagePullPolicy: IfNotPresent
+    command:
+      - /bin/sh
+      - -ec
+    args:
+      - cp -r /plugins/* /headlamp/plugins/
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+    volumeMounts:
+      - name: cnpg-plugin
+        mountPath: /headlamp/plugins
+
+volumes:
+  - name: cnpg-plugin
+    emptyDir: {}
+
+volumeMounts:
+  - name: cnpg-plugin
+    mountPath: /headlamp/plugins
+
+extraManifests:
+  - |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRole
+    metadata:
+      name: headlamp-cnpg-view
+    rules:
+      - apiGroups:
+          - postgresql.cnpg.io
+        resources:
+          - '*'
+        verbs:
+          - get
+          - list
+          - watch
+  - |
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: headlamp-cnpg-view
+    roleRef:
+      apiGroup: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: headlamp-cnpg-view
+    subjects:
+      - kind: ServiceAccount
+        name: headlamp
+        namespace: headlamp
 
 # Headlamp users authenticate with their own Kubernetes bearer tokens. Keep
 # the pod's identity read-only in case it performs in-cluster discovery.

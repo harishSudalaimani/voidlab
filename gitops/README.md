@@ -2,7 +2,7 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, and standalone Redis. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, or `platform` project.
+GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, standalone Redis, and RedisInsight. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, or `platform` project.
 
 The `networking` AppProject allows Cilium network policies, LB IP pools, and L2 announcement policies. Manifests under `policies/cilium-network-policies/` are applied by Argo CD; Pulumi retains ownership of the Cilium installation. The public Istio Gateway pool is restricted to `192.168.29.254/32` and the `istio-system/public-istio` Service. Its L2 announcement is restricted to the control-plane node's `enp8s0` interface.
 
@@ -78,7 +78,9 @@ The chart versions are pinned in their Argo CD Applications: kube-prometheus-sta
 
 ## Database and platform projects
 
-The `database` AppProject installs the CloudNativePG operator in `cnpg-system` on `cp` and the standalone Redis service in the `database` namespace. The operator namespace is not ambient-enrolled so its Kubernetes admission webhook remains on its normal control-plane TLS path; the Redis namespace is ambient-enrolled for Istio mTLS. The Redis StatefulSet is pinned to `cp`, uses an 8 GiB Longhorn PVC, append-only persistence, and a password from Infisical. Its in-cluster endpoint is `redis.database.svc.cluster.local:6379`. It is a single instance with no failover or backup configuration, so configure and verify backups before relying on it for irreplaceable data. Redis uses `noeviction`; clients receive write errors when its 512 MiB data limit is full. Redis remains bundled with Harbor and Infisical as well; their chart resources stay in their parent Applications' projects and are separate from this standalone instance.
+The `database` AppProject installs the CloudNativePG operator in `cnpg-system` on `cp`, standalone Redis, and RedisInsight in the `database` namespace. The operator namespace is not ambient-enrolled so its Kubernetes admission webhook remains on its normal control-plane TLS path; the database namespace is ambient-enrolled for Istio mTLS. The Redis StatefulSet is pinned to `cp`, uses an 8 GiB Longhorn PVC, append-only persistence, and a password from Infisical. Its in-cluster endpoint is `redis.database.svc.cluster.local:6379`. It is a single instance with no failover or backup configuration, so configure and verify backups before relying on it for irreplaceable data. Redis uses `noeviction`; clients receive write errors when its 512 MiB data limit is full. RedisInsight is also pinned to `cp`, stores its local data on Longhorn, and is preconfigured for the standalone Redis service. It has no public HTTPRoute because RedisInsight has no built-in UI login; use `kubectl -n database port-forward svc/redisinsight-ui 5540:5540` and open `http://localhost:5540`. Redis remains bundled with Harbor and Infisical as well; their chart resources stay in their parent Applications' projects and are separate from this standalone instance.
+
+The working Headlamp deployment includes the official CloudNativePG plugin. Open Headlamp at `https://headlamp.kiroku.life` and select the CloudNativePG section. Its service account receives read-only access to CloudNativePG custom resources. Headlamp users authenticate with their own Kubernetes credentials, so the actions available to each user follow their own Kubernetes RBAC.
 
 Harbor stores registry images and charts in the MinIO `harbor` bucket, using its bucket-scoped service account. Harbor's PostgreSQL credentials and chart secrets come from Infisical path `/harbor`. Harbor is reachable at `https://harbor.kiroku.life` through an Istio Gateway API `HTTPRoute`; the public Gateway terminates Let's Encrypt TLS and ambient mTLS protects in-cluster service traffic. Its database and MinIO endpoints use HTTP/PostgreSQL TLS disabled at the application layer because the Harbor namespace is enrolled in ambient mode. Harbor keeps Trivy and job logs on Longhorn PVCs.
 
@@ -106,6 +108,7 @@ Add these values to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94
 | `/openfga` | `OPENFGA_DATABASE_PASSWORD` | PostgreSQL password for OpenFGA |
 | `/openfga` | `OPENFGA_PRESHARED_KEYS` | Long random API key; multiple keys may be comma-separated for rotation |
 | `/redis` | `REDIS_PASSWORD` | 64-character random hexadecimal password for the standalone Redis service; generate with `openssl rand -hex 32` |
+| `/redis` | `REDISINSIGHT_ENCRYPTION_KEY` | 64-character random hexadecimal key for encrypting RedisInsight's saved connection data; generate with `openssl rand -hex 32` |
 
 For `HARBOR_REGISTRY_HTPASSWD`, generate a bcrypt line with `htpasswd -B -n harbor_registry_user` and store the complete `username:hash` output; store the matching plaintext password separately in `HARBOR_REGISTRY_PASSWORD`. Harbor and both database Applications automatically sync these values into Kubernetes Secrets. The PostgreSQL bootstrap Secrets use the `kubernetes.io/basic-auth` type supported by the installed Infisical operator and carry the CNPG reload label.
 
@@ -130,7 +133,7 @@ applications/
 ├── storage/{minio,minio-observability-access,minio-harbor-access}/application.yaml
 ├── platform/headlamp/application.yaml
 ├── platform/{harbor-database,harbor,opencost,openfga-database,openfga}/application.yaml
-├── database/{cloudnative-pg,redis}/application.yaml
+├── database/{cloudnative-pg,redis,redisinsight}/application.yaml
 └── observability/{observability-credentials,kube-prometheus-stack,loki,tempo,opentelemetry-collector}/application.yaml
 
 projects/
@@ -157,6 +160,7 @@ values/
 ├── platform/{harbor-database,openfga-database}/resources/
 ├── database/cloudnative-pg/values.yaml
 ├── database/redis/resources/{infisical-static-secret,service,statefulset}.yaml
+├── database/redisinsight/resources/{deployment,infisical-static-secret,pvc,service}.yaml
 └── observability/{credentials,kube-prometheus-stack,loki,tempo,opentelemetry-collector}/values.yaml and resources/
 
 policies/
