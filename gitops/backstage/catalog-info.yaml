@@ -1,0 +1,130 @@
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform
+  title: VoidLab Platform
+  description: Owners of the VoidLab Kubernetes platform
+spec:
+  type: team
+  profile:
+    displayName: VoidLab Platform
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: voidlab-platform
+  title: VoidLab Platform
+  description: Core cluster services managed through GitOps
+spec:
+  owner: group:default/platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: argo-rollouts
+  title: Argo Rollouts
+  description: Progressive delivery controller using the Gateway API traffic router
+  annotations:
+    argocd/app-name: argo-rollouts
+    backstage.io/kubernetes-id: argo-rollouts
+  links:
+    - url: https://rollouts.kiroku.life
+      title: Rollouts Dashboard
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: keycloak
+  title: Keycloak
+  description: Identity and access management
+  annotations:
+    argocd/app-name: keycloak
+  links:
+    - url: https://sso.kiroku.life
+      title: Keycloak Admin Console
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kyverno
+  title: Kyverno
+  description: Kubernetes policy engine; policy results are displayed in Policy Reporter
+  annotations:
+    argocd/app-name: kyverno
+  links:
+    - url: https://policy-reporter.kiroku.life
+      title: Policy results
+      icon: dashboard
+    - url: https://kyverno.io/docs/
+      title: Kyverno documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: policy-reporter
+  title: Policy Reporter
+  description: Policy report dashboards and Kyverno policy details
+  annotations:
+    argocd/app-name: policy-reporter
+  links:
+    - url: https://policy-reporter.kiroku.life
+      title: Policy Reporter UI
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: keycloak-identity
+  title: Keycloak Identity
+  description: SSO provider for the Policy Reporter UI
+  links:
+    - url: https://sso.kiroku.life/realms/voidlab
+      title: VoidLab realm
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: backstage
+  title: Backstage
+  description: VoidLab developer portal and service catalog
+  annotations:
+    argocd/app-name: backstage
+  links:
+    - url: https://backstage.kiroku.life
+      title: Developer Portal
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform

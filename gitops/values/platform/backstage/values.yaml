@@ -1,0 +1,98 @@
+backstage:
+  replicas: 1
+  image:
+    registry: ghcr.io
+    repository: backstage/backstage
+    tag: 1.55.2
+    pullPolicy: IfNotPresent
+  strategy:
+    type: Recreate
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+  serviceAccount:
+    create: true
+    name: backstage
+    automountServiceAccountToken: false
+  extraEnvVars:
+    - name: BACKSTAGE_DB_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: backstage-db-credentials
+          key: username
+    - name: BACKSTAGE_DB_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: backstage-db-credentials
+          key: password
+    - name: BACKSTAGE_BACKEND_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: backstage-secrets
+          key: backend-secret
+  appConfig:
+    app:
+      title: VoidLab Developer Portal
+      baseUrl: https://backstage.kiroku.life
+    backend:
+      baseUrl: https://backstage.kiroku.life
+      cors:
+        origin: https://backstage.kiroku.life
+        methods:
+          - GET
+          - HEAD
+          - PATCH
+          - POST
+          - PUT
+          - DELETE
+        credentials: true
+      auth:
+        keys:
+          - secret: ${BACKSTAGE_BACKEND_SECRET}
+      database:
+        client: pg
+        connection:
+          host: backstage-db-rw.backstage.svc.cluster.local
+          port: 5432
+          user: ${BACKSTAGE_DB_USERNAME}
+          password: ${BACKSTAGE_DB_PASSWORD}
+          database: backstage
+    auth:
+      environment: production
+      providers:
+        guest:
+          production:
+            dangerouslyAllowOutsideDevelopment: true
+    catalog:
+      rules:
+        - allow:
+            - Component
+            - Domain
+            - Group
+            - Location
+            - Resource
+            - System
+      locations:
+        - type: url
+          target: https://raw.githubusercontent.com/harishSudalaimani/voidlab/main/gitops/backstage/catalog-info.yaml
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: istio-system
+      sectionName: https
+  hostnames:
+    - backstage.kiroku.life
+
+postgresql:
+  enabled: false

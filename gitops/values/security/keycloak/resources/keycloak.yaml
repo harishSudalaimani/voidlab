@@ -1,0 +1,98 @@
+apiVersion: k8s.keycloak.org/v2beta1
+kind: Keycloak
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels:
+    app.kubernetes.io/instance: keycloak
+spec:
+  instances: 1
+  db:
+    vendor: postgres
+    host: keycloak-db-rw.keycloak.svc.cluster.local
+    database: keycloak
+    usernameSecret:
+      name: keycloak-db-credentials
+      key: username
+    passwordSecret:
+      name: keycloak-db-credentials
+      key: password
+  http:
+    httpEnabled: true
+  hostname:
+    hostname: https://sso.kiroku.life
+    strict: true
+  proxy:
+    headers: xforwarded
+  scheduling:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                    - cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+---
+apiVersion: k8s.keycloak.org/v2beta1
+kind: KeycloakRealmImport
+metadata:
+  name: voidlab-realm
+  namespace: keycloak
+spec:
+  keycloakCRName: keycloak
+  placeholders:
+    POLICY_REPORTER_CLIENT_SECRET:
+      secret:
+        name: keycloak-client-secrets
+        key: policy-reporter-client-secret
+  realm:
+    id: voidlab
+    realm: voidlab
+    enabled: true
+    displayName: VoidLab
+    clients:
+      - clientId: policy-reporter
+        enabled: true
+        protocol: openid-connect
+        publicClient: false
+        secret: "${POLICY_REPORTER_CLIENT_SECRET}"
+        standardFlowEnabled: true
+        directAccessGrantsEnabled: false
+        serviceAccountsEnabled: false
+        redirectUris:
+          - https://policy-reporter.kiroku.life/callback
+        webOrigins:
+          - https://policy-reporter.kiroku.life
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  parentRefs:
+    - name: public
+      namespace: istio-system
+      sectionName: https
+  hostnames:
+    - sso.kiroku.life
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: keycloak-service
+          port: 8080

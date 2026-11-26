@@ -2,7 +2,7 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, standalone Redis, and RedisInsight. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, or `platform` project.
+GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, standalone Redis, RedisInsight, Argo Rollouts, Keycloak, Kyverno, Policy Reporter, and Backstage. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, or `platform` project.
 
 The `networking` AppProject allows Cilium network policies, LB IP pools, and L2 announcement policies. Manifests under `policies/cilium-network-policies/` are applied by Argo CD; Pulumi retains ownership of the Cilium installation. The public Istio Gateway pool is restricted to `192.168.29.254/32` and the `istio-system/public-istio` Service. Its L2 announcement is restricted to the control-plane node's `enp8s0` interface.
 
@@ -114,6 +114,35 @@ For `HARBOR_REGISTRY_HTPASSWD`, generate a bcrypt line with `htpasswd -B -n harb
 
 CloudNativePG chart `0.29.1` installs operator `1.30.1`. Its Application in the `database` project does not prune chart resources or CRDs, protecting the databases if the chart changes; removing that Application from the root leaves its operator resources orphaned for deliberate cleanup. The cluster reports Kubernetes `1.37.2`, which CNPG 1.30 lists as tested but not officially supported; confirm operator health after Argo sync. The CNPG databases are single-instance home-lab deployments with no backup configuration yet, so set up and verify backups before relying on them for irreplaceable data.
 
+## Progressive delivery, identity, and policy
+
+Argo Rollouts is installed from the `argo-rollouts` chart in the `platform` project. Its controller and read-only dashboard are pinned to `cp` and tolerate the control-plane taint. The dashboard is available at `https://rollouts.kiroku.life` through the existing Istio Gateway API. The controller loads Gateway API traffic-router plugin `v0.11.0` from an init container and grants Gateway API provider RBAC only. The plugin's published provider table lists Istio `1.29.1` with plugin `0.11.0`; this cluster uses Istio `1.32.0` and Gateway API `1.6.1`, so that combination still needs an actual canary smoke test before using it for application releases. Rollouts and plugin support do not automatically convert existing Deployments to Rollout resources.
+
+Keycloak uses upstream operator resources pinned to `26.8.2`, plus a single-instance CloudNativePG database. The operator, database, and Keycloak server run on `cp`; the Keycloak CR uses required node affinity and a control-plane toleration. The Keycloak namespace is not ambient-enrolled, so management traffic stays on the normal Kubernetes path. Keycloak is reachable at `https://sso.kiroku.life`, with TLS terminated by the shared Gateway and X-Forwarded headers enabled. The operator generates a temporary admin credential in `keycloak-initial-admin`; change it and enable MFA before relying on the identity service. The `voidlab` realm import creates the Policy Reporter OIDC client. Keycloak realm imports are create-only: rotating that client's secret later also requires updating the client in Keycloak.
+
+Kyverno chart `3.10.0` installs the admission, background, cleanup, and reports controllers on `cp` with the control-plane toleration. It installs the Kyverno and WG Policy report CRDs, but no enforcement policies are bundled; add policies after reviewing their effects. Policy Reporter chart `3.11.2` installs its core service, Kyverno plugin, and UI, all pinned to `cp`. The UI is at `https://policy-reporter.kiroku.life` and uses Keycloak OIDC with PKCE. The UI presents policy reports and Kyverno policy details; Kyverno itself does not ship a separate dashboard.
+
+Backstage chart `2.11.0` is deployed with the pinned official image `ghcr.io/backstage/backstage:1.55.2`, a single-instance CloudNativePG database, and `cp` node placement plus control-plane toleration. Its Software Catalog loads `gitops/backstage/catalog-info.yaml` and lists the platform services with direct links to their interfaces. Backstage is available at `https://backstage.kiroku.life`. This catalog launchpad uses the generic Backstage image; custom frontend/backend plugin pages require building a tailored Backstage image.
+
+### Argo Rollouts Gateway API smoke test
+
+The Gateway API plugin is pinned to `v0.11.0`. Its published compatibility table lists Istio `1.29.1` with that plugin version, while this cluster runs Istio `1.32.0`; the provider docs say the plugin should work with Gateway API providers generally, but this exact combination is not confirmed here. No live test has run yet because this workspace has no active `kubectl` context. After the manifests sync, use the plugin's [v0.11.0 quick start](https://rollouts-plugin-trafficrouter-gatewayapi.readthedocs.io/en/v0.11.0/quick-start/) in a disposable namespace, with its HTTPRoute attached to `istio-system/public` and a `*.kiroku.life` hostname. Confirm the route is `Accepted` and `ResolvedRefs`, update the demo image, verify the route backend weights change at each canary step, then promote and confirm the stable backend returns to 100%.
+
+For any Git-managed application that uses this plugin, configure Argo CD to ignore HTTPRoute `.spec.rules` while the route has label `rollouts.argoproj.io/gatewayapi-canary: in-progress`, and enable `RespectIgnoreDifferences=true` for that Application. The plugin changes route weights during a rollout; without this Argo CD setting, reconciliation can overwrite those temporary weights.
+
+Add these values to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94c393caf930`), environment `prod`:
+
+| Path | Infisical key | Purpose |
+| --- | --- | --- |
+| `/keycloak` | `KEYCLOAK_DATABASE_USERNAME` | Set to `keycloak` for the CNPG bootstrap user |
+| `/keycloak` | `KEYCLOAK_DATABASE_PASSWORD` | PostgreSQL password for Keycloak |
+| `/keycloak` | `POLICY_REPORTER_OIDC_CLIENT_SECRET` | Long random confidential-client secret, used in Keycloak and Policy Reporter |
+| `/backstage` | `BACKSTAGE_DATABASE_USERNAME` | Set to `backstage` for the CNPG bootstrap user |
+| `/backstage` | `BACKSTAGE_DATABASE_PASSWORD` | PostgreSQL password for Backstage |
+| `/backstage` | `BACKSTAGE_BACKEND_SECRET` | Long random secret for Backstage backend tokens |
+
+The four public Gateway routes use the existing wildcard certificate. The current host firewall restricts Gateway access to the LAN CIDR. Add DNS records for `rollouts`, `sso`, `policy-reporter`, and `backstage` pointing to the public Gateway VIP before using the hostnames. The GitOps routes alone do not create DNS records or widen the firewall.
+
 ## Pruning
 
 The MinIO tenant, MinIO access provisioners, observability, cert-manager, Let's Encrypt, Headlamp, platform services, standalone Redis, public Gateway, and Kiali Applications use automated sync, self-heal, retry, and Argo CD's resources finalizer. The MinIO tenant Application leaves pruning disabled to protect its stateful tenant resources. The CloudNativePG operator Application also leaves pruning disabled and has no cascading finalizer to protect its CRDs. Other included Applications prune resources removed from their source; `allowEmpty` is enabled only where explicitly listed. Removing an Application manifest from Git removes that Application and cascades deletion to resources it manages when a finalizer is configured. Removing a resource from an Application source prunes that resource when pruning is enabled.
@@ -129,9 +158,11 @@ applications/
 ├── security/{cert-manager,letsencrypt}/application.yaml
 ├── security/infisical/application.yaml
 ├── security/infisical-secrets-operator/application.yaml
+├── security/{keycloak-operator,keycloak-database,keycloak,kyverno,policy-reporter}/application.yaml
 ├── storage/longhorn/application.yaml
 ├── storage/{minio,minio-observability-access,minio-harbor-access}/application.yaml
 ├── platform/headlamp/application.yaml
+├── platform/{argo-rollouts,backstage}/application.yaml
 ├── platform/{harbor-database,harbor,opencost,openfga-database,openfga}/application.yaml
 ├── database/{cloudnative-pg,redis,redisinsight}/application.yaml
 └── observability/{observability-credentials,kube-prometheus-stack,loki,tempo,opentelemetry-collector}/application.yaml
@@ -151,11 +182,14 @@ values/
 ├── security/cert-manager/cert-manager-values.yaml
 ├── security/letsencrypt/resources/acme.yaml
 ├── security/infisical-secrets-operator/values.yaml and resources/
+├── security/{keycloak-operator,keycloak-database,keycloak,kyverno,policy-reporter}/values.yaml and resources/
 ├── storage/minio/operator-values.yaml, tenant-values.yaml, and resources/
 ├── storage/minio/{observability-access,harbor-access}/resources/
 ├── security/infisical/values.yaml and resources/
 ├── storage/longhorn/values.yaml and resources/
 ├── platform/headlamp/values.yaml
+├── platform/argo-rollouts/values.yaml
+├── platform/backstage/values.yaml and resources/
 ├── platform/{harbor,opencost,openfga}/values.yaml and resources/
 ├── platform/{harbor-database,openfga-database}/resources/
 ├── database/cloudnative-pg/values.yaml
@@ -165,6 +199,9 @@ values/
 
 policies/
 └── cilium-network-policies/kustomization.yaml and Cilium policy/LB manifests
+
+backstage/
+└── catalog-info.yaml
 ```
 
 Helm values and component manifests stay under `values/<project>/<application>/`. AppProjects and child Applications stay under `projects/` and `applications/`. Do not commit secret values as plaintext.

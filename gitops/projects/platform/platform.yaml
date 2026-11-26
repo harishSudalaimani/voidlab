@@ -13,6 +13,8 @@ spec:
     - https://helm.goharbor.io
     - https://opencost.github.io/opencost-helm-chart
     - https://openfga.github.io/helm-charts
+    - https://argoproj.github.io/argo-helm
+    - https://backstage.github.io/charts
   destinations:
     - server: https://kubernetes.default.svc
       namespace: headlamp
@@ -22,6 +24,10 @@ spec:
       namespace: opencost
     - server: https://kubernetes.default.svc
       namespace: openfga
+    - server: https://kubernetes.default.svc
+      namespace: argo-rollouts
+    - server: https://kubernetes.default.svc
+      namespace: backstage
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
@@ -35,9 +41,19 @@ spec:
     - group: ""
       kind: Namespace
       name: openfga
+    - group: ""
+      kind: Namespace
+      name: argo-rollouts
+    - group: ""
+      kind: Namespace
+      name: backstage
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
     - group: rbac.authorization.k8s.io
       kind: ClusterRole
       name: opencost
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
     - group: rbac.authorization.k8s.io
       kind: ClusterRole
       name: headlamp-cnpg-view
