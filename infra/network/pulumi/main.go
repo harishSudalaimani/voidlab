@@ -44,7 +44,13 @@ func main() {
 		if err := cfg.GetObject("servers", &configured); err != nil {
 			return fmt.Errorf("read network server configuration: %w", err)
 		}
-		if err := validateServers(configured); err != nil {
+		lanCIDR := cfg.Get("lanCIDR")
+		lanPrefix, err := netip.ParsePrefix(lanCIDR)
+		if err != nil || !lanPrefix.Addr().Is4() {
+			return fmt.Errorf("lanCIDR must be set to an IPv4 CIDR, got %q", lanCIDR)
+		}
+		lanPrefix = lanPrefix.Masked()
+		if err := validateServers(configured, lanPrefix); err != nil {
 			return err
 		}
 
@@ -93,7 +99,7 @@ func main() {
 		changes := make([]*remote.Command, 0, len(servers))
 		for i := range servers {
 			peer := servers[1-i]
-			command, err := configureServer(ctx, servers[i], peer, podCIDR, script)
+			command, err := configureServer(ctx, servers[i], peer, podCIDR, pulumi.String(lanPrefix.String()), script)
 			if err != nil {
 				return fmt.Errorf("register network configuration for %s: %w", servers[i].name, err)
 			}
@@ -110,7 +116,7 @@ func main() {
 	})
 }
 
-func validateServers(servers []serverConfig) error {
+func validateServers(servers []serverConfig, lanPrefix netip.Prefix) error {
 	if len(servers) == 0 {
 		return fmt.Errorf("no servers are configured; set voidlab-network:servers[0] and [1] with the commands in README.md")
 	}
@@ -132,6 +138,9 @@ func validateServers(servers []serverConfig) error {
 		address, err := netip.ParseAddr(current.Address)
 		if err != nil || !address.Is4() {
 			return fmt.Errorf("server %s address %q must be an IPv4 Kubernetes node address", current.Name, current.Address)
+		}
+		if !lanPrefix.Contains(address) {
+			return fmt.Errorf("server %s address %q is outside configured LAN CIDR %s", current.Name, current.Address, lanPrefix)
 		}
 		if seenAddresses[current.Address] {
 			return fmt.Errorf("server address %q is configured more than once", current.Address)
@@ -166,7 +175,7 @@ func requireMatchingRole(name, expected string, actual pulumi.StringOutput) pulu
 	}).(pulumi.StringOutput)
 }
 
-func configureServer(ctx *pulumi.Context, current, peer server, podCIDR pulumi.StringOutput, script string) (*remote.Command, error) {
+func configureServer(ctx *pulumi.Context, current, peer server, podCIDR pulumi.StringOutput, lanCIDR pulumi.StringInput, script string) (*remote.Command, error) {
 	return remote.NewCommand(ctx, "configure-network-"+current.name, &remote.CommandArgs{
 		Connection: &remote.ConnectionArgs{
 			Host: pulumi.String(current.sshAddress), User: pulumi.String(current.sshUser),
@@ -178,6 +187,7 @@ func configureServer(ctx *pulumi.Context, current, peer server, podCIDR pulumi.S
 			pulumi.String(current.role),
 			peer.roleOutput,
 			podCIDR,
+			lanCIDR,
 		})),
 		Stdin:                  pulumi.String(script),
 		AddPreviousOutputInEnv: pulumi.Bool(false),

@@ -6,6 +6,7 @@ peer_ip="$2"
 local_role="$3"
 peer_role="$4"
 pod_cidr="$5"
+lan_cidr="$6"
 
 if [[ "$local_role:$peer_role" != "control-plane:worker" && "$local_role:$peer_role" != "worker:control-plane" ]]; then
   echo "Expected one control-plane and one worker; got ${local_role} and ${peer_role}" >&2
@@ -37,6 +38,12 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
     rule="rule family=\"ipv4\" source address=\"${source}\" destination address=\"${local_ip}\" port port=\"4244\" protocol=\"tcp\" accept"
     firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
   done
+  if [[ "$local_role" == "control-plane" ]]; then
+    for port in 80 443; do
+      rule="rule family=\"ipv4\" source address=\"${lan_cidr}\" port port=\"${port}\" protocol=\"tcp\" accept"
+      firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
+    done
+  fi
   rule="rule family=\"ipv4\" source address=\"${peer_ip}\" destination address=\"${local_ip}\" port port=\"8472\" protocol=\"udp\" accept"
   firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
   firewall-cmd --reload >/dev/null
@@ -50,6 +57,10 @@ elif command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; t
   ufw allow proto tcp from "$peer_ip" to "$local_ip" port 4244
   ufw allow proto tcp from "$pod_cidr" to "$local_ip" port 4244
   ufw allow proto udp from "$peer_ip" to "$local_ip" port 8472
+  if [[ "$local_role" == "control-plane" ]]; then
+    ufw allow proto tcp from "$lan_cidr" to any port 80
+    ufw allow proto tcp from "$lan_cidr" to any port 443
+  fi
 fi
 
 # Verify the Kubernetes listener on the other server. Kubernetes bootstrap

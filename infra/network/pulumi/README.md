@@ -4,7 +4,7 @@ This Pulumi project applies peer-specific firewall rules on the two physical Fed
 
 ## Configuration
 
-The stack config mirrors the node names, roles, addresses, SSH users, and key paths in `infra/kubernetes/pulumi/Pulumi.k8.yaml`. `sshAddress` is optional and defaults to the node IP.
+The stack config mirrors the node names, roles, addresses, SSH users, and key paths in `infra/kubernetes/pulumi/Pulumi.k8.yaml`. Set `voidlab-network:lanCIDR` to the trusted home LAN prefix; each configured node address must be inside it. `sshAddress` is optional and defaults to the node IP.
 
 Apply after Kubernetes and before Cilium:
 
@@ -22,5 +22,6 @@ When firewalld or UFW is active, the stack applies this cluster network baseline
 | TCP 4240 | Between peer servers | Cilium health checks |
 | UDP 8472 | Between peer servers | Cilium VXLAN |
 | TCP 4244 | Peer server and Kubernetes Pod CIDR to each node | Hubble server and Relay |
+| TCP 80, 443 | LAN CIDR to control plane | Istio Gateway from trusted home LAN clients |
 
-The Pod CIDR comes from the Kubernetes stack. Cilium's TCP health check port is included so `cilium-health` can report node connectivity; the network also verifies the direct route and peer Kubernetes listener. Argo CD uses in-cluster services and adds no node-to-node firewall port. Future components that require host-network listeners or direct node-to-node connections must add their documented ports here before deployment; ClusterIP-only components need no host firewall port.
+The Pod CIDR comes from the Kubernetes stack. Cilium's TCP health check port is included so `cilium-health` can report node connectivity; the network also verifies the direct route and peer Kubernetes listener. Gateway ports are source-restricted to `lanCIDR` and allowed only on the control plane, where the Gateway pod and L2-announced VIP are placed. The NodePort range is not opened. WAN clients will not pass this host firewall rule unless the router rewrites their source addresses into the LAN CIDR. Argo CD uses in-cluster services and adds no node-to-node firewall port. Future components that require host-network listeners or direct node-to-node connections must add their documented ports here before deployment; ClusterIP-only components need no host firewall port.
