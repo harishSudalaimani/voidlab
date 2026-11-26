@@ -16,6 +16,9 @@ loki:
   auth_enabled: false
   commonConfig:
     replication_factor: 1
+    ring:
+      kvstore:
+        store: inmemory
   # This is a single-replica monolithic deployment; it has no memberlist peers.
   memberlistConfig:
     join_members: []
