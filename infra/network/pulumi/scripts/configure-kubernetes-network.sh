@@ -39,9 +39,27 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
     firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
   done
   if [[ "$local_role" == "control-plane" ]]; then
+    # Gateway VIP traffic is forwarded by Cilium to a pod IP. Host input
+    # rules (or opening the ports on the node) do not permit that path.
+    policy="lan-to-istio"
+    if ! firewall-cmd --permanent --get-policies | tr ' ' '\n' | grep -Fxq "$policy"; then
+      firewall-cmd --permanent --new-policy="$policy" >/dev/null
+    fi
+    firewall-cmd --permanent --policy="$policy" --query-ingress-zone="$zone" >/dev/null 2>&1 || firewall-cmd --permanent --policy="$policy" --add-ingress-zone="$zone" >/dev/null
+    firewall-cmd --permanent --policy="$policy" --query-egress-zone=ANY >/dev/null 2>&1 || firewall-cmd --permanent --policy="$policy" --add-egress-zone=ANY >/dev/null
     for port in 80 443; do
-      rule="rule family=\"ipv4\" source address=\"${lan_cidr}\" port port=\"${port}\" protocol=\"tcp\" accept"
-      firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
+      rule="rule family=\"ipv4\" source address=\"${lan_cidr}\" destination address=\"${pod_cidr}\" port port=\"${port}\" protocol=\"tcp\" accept"
+      firewall-cmd --permanent --policy="$policy" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --policy="$policy" --add-rich-rule="$rule" >/dev/null
+
+      # Remove both the previous LAN-only host-input rules and broad port
+      # openings created by earlier versions of this script.
+      input_rule="rule family=\"ipv4\" source address=\"${lan_cidr}\" port port=\"${port}\" protocol=\"tcp\" accept"
+      if firewall-cmd --permanent --zone="$zone" --query-rich-rule="$input_rule" >/dev/null 2>&1; then
+        firewall-cmd --permanent --zone="$zone" --remove-rich-rule="$input_rule" >/dev/null
+      fi
+      if firewall-cmd --permanent --zone="$zone" --query-port="${port}/tcp" >/dev/null 2>&1; then
+        firewall-cmd --permanent --zone="$zone" --remove-port="${port}/tcp" >/dev/null
+      fi
     done
   fi
   rule="rule family=\"ipv4\" source address=\"${peer_ip}\" destination address=\"${local_ip}\" port port=\"8472\" protocol=\"udp\" accept"
@@ -58,8 +76,13 @@ elif command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; t
   ufw allow proto tcp from "$pod_cidr" to "$local_ip" port 4244
   ufw allow proto udp from "$peer_ip" to "$local_ip" port 8472
   if [[ "$local_role" == "control-plane" ]]; then
-    ufw allow proto tcp from "$lan_cidr" to any port 80
-    ufw allow proto tcp from "$lan_cidr" to any port 443
+    for port in 80 443; do
+      # Remove old host-input rules; this traffic must be routed to the
+      # Gateway pod CIDR. Ignore missing rules to keep reconciliation safe.
+      ufw --force delete allow proto tcp from "$lan_cidr" to any port "$port" >/dev/null 2>&1 || true
+      ufw --force delete allow "${port}/tcp" >/dev/null 2>&1 || true
+      ufw route allow proto tcp from "$lan_cidr" to "$pod_cidr" port "$port"
+    done
   fi
 fi
 
