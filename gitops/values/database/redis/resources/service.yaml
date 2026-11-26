@@ -8,6 +8,11 @@ metadata:
     app.kubernetes.io/instance: redis
 spec:
   type: ClusterIP
+  # Preserve the address already allocated to this Service. Kubernetes treats
+  # both fields as immutable after creation.
+  clusterIP: 10.110.45.151
+  clusterIPs:
+    - 10.110.45.151
   selector:
     app.kubernetes.io/name: redis
     app.kubernetes.io/instance: redis
