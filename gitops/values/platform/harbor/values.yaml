@@ -1,0 +1,143 @@
+expose:
+  type: clusterIP
+  tls:
+    enabled: false
+    certSource: none
+  clusterIP:
+    name: harbor
+    ports:
+      httpPort: 80
+
+externalURL: https://harbor.kiroku.life
+existingSecretAdminPassword: harbor-secrets
+existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+existingSecretSecretKey: harbor-secrets
+internalTLS:
+  enabled: false
+
+persistence:
+  enabled: true
+  resourcePolicy: keep
+  persistentVolumeClaim:
+    registry:
+      storageClass: longhorn
+      size: 5Gi
+    jobservice:
+      jobLog:
+        storageClass: longhorn
+        size: 1Gi
+    database:
+      storageClass: longhorn
+      size: 1Gi
+    redis:
+      storageClass: longhorn
+      size: 1Gi
+    trivy:
+      storageClass: longhorn
+      size: 5Gi
+  imageChartStorage:
+    type: s3
+    disableredirect: true
+    s3:
+      existingSecret: harbor-secrets
+      region: us-east-1
+      bucket: harbor
+      regionendpoint: http://minio.minio.svc.cluster.local:80
+      secure: false
+      v4auth: true
+
+core:
+  existingSecret: harbor-secrets
+  existingXsrfSecret: harbor-secrets
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+jobservice:
+  existingSecret: harbor-secrets
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+registry:
+  existingSecret: harbor-secrets
+  credentials:
+    existingSecret: harbor-secrets
+  registry:
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+  controller:
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+portal:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+nginx:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+trivy:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+
+database:
+  type: external
+  external:
+    host: harbor-db-rw.harbor.svc.cluster.local
+    port: "5432"
+    username: harbor
+    coreDatabase: registry
+    existingSecret: harbor-db-credentials
+    sslmode: disable
+  internal:
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+redis:
+  internal:
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+
+exporter:
+  nodeSelector:
+    kubernetes.io/hostname: cp
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule

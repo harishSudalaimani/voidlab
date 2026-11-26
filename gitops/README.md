@@ -2,7 +2,7 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, and the observability stack. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, or `platform-tools` project.
+GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, and standalone Redis. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, or `platform` project.
 
 The `networking` AppProject allows Cilium network policies, LB IP pools, and L2 announcement policies. Manifests under `policies/cilium-network-policies/` are applied by Argo CD; Pulumi retains ownership of the Cilium installation. The public Istio Gateway pool is restricted to `192.168.29.254/32` and the `istio-system/public-istio` Service. Its L2 announcement is restricted to the control-plane node's `enp8s0` interface.
 
@@ -30,11 +30,11 @@ The `cert-manager` Application installs cert-manager in the `cert-manager` names
 
 MinIO's `InfisicalStaticSecret` reads project ID `60e9131c-3eef-403a-b2b1-94c393caf930` (project name `voidlab`), environment `prod`, path `/minio`, and writes `minio-env-configuration`. No CA certificate is needed in that path for internal MinIO traffic: auto-TLS is disabled, so MinIO serves HTTP on the Tenant Service's port 80 while Istio ambient mTLS protects in-mesh traffic. The shared public Gateway terminates external HTTPS with the wildcard Let's Encrypt certificate.
 
-The `minio-observability-access` Application automatically provisions the Loki/Tempo service account from the Infisical keys at `/observability`. It creates a MinIO service account with an inline policy limited to `loki-chunks`, `loki-ruler`, and `tempo-traces`; a CronJob reapplies credentials and policy every two minutes so Infisical rotations are reconciled promptly. The same Infisical credentials are synced into the `observability` namespace for Loki and Tempo.
+The `minio-observability-access` Application automatically provisions the Loki/Tempo service account from the Infisical keys at `/observability`. It creates a MinIO service account with an inline policy limited to `loki-chunks`, `loki-ruler`, and `tempo-traces`; a CronJob reapplies credentials and policy every two minutes so Infisical rotations are reconciled promptly. The same Infisical credentials are synced into the `observability` namespace for Loki and Tempo. A separate `minio-harbor-access` Application creates the `harbor` bucket and a Harbor-only service account from `/harbor`; its policy is scoped to that bucket and its objects.
 
 MinIO's community Operator and Tenant charts are pinned at `7.1.1`; the community repositories were archived in 2026. The Tenant uses Chainguard's public MinIO image (`docker.io/chainguard/minio:latest`) because anonymous pulls from MinIO's old Quay image now fail. Its pool security context matches the image's non-root UID/GID 65532. The `latest` tag follows Chainguard's current build on each pod start. The tenant is configured as a single server and is not a distributed or highly available MinIO deployment.
 
-Infisical uses the official `infisical-standalone` chart with its bundled PostgreSQL and Redis dependencies enabled. These are part of the Infisical Application, not separate platform apps. Infisical, PostgreSQL, and Redis are pinned to `cp`; their persistent data uses Longhorn. Kubernetes Ingress and the chart's bundled ingress controller are disabled; use `kubectl -n security port-forward svc/infisical-infisical-standalone-infisical 8082:8080` and open `http://localhost:8082` for initial setup. Public tool routes use Gateway API HTTPRoutes attached to Istio's `public` Gateway.
+Infisical uses the official `infisical-standalone` chart with its bundled PostgreSQL and Redis dependencies enabled. These remain part of the Infisical Application in the `security` project, not separate platform apps. Infisical, PostgreSQL, and Redis are pinned to `cp`; their persistent data uses Longhorn. Kubernetes Ingress and the chart's bundled ingress controller are disabled; use `kubectl -n security port-forward svc/infisical-infisical-standalone-infisical 8082:8080` and open `http://localhost:8082` for initial setup. Public tool routes use Gateway API HTTPRoutes attached to Istio's `public` Gateway.
 
 ### Infisical bootstrap secret
 
@@ -53,7 +53,7 @@ Longhorn control components are pinned to `cp`; Longhorn's node manager and stor
 
 Longhorn stores data on `cp`'s `/data/vms/longhorn` SSD and `/storage/longhorn` HDD mounts, and on `worker`'s `/var/lib/longhorn` root filesystem. With two replicas and node-level replica anti-affinity, the worker root disk is the capacity limit; usable volume capacity is much lower than the sum of all three disks. Disk scheduling keeps a 15% free-space threshold, but this is not a hard cap for snapshot growth or volume writes, so monitor disk usage and leave host space available. The Longhorn Node annotation configures disks when Longhorn first discovers a node; it does not rewrite disks already present in Longhorn's Node resources.
 
-The bundled PostgreSQL and Redis instances are single-instance proof-of-concept dependencies, not HA services. Add other shared data services or application workloads later as separate GitOps Applications after this phase is confirmed healthy.
+The bundled PostgreSQL and Redis instances are single-instance proof-of-concept dependencies, not HA services. Harbor also retains its chart-bundled Redis. Redis stays managed by each parent Helm Application; it is not a standalone resource in the `database` project. Add other shared data services or application workloads later as separate GitOps Applications after this phase is confirmed healthy.
 
 ## Observability
 
@@ -76,9 +76,44 @@ Grafana is included in kube-prometheus-stack; there is no separate Grafana relea
 
 The chart versions are pinned in their Argo CD Applications: kube-prometheus-stack `93.10.0`, Loki `21.6.0`, Tempo `3.2.1`, and OpenTelemetry Collector `0.178.2`. These are single-node lab deployments, not highly available services. Loki and Tempo each use one core process on `cp`; their PVCs preserve local WAL/state while MinIO stores their long-term blocks.
 
+## Database and platform projects
+
+The `database` AppProject installs the CloudNativePG operator in `cnpg-system` on `cp` and the standalone Redis service in the `database` namespace. The operator namespace is not ambient-enrolled so its Kubernetes admission webhook remains on its normal control-plane TLS path; the Redis namespace is ambient-enrolled for Istio mTLS. The Redis StatefulSet is pinned to `cp`, uses an 8 GiB Longhorn PVC, append-only persistence, and a password from Infisical. Its in-cluster endpoint is `redis.database.svc.cluster.local:6379`. It is a single instance with no failover or backup configuration, so configure and verify backups before relying on it for irreplaceable data. Redis uses `noeviction`; clients receive write errors when its 512 MiB data limit is full. Redis remains bundled with Harbor and Infisical as well; their chart resources stay in their parent Applications' projects and are separate from this standalone instance.
+
+Harbor stores registry images and charts in the MinIO `harbor` bucket, using its bucket-scoped service account. Harbor's PostgreSQL credentials and chart secrets come from Infisical path `/harbor`. Harbor is reachable at `https://harbor.kiroku.life` through an Istio Gateway API `HTTPRoute`; the public Gateway terminates Let's Encrypt TLS and ambient mTLS protects in-cluster service traffic. Its database and MinIO endpoints use HTTP/PostgreSQL TLS disabled at the application layer because the Harbor namespace is enrolled in ambient mode. Harbor keeps Trivy and job logs on Longhorn PVCs.
+
+OpenCost queries `kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090` over HTTP inside ambient mTLS and registers a ServiceMonitor with the label selected by the existing Prometheus instance. The OpenCost UI/API has no built-in authentication, so no public Gateway route is created yet. Use `kubectl -n opencost port-forward svc/opencost 9090:9090` and open `http://localhost:9090`; add an authenticated access layer before exposing it through the shared Gateway.
+
+OpenFGA uses its PostgreSQL cluster, requires a pre-shared API key from Infisical path `/openfga`, and disables the development Playground. It stays internal with no public HTTPRoute. In-cluster clients use `openfga.openfga.svc.cluster.local:8080` for HTTP or port `8081` for gRPC; ambient mTLS encrypts service-to-service traffic. The OpenFGA chart also creates a ServiceMonitor for Prometheus.
+
+Add these values to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94c393caf930`), environment `prod`:
+
+| Path | Infisical key | Purpose / format |
+| --- | --- | --- |
+| `/harbor` | `HARBOR_ADMIN_PASSWORD` | Initial Harbor admin password |
+| `/harbor` | `HARBOR_SECRET_KEY` | Exactly 16 characters |
+| `/harbor` | `HARBOR_CORE_SECRET` | Exactly 16 characters |
+| `/harbor` | `HARBOR_CSRF_KEY` | Exactly 32 characters |
+| `/harbor` | `HARBOR_JOBSERVICE_SECRET` | Exactly 16 characters |
+| `/harbor` | `HARBOR_REGISTRY_HTTP_SECRET` | Exactly 16 characters |
+| `/harbor` | `HARBOR_REGISTRY_PASSWORD` | Password matching the registry htpasswd entry |
+| `/harbor` | `HARBOR_REGISTRY_HTPASSWD` | Bcrypt htpasswd line for `harbor_registry_user` |
+| `/harbor` | `HARBOR_MINIO_ACCESS_KEY` | MinIO service-account key; keep it at 20 characters or fewer |
+| `/harbor` | `HARBOR_MINIO_SECRET_KEY` | MinIO service-account secret key |
+| `/harbor` | `HARBOR_DATABASE_USERNAME` | Set to `harbor` |
+| `/harbor` | `HARBOR_DATABASE_PASSWORD` | PostgreSQL password for Harbor |
+| `/openfga` | `OPENFGA_DATABASE_USERNAME` | Set to `openfga` |
+| `/openfga` | `OPENFGA_DATABASE_PASSWORD` | PostgreSQL password for OpenFGA |
+| `/openfga` | `OPENFGA_PRESHARED_KEYS` | Long random API key; multiple keys may be comma-separated for rotation |
+| `/redis` | `REDIS_PASSWORD` | 64-character random hexadecimal password for the standalone Redis service; generate with `openssl rand -hex 32` |
+
+For `HARBOR_REGISTRY_HTPASSWD`, generate a bcrypt line with `htpasswd -B -n harbor_registry_user` and store the complete `username:hash` output; store the matching plaintext password separately in `HARBOR_REGISTRY_PASSWORD`. Harbor and both database Applications automatically sync these values into Kubernetes Secrets. The PostgreSQL bootstrap Secrets use the `kubernetes.io/basic-auth` type supported by the installed Infisical operator and carry the CNPG reload label.
+
+CloudNativePG chart `0.29.1` installs operator `1.30.1`. Its Application in the `database` project does not prune chart resources or CRDs, protecting the databases if the chart changes; removing that Application from the root leaves its operator resources orphaned for deliberate cleanup. The cluster reports Kubernetes `1.37.2`, which CNPG 1.30 lists as tested but not officially supported; confirm operator health after Argo sync. The CNPG databases are single-instance home-lab deployments with no backup configuration yet, so set up and verify backups before relying on them for irreplaceable data.
+
 ## Pruning
 
-The MinIO, MinIO access provisioner, observability, cert-manager, Let's Encrypt, Headlamp, public Gateway, and Kiali Applications use automated sync, self-heal, retry, and Argo CD's resources finalizer. MinIO leaves pruning disabled to protect its stateful tenant resources. Other included Applications prune resources removed from their source; `allowEmpty` is enabled only where explicitly listed. Removing an Application manifest from Git removes that Application and cascades deletion to resources it manages. Removing a resource from an Application source prunes that resource when pruning is enabled.
+The MinIO tenant, MinIO access provisioners, observability, cert-manager, Let's Encrypt, Headlamp, platform services, standalone Redis, public Gateway, and Kiali Applications use automated sync, self-heal, retry, and Argo CD's resources finalizer. The MinIO tenant Application leaves pruning disabled to protect its stateful tenant resources. The CloudNativePG operator Application also leaves pruning disabled and has no cascading finalizer to protect its CRDs. Other included Applications prune resources removed from their source; `allowEmpty` is enabled only where explicitly listed. Removing an Application manifest from Git removes that Application and cascades deletion to resources it manages when a finalizer is configured. Removing a resource from an Application source prunes that resource when pruning is enabled.
 
 ## Structure
 
@@ -92,15 +127,18 @@ applications/
 ├── security/infisical/application.yaml
 ├── security/infisical-secrets-operator/application.yaml
 ├── storage/longhorn/application.yaml
-├── storage/{minio,minio-observability-access}/application.yaml
+├── storage/{minio,minio-observability-access,minio-harbor-access}/application.yaml
 ├── platform/headlamp/application.yaml
+├── platform/{harbor-database,harbor,opencost,openfga-database,openfga}/application.yaml
+├── database/{cloudnative-pg,redis}/application.yaml
 └── observability/{observability-credentials,kube-prometheus-stack,loki,tempo,opentelemetry-collector}/application.yaml
 
 projects/
 ├── networking/networking.yaml
 ├── service-mesh/service-mesh.yaml
 ├── security/security.yaml
-├── platform-tools/platform-tools.yaml
+├── platform/platform.yaml
+├── database/database.yaml
 ├── storage/storage.yaml
 └── observability/observability.yaml
 
@@ -111,9 +149,14 @@ values/
 ├── security/letsencrypt/resources/acme.yaml
 ├── security/infisical-secrets-operator/values.yaml and resources/
 ├── storage/minio/operator-values.yaml, tenant-values.yaml, and resources/
+├── storage/minio/{observability-access,harbor-access}/resources/
 ├── security/infisical/values.yaml and resources/
 ├── storage/longhorn/values.yaml and resources/
 ├── platform/headlamp/values.yaml
+├── platform/{harbor,opencost,openfga}/values.yaml and resources/
+├── platform/{harbor-database,openfga-database}/resources/
+├── database/cloudnative-pg/values.yaml
+├── database/redis/resources/{infisical-static-secret,service,statefulset}.yaml
 └── observability/{credentials,kube-prometheus-stack,loki,tempo,opentelemetry-collector}/values.yaml and resources/
 
 policies/

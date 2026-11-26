@@ -1,0 +1,24 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: harbor-db
+  namespace: harbor
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1
+  bootstrap:
+    initdb:
+      database: registry
+      owner: harbor
+      secret:
+        name: harbor-db-credentials
+  storage:
+    storageClass: longhorn
+    size: 16Gi
+  affinity:
+    nodeSelector:
+      kubernetes.io/hostname: cp
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule

@@ -1,0 +1,35 @@
+replicaCount: 1
+
+datastore:
+  engine: postgres
+  uri: postgres://openfga-db-rw.openfga.svc.cluster.local:5432/openfga?sslmode=disable
+  existingSecret: openfga-db-credentials
+  secretKeys:
+    usernameKey: username
+    passwordKey: password
+  migrationType: initContainer
+  applyMigrations: true
+  waitForMigrations: true
+
+authn:
+  method: preshared
+  preshared:
+    keysSecret: openfga-credentials
+
+playground:
+  enabled: false
+
+telemetry:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      additionalLabels:
+        release: kube-prometheus-stack
+
+nodeSelector:
+  kubernetes.io/hostname: cp
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule

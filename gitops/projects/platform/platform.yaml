@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  description: Platform interfaces and services managed by Argo CD
+  sourceRepos:
+    - https://github.com/harishSudalaimani/voidlab.git
+    - https://kubernetes-sigs.github.io/headlamp/
+    - https://helm.goharbor.io
+    - https://opencost.github.io/opencost-helm-chart
+    - https://openfga.github.io/helm-charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: headlamp
+    - server: https://kubernetes.default.svc
+      namespace: harbor
+    - server: https://kubernetes.default.svc
+      namespace: opencost
+    - server: https://kubernetes.default.svc
+      namespace: openfga
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+      name: headlamp
+    - group: ""
+      kind: Namespace
+      name: harbor
+    - group: ""
+      kind: Namespace
+      name: opencost
+    - group: ""
+      kind: Namespace
+      name: openfga
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
