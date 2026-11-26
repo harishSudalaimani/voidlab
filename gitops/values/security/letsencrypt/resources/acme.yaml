@@ -21,7 +21,7 @@ spec:
       template:
         engineVersion: v1
         data:
-          api-token: "{{ .CLOUDFLARE_API_TOKEN.Value }}"
+          api-token: "{{ .CLOUDFLARE_DNS_API_TOKEN.Value }}"
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
