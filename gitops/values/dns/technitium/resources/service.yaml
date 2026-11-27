@@ -5,6 +5,7 @@ metadata:
   namespace: dns
 spec:
   type: ClusterIP
+  clusterIP: 10.108.57.178
   selector:
     app.kubernetes.io/name: technitium
   ports:
