@@ -22,7 +22,7 @@ backstage:
         - -ec
       args:
         - |
-          until pg_isready --host=backstage-db-rw.backstage.svc.cluster.local --port=5432; do
+          until pg_isready --host=backstage-db-rw.backstage.svc.cluster.local --port=5432 --username=backstage --dbname=backstage; do
             echo "Waiting for Backstage PostgreSQL to accept connections"
             sleep 2
           done
