@@ -139,7 +139,11 @@ Keycloak uses upstream operator resources pinned to `26.8.2`, plus a single-inst
 
 Kyverno chart `3.10.0` installs the admission, background, cleanup, and reports controllers on `cp` with the control-plane toleration. Cluster cleanup policies use the CEL-based `DeletingPolicy` API: completed or failed Jobs and terminal Pods are retained for seven days, while CronJobs are deleted only when explicitly marked with an expired `cleanup.voidlab.io/expire-at` RFC3339 label. The policies exclude Kubernetes and controller namespaces. Companion Audit `ValidatingPolicy` resources report current cleanup candidates to Policy Reporter. Kyverno emits Kubernetes Events for actual deletions; those events are not PolicyReports, so the Policy Reporter UI shows candidates and policy results rather than deletion history. Policy Reporter chart `3.11.2` installs its core service, Kyverno plugin, and UI, all pinned to `cp`. The UI is at `https://policy-reporter.kiroku.life` and uses Keycloak OIDC with PKCE. The UI presents policy reports and Kyverno policy details; Kyverno itself does not ship a separate dashboard.
 
-Backstage chart `2.11.0` is deployed with the pinned official image `ghcr.io/backstage/backstage:1.55.2`, a single-instance CloudNativePG database, and `cp` node placement plus control-plane toleration. Its Software Catalog loads `gitops/backstage/catalog-info.yaml`, which catalogs the GitOps-managed services and supporting components, links their dashboards, and records service dependencies. Backstage is available at `https://backstage.kiroku.life`. The current generic image provides the Software Catalog and dashboard launchpad; live Kubernetes and Argo CD plugin pages require a tailored Backstage image with those plugins installed and configured.
+Backstage chart `2.11.0` uses a custom app under `gitops/backstage/app/`, based on Backstage `1.55.2`, with the OIDC backend module and a Keycloak sign-in page. Its image is `ghcr.io/harishsudalaimani/voidlab-backstage:1.55.2-oidc1`; build and publish it before syncing the chart. A single-instance CloudNativePG database and the Backstage pod run on `cp` with the control-plane toleration. The Software Catalog loads `gitops/backstage/catalog-info.yaml`, including the `contact` User entity used by the email-local-part resolver, and catalogs the GitOps-managed services and supporting components. Backstage is available at `https://backstage.kiroku.life`.
+
+Create a confidential OIDC client with ID `backstage` in Keycloak's `voidlab` realm. Enable Standard flow and client authentication, disable Direct access grants, set the redirect URI to `https://backstage.kiroku.life/api/auth/oidc/handler/frame`, and set the web origin to `https://backstage.kiroku.life`. Mark the Keycloak user's email as verified. The resolver only accepts the `harish8.com` domain and matches the email local-part to a Backstage User entity; the current entity is named `contact`, so the Keycloak email must use `contact` before the `@`. Add a matching User entity for each additional login. Store the client secret in Infisical at `/backstage/BACKSTAGE_KEYCLOAK_CLIENT_SECRET`, and add a separate random 32-byte base64 value as `/backstage/BACKSTAGE_AUTH_SESSION_SECRET`.
+
+Build the image from the app directory with Node 22 and Yarn 4.4.1: run `yarn install --immutable`, `yarn tsc`, and `yarn build:backend`, then run `docker build . -f packages/backend/Dockerfile -t ghcr.io/harishsudalaimani/voidlab-backstage:1.55.2-oidc1` and push that tag to GHCR. Make the GHCR package public or configure a pull secret for the cluster. The deployment references that immutable tag; update the tag in `values/platform/backstage/values.yaml` when publishing a later image.
 
 ### Backstage internal dashboard links
 
@@ -177,6 +181,8 @@ Add these values to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94
 | `/backstage` | `BACKSTAGE_DATABASE_USERNAME` | Set to `backstage` for the CNPG bootstrap user |
 | `/backstage` | `BACKSTAGE_DATABASE_PASSWORD` | PostgreSQL password for Backstage |
 | `/backstage` | `BACKSTAGE_BACKEND_SECRET` | Long random secret for Backstage backend tokens |
+| `/backstage` | `BACKSTAGE_KEYCLOAK_CLIENT_SECRET` | Secret for the `backstage` Keycloak OIDC client |
+| `/backstage` | `BACKSTAGE_AUTH_SESSION_SECRET` | Random base64-encoded 32-byte secret for Backstage OIDC sessions |
 | `/dns` | `TECHNITIUM_ADMIN_PASSWORD` | Strong initial password for the Technitium administrator account |
 | `/external-dns` | `TECHNITIUM_API_TOKEN` | Technitium API token for the dedicated DNS automation user; create it in Technitium after its first start |
 | `/cloudflare-tunnel` | `CLOUDFLARE_TUNNEL_TOKEN` | Connector token for the remotely managed Cloudflare Tunnel |
@@ -272,6 +278,7 @@ policies/
     └── cleanup/kustomization.yaml, RBAC, DeletingPolicies, and Audit policies
 
 backstage/
+├── app/                                   # Custom Backstage app, Keycloak OIDC provider, and image build source
 └── catalog-info.yaml
 ```
 

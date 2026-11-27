@@ -1,0 +1,47 @@
+app:
+  title: VoidLab Developer Portal
+  baseUrl: https://backstage.kiroku.life
+
+backend:
+  baseUrl: https://backstage.kiroku.life
+  listen: ':7007'
+  cors:
+    origin: https://backstage.kiroku.life
+    methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+    credentials: true
+  auth:
+    keys:
+      - secret: ${BACKSTAGE_BACKEND_SECRET}
+  database:
+    client: pg
+    pluginDivisionMode: schema
+    connection:
+      host: backstage-db-rw.backstage.svc.cluster.local
+      port: 5432
+      user: ${BACKSTAGE_DB_USERNAME}
+      password: ${BACKSTAGE_DB_PASSWORD}
+      database: backstage
+
+auth:
+  environment: production
+  session:
+    secret: ${BACKSTAGE_AUTH_SESSION_SECRET}
+  providers:
+    oidc:
+      production:
+        metadataUrl: https://keycloak.kiroku.life/realms/voidlab/.well-known/openid-configuration
+        clientId: backstage
+        clientSecret: ${BACKSTAGE_KEYCLOAK_CLIENT_SECRET}
+        prompt: auto
+        signIn:
+          resolvers:
+            - resolver: emailLocalPartMatchingUserEntityName
+              allowedDomains:
+                - harish8.com
+
+catalog:
+  rules:
+    - allow: [Component, Domain, Group, Location, Resource, System, User]
+  locations:
+    - type: url
+      target: https://raw.githubusercontent.com/harishSudalaimani/voidlab/main/gitops/backstage/catalog-info.yaml

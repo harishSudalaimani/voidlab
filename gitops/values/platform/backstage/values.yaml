@@ -2,8 +2,8 @@ backstage:
   replicas: 1
   image:
     registry: ghcr.io
-    repository: backstage/backstage
-    tag: 1.55.2
+    repository: harishsudalaimani/voidlab-backstage
+    tag: 1.55.2-oidc1
     pullPolicy: IfNotPresent
   strategy:
     type: Recreate
@@ -58,6 +58,16 @@ backstage:
         secretKeyRef:
           name: backstage-secrets
           key: backend-secret
+    - name: BACKSTAGE_KEYCLOAK_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: backstage-auth-secrets
+          key: oidc-client-secret
+    - name: BACKSTAGE_AUTH_SESSION_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: backstage-auth-secrets
+          key: auth-session-secret
   appConfig:
     app:
       title: VoidLab Developer Portal
@@ -88,10 +98,20 @@ backstage:
           database: backstage
     auth:
       environment: production
+      session:
+        secret: ${BACKSTAGE_AUTH_SESSION_SECRET}
       providers:
-        guest:
+        oidc:
           production:
-            dangerouslyAllowOutsideDevelopment: true
+            metadataUrl: https://keycloak.kiroku.life/realms/voidlab/.well-known/openid-configuration
+            clientId: backstage
+            clientSecret: ${BACKSTAGE_KEYCLOAK_CLIENT_SECRET}
+            prompt: auto
+            signIn:
+              resolvers:
+                - resolver: emailLocalPartMatchingUserEntityName
+                  allowedDomains:
+                    - harish8.com
     catalog:
       rules:
         - allow:
@@ -101,6 +121,7 @@ backstage:
             - Location
             - Resource
             - System
+            - User
       locations:
         - type: url
           target: https://raw.githubusercontent.com/harishSudalaimani/voidlab/main/gitops/backstage/catalog-info.yaml
