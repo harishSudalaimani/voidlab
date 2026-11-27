@@ -19,10 +19,6 @@ backstage:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
       effect: NoSchedule
-  serviceAccount:
-    create: true
-    name: backstage
-    automountServiceAccountToken: false
   extraEnvVars:
     - name: BACKSTAGE_DB_USERNAME
       valueFrom:
@@ -96,3 +92,8 @@ httpRoute:
 
 postgresql:
   enabled: false
+
+serviceAccount:
+  create: true
+  name: backstage
+  automountServiceAccountToken: false
