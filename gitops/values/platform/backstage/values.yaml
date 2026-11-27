@@ -79,6 +79,7 @@ backstage:
           - secret: ${BACKSTAGE_BACKEND_SECRET}
       database:
         client: pg
+        pluginDivisionMode: schema
         connection:
           host: backstage-db-rw.backstage.svc.cluster.local
           port: 5432
