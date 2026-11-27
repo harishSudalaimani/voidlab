@@ -105,10 +105,4 @@ ingress:
   enabled: false
 
 httpRoute:
-  enabled: true
-  parentRefs:
-    - name: public
-      namespace: istio-system
-      sectionName: https
-  hostnames:
-    - headlamp.kiroku.life
+  enabled: false

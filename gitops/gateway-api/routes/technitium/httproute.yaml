@@ -10,6 +10,7 @@ spec:
       sectionName: https
   hostnames:
     - dns.kiroku.life
+    - technitium.kiroku.life
   rules:
     - backendRefs:
         - name: technitium

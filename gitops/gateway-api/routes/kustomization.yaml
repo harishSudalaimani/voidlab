@@ -1,0 +1,21 @@
+# Audit inventory for all HTTPRoutes; applications consume their own child module.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - argo-rollouts
+  - argocd
+  - backstage
+  - harbor
+  - headlamp
+  - hubble
+  - infisical
+  - keycloak
+  - kiali
+  - longhorn
+  - minio
+  - observability
+  - opencost
+  - policy-reporter
+  - redisinsight
+  - shared
+  - technitium

@@ -28,6 +28,9 @@ spec:
       targetRevision: main
       ref: values
       path: gitops/values/storage/minio/resources
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/gateway-api/routes/minio
   destination:
     server: https://kubernetes.default.svc
     namespace: minio

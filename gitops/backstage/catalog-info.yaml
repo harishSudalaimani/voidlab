@@ -52,7 +52,10 @@ metadata:
     backstage.io/kubernetes-id: technitium
   links:
     - url: https://dns.kiroku.life
-      title: DNS Administration
+      title: Technitium DNS Administration
+      icon: dashboard
+    - url: https://technitium.kiroku.life
+      title: Technitium DNS alias
       icon: dashboard
 spec:
   type: service
@@ -761,6 +764,29 @@ spec:
   lifecycle: production
   owner: group:default/platform
   system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: hubble
+  title: Hubble UI
+  description: Cilium service map and network flow visibility dashboard
+  annotations:
+    backstage.io/kubernetes-id: hubble-ui
+  links:
+    - url: https://hubble.kiroku.life
+      title: Hubble dashboard
+      icon: dashboard
+    - url: https://docs.cilium.io/en/stable/observability/hubble/hubble-ui/
+      title: Hubble UI documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/cilium
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component

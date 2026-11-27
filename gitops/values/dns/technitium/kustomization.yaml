@@ -4,4 +4,3 @@ resources:
   - resources/infisical-static-secret.yaml
   - resources/statefulset.yaml
   - resources/service.yaml
-  - resources/httproute.yaml

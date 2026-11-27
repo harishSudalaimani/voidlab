@@ -46,10 +46,4 @@ ui:
     secretRef: policy-reporter-oidc
     pkce: true
   httproute:
-    enabled: true
-    parentRefs:
-      - name: public
-        namespace: istio-system
-        sectionName: https
-    hostnames:
-      - policy-reporter.kiroku.life
+    enabled: false

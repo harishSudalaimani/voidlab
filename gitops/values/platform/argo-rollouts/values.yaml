@@ -82,10 +82,4 @@ dashboard:
     limits:
       memory: 256Mi
   httproute:
-    enabled: true
-    parentRefs:
-      - name: public
-        namespace: istio-system
-        sectionName: https
-    hostnames:
-      - rollouts.kiroku.life
+    enabled: false

@@ -6,7 +6,7 @@ GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinI
 
 The `networking` AppProject allows Cilium network policies, LB IP pools, and L2 announcement policies. Manifests under `policies/cilium/network-policies/` are applied by Argo CD; Pulumi retains ownership of the Cilium installation. The public Istio Gateway uses `192.168.29.254/32`, while Technitium DNS uses a separate `192.168.29.253/32` pool. Each pool selects only its matching Service. Their L2 announcements are restricted to the control-plane node's `enp8s0` interface.
 
-The shared Gateway API configuration is organized as Kustomize modules under `gateway-api/`: `gateway/public/` holds the Gateway listeners, and `routes/` holds shared redirect routes. Application HTTPRoutes stay with their owning application resources, alongside their backend configuration.
+Gateway API configuration is organized under `gateway-api/`. `gateway/public/` holds the Gateway listeners. Every `HTTPRoute` has a small Kustomize module in `routes/<module>/`, so the full route inventory is easy to review in one place. Each application keeps ownership of its own route by including that route module as an Argo CD source; the public Gateway Application owns the shared redirects and Hubble route. The top-level `routes/kustomization.yaml` is an audit/build inventory only and is not an Argo CD source.
 
 Before syncing either VIP, keep the router DHCP range at `192.168.29.2–192.168.29.199` so it cannot lease `.253` or `.254`. Cilium's Pulumi Helm release enables `l2announcements.enabled=true` and already has `kubeProxyReplacement=true`. Cilium auto-detects devices because the node interfaces have different names; verify `enp8s0` is selected on `cp` before relying on the Gateway VIP. Apply the Cilium Pulumi update before the networking-policies Application syncs the announcement policy.
 
@@ -14,7 +14,7 @@ The Cloudflare Tunnel connector runs two replicas on `cp` and uses a remotely ma
 
 The Istio stack uses ambient mode and Gateway API. It is kept separate from the narrow Cilium `networking` project under the `service-mesh` AppProject. Istio 1.32.0 and Gateway API v1.6.1 are pinned together because Istio 1.32 lists Gateway API v1.6.1 as its tested version and supports Kubernetes 1.37. The Gateway API CRDs are sourced from the upstream tagged repository, using its `config/crd/experimental` manifests. The Gateway API CRD Application uses server-side apply and does not prune CRDs, since deleting a CRD also deletes every Gateway API object.
 
-DNS follows the route-driven design: Gateway API `HTTPRoute` hostnames are the desired names, ExternalDNS watches only the `gateway-httproute` source and writes private records to Technitium through its webhook API, and the existing kubeadm CoreDNS service forwards cluster queries to Technitium. Technitium forwards public lookups to `1.1.1.1` and `9.9.9.9` and is the internal authority for the `kiroku.life` zone. At home, configure the router's DHCP DNS server to `192.168.29.253`; Technitium's Cilium LoadBalancer Service answers on that dedicated L2 VIP, while application host records resolve to the Istio Gateway at `192.168.29.254`. Technitium's UI is at `https://dns.kiroku.life`; Technitium and ExternalDNS run on `cp` with the control-plane toleration.
+DNS follows the route-driven design: Gateway API `HTTPRoute` hostnames are the desired names, ExternalDNS watches only the `gateway-httproute` source and writes private records to Technitium through its webhook API, and the existing kubeadm CoreDNS service forwards cluster queries to Technitium. Technitium forwards public lookups to `1.1.1.1` and `9.9.9.9` and is the internal authority for the `kiroku.life` zone. At home, configure the router's DHCP DNS server to `192.168.29.253`; Technitium's Cilium LoadBalancer Service answers on that dedicated L2 VIP, while application host records resolve to the Istio Gateway at `192.168.29.254`. Technitium's UI is at `https://technitium.kiroku.life` (also available as `https://dns.kiroku.life`); Technitium and ExternalDNS run on `cp` with the control-plane toleration.
 
 Before ExternalDNS can publish records, connect to the Technitium UI on first install with `kubectl -n dns port-forward svc/technitium 5380:5380` and open `http://localhost:5380`. Create the primary `kiroku.life` zone, then create an API token for a dedicated DNS automation user with permission to manage records in that zone. Store the admin password and API token in Infisical as described below. The webhook image currently uses the upstream `latest` tag because its README still shows a placeholder version; pin a published image tag when the project releases one. CoreDNS's existing `kube-system/coredns` ConfigMap is adopted by the `coredns-forwarding` Application. Compare it with the live ConfigMap before syncing and preserve any local Corefile customizations; this manifest manages the entire Corefile and uses the kubeadm default plugin chain.
 
@@ -24,7 +24,7 @@ The two CNI components have separate roles: Cilium assigns Pod IPs and provides 
 
 The Istio controller, Kiali, the public Gateway, and Headlamp are pinned to `cp` and tolerate the control-plane taint. The shared `public` Gateway uses class `istio`, terminates HTTPS with the wildcard Let's Encrypt certificate, and redirects HTTP to HTTPS. Its listeners accept the apex hostname `kiroku.life` and tool hostnames under `*.kiroku.life`. The host firewall restricts direct Gateway and DNS access to the configured LAN CIDR; Cloudflare Tunnel uses the in-cluster Gateway Service for public requests. Istiod creates a waypoint when you add a Gateway API `Gateway` using class `istio-waypoint`; no waypoint is created until a namespace or service needs L7 processing. The `minio`, `observability`, and `headlamp` namespaces are enrolled through their Argo CD Applications, and Kiali's server pod is enrolled individually. Because Argo automatically syncs these labels, verify Istio CNI and ztunnel are healthy on every node before pushing a change that enables enrollment.
 
-GUI routes use `HTTPRoute` hostnames, and ExternalDNS publishes private records to Technitium's `kiroku.life` zone with the Gateway VIP as the target. The same dashboard URLs work on the LAN and through Cloudflare Tunnel outside the home. Cloudflare Access protects the public wildcard route; the direct LAN route bypasses Access. The Gateway host firewall blocks direct WAN connections. The dashboards are available at `argocd`, `alertmanager`, `backstage`, `dns`, `grafana`, `harbor`, `headlamp`, `infisical`, `kiali`, `keycloak`, `longhorn`, `minio`, `opencost`, `policy-reporter`, `prometheus`, `redisinsight`, and `rollouts` under `kiroku.life`.
+GUI routes use `HTTPRoute` hostnames, and ExternalDNS publishes private records to Technitium's `kiroku.life` zone with the Gateway VIP as the target. The same dashboard URLs work on the LAN and through Cloudflare Tunnel outside the home. Cloudflare Access protects the public wildcard route; the direct LAN route bypasses Access. The Gateway host firewall blocks direct WAN connections. The dashboards are available at `argocd`, `alertmanager`, `backstage`, `dns`, `grafana`, `harbor`, `headlamp`, `hubble`, `infisical`, `kiali`, `keycloak`, `longhorn`, `minio`, `opencost`, `policy-reporter`, `prometheus`, `redisinsight`, `rollouts`, and `technitium` under `kiroku.life`.
 
 Argo CD is exposed at `https://argocd.kiroku.life` over its existing TLS service port. A cert-manager `Certificate` supplies the `argocd-server-tls` Secret, and Gateway API `BackendTLSPolicy` validates the upstream certificate against system roots. Argo CD hot-reloads this certificate when cert-manager renews it.
 
@@ -205,7 +205,25 @@ applications/
 gateway-api/
 ├── kustomization.yaml
 ├── gateway/public/gateway.yaml
-└── routes/redirects.yaml
+└── routes/
+    ├── kustomization.yaml              # audit/build inventory; not deployed directly
+    ├── shared/                          # HTTP to HTTPS redirects
+    ├── observability/                   # Grafana, Prometheus, Alertmanager
+    ├── argocd/                          # and one module for each app route
+    ├── backstage/
+    ├── headlamp/                        # includes the CloudNativePG plugin
+    ├── redisinsight/
+    ├── keycloak/
+    ├── argo-rollouts/
+    ├── longhorn/
+    ├── minio/
+    ├── infisical/
+    ├── policy-reporter/
+    ├── technitium/
+    ├── kiali/
+    ├── harbor/
+    ├── opencost/
+    └── hubble/
 
 projects/
 ├── networking/networking.yaml

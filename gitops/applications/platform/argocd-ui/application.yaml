@@ -9,10 +9,13 @@ metadata:
     argocd.argoproj.io/sync-wave: "5"
 spec:
   project: gitops-system
-  source:
-    repoURL: https://github.com/harishSudalaimani/voidlab.git
-    targetRevision: main
-    path: gitops/values/platform/argocd-ui/resources
+  sources:
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/platform/argocd-ui/resources
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/gateway-api/routes/argocd
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd

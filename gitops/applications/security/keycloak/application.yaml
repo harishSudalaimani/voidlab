@@ -9,10 +9,13 @@ metadata:
     argocd.argoproj.io/sync-wave: "2"
 spec:
   project: security
-  source:
-    repoURL: https://github.com/harishSudalaimani/voidlab.git
-    targetRevision: main
-    path: gitops/values/security/keycloak/resources
+  sources:
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/security/keycloak/resources
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/gateway-api/routes/keycloak
   destination:
     server: https://kubernetes.default.svc
     namespace: keycloak

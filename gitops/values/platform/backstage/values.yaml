@@ -106,13 +106,7 @@ backstage:
           target: https://raw.githubusercontent.com/harishSudalaimani/voidlab/main/gitops/backstage/catalog-info.yaml
 
 httpRoute:
-  enabled: true
-  parentRefs:
-    - name: public
-      namespace: istio-system
-      sectionName: https
-  hostnames:
-    - backstage.kiroku.life
+  enabled: false
 
 postgresql:
   enabled: false

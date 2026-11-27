@@ -20,7 +20,7 @@ spec:
       ref: values
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
-      path: gitops/values/networking/istio/kiali-resources
+      path: gitops/gateway-api/routes/kiali
   destination:
     server: https://kubernetes.default.svc
     namespace: istio-system

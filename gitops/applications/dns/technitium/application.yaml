@@ -9,10 +9,13 @@ metadata:
     argocd.argoproj.io/sync-wave: "2"
 spec:
   project: dns
-  source:
-    repoURL: https://github.com/harishSudalaimani/voidlab.git
-    targetRevision: main
-    path: gitops/values/dns/technitium
+  sources:
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/dns/technitium
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/gateway-api/routes/technitium
   destination:
     server: https://kubernetes.default.svc
     namespace: dns

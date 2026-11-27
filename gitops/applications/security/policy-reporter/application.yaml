@@ -21,6 +21,9 @@ spec:
       targetRevision: main
       ref: values
       path: gitops/values/security/policy-reporter/resources
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/gateway-api/routes/policy-reporter
   destination:
     server: https://kubernetes.default.svc
     namespace: policy-reporter

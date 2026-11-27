@@ -20,7 +20,7 @@ spec:
       ref: values
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
-      path: gitops/values/observability/kube-prometheus-stack/resources
+      path: gitops/gateway-api/routes/observability
   destination:
     server: https://kubernetes.default.svc
     namespace: observability

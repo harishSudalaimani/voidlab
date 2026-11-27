@@ -9,10 +9,13 @@ metadata:
     argocd.argoproj.io/sync-wave: "4"
 spec:
   project: database
-  source:
-    repoURL: https://github.com/harishSudalaimani/voidlab.git
-    targetRevision: main
-    path: gitops/values/database/redisinsight/resources
+  sources:
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/database/redisinsight/resources
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/gateway-api/routes/redisinsight
   destination:
     server: https://kubernetes.default.svc
     namespace: database
