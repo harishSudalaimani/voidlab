@@ -12,6 +12,8 @@ Before syncing either VIP, keep the router DHCP range at `192.168.29.2–192.168
 
 The Cloudflare Tunnel connector runs two replicas on `cp` and uses a remotely managed tunnel token synchronized from Infisical. In Cloudflare, protect both `kiroku.life` and `*.kiroku.life` with Access allow policies for your account; the wildcard does not include the apex. Use an identity provider that does not depend only on Keycloak. Add two published application routes to `https://public-istio.istio-system.svc.cluster.local:443`: leave Subdomain empty for `kiroku.life`, and use `*` for tool hostnames under `*.kiroku.life`. Keep origin TLS verification enabled and turn on **Match SNI to Host** on both routes. The apex route will work after an HTTPRoute for the root application is added to GitOps. Ensure the apex DNS record and wildcard DNS record are proxied and point to the Tunnel; the route wizard can create them. Remove or update exact public DNS records that conflict with the wildcard. Add the tunnel token to Infisical at `/cloudflare-tunnel` as `CLOUDFLARE_TUNNEL_TOKEN`. The connector initiates outbound connections; public requests do not need a WAN port forward or wider host firewall rule. At home, Technitium resolves names directly to `.254`, bypassing Cloudflare Access; the LAN path remains protected by trusted-LAN firewall scope and each application's own login where provided.
 
+Argo CD's `argocd-auth` Application manages `argocd-cm`, `argocd-rbac-cm`, and the InfisicalStaticSecret for its Keycloak OIDC client. The client secret is read from `/argocd/ARGOCD_OIDC_CLIENT_SECRET` and synchronized to `argocd-oidc-secret`; only the reference to that Secret is stored in the OIDC ConfigMap. Keycloak group claims `argocd-admins` and `/argocd-admins` map to `role:admin`, while other authenticated users receive read-only access. These ConfigMaps are also rendered by the Pulumi-installed Helm release, so review this GitOps configuration if you change the Argo CD chart or values through Pulumi.
+
 The Istio stack uses ambient mode and Gateway API. It is kept separate from the narrow Cilium `networking` project under the `service-mesh` AppProject. Istio 1.32.0 and Gateway API v1.6.1 are pinned together because Istio 1.32 lists Gateway API v1.6.1 as its tested version and supports Kubernetes 1.37. The Gateway API CRDs are sourced from the upstream tagged repository, using its `config/crd/experimental` manifests. The Gateway API CRD Application uses server-side apply and does not prune CRDs, since deleting a CRD also deletes every Gateway API object.
 
 DNS follows the route-driven design: Gateway API `HTTPRoute` hostnames are the desired names, ExternalDNS watches only the `gateway-httproute` source and writes private records to Technitium through its webhook API, and the existing kubeadm CoreDNS service forwards cluster queries to Technitium. Technitium forwards public lookups to `1.1.1.1` and `9.9.9.9` and is the internal authority for the `kiroku.life` zone. At home, configure the router's DHCP DNS server to `192.168.29.253`; Technitium's Cilium LoadBalancer Service answers on that dedicated L2 VIP, while application host records resolve to the Istio Gateway at `192.168.29.254`. Technitium's UI is at `https://technitium.kiroku.life` (also available as `https://dns.kiroku.life`); Technitium and ExternalDNS run on `cp` with the control-plane toleration. cert-manager checks DNS-01 challenge records through public recursive resolvers because the private Technitium zone does not contain Cloudflare's public challenge records.
@@ -168,6 +170,7 @@ Add these values to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94
 | `/keycloak` | `KEYCLOAK_DATABASE_USERNAME` | Set to `keycloak` for the CNPG bootstrap user |
 | `/keycloak` | `KEYCLOAK_DATABASE_PASSWORD` | PostgreSQL password for Keycloak |
 | `/keycloak` | `POLICY_REPORTER_OIDC_CLIENT_SECRET` | Long random confidential-client secret, used in Keycloak and Policy Reporter |
+| `/argocd` | `ARGOCD_OIDC_CLIENT_SECRET` | Long random confidential-client secret for the Argo CD Keycloak OIDC client |
 | `/backstage` | `BACKSTAGE_DATABASE_USERNAME` | Set to `backstage` for the CNPG bootstrap user |
 | `/backstage` | `BACKSTAGE_DATABASE_PASSWORD` | PostgreSQL password for Backstage |
 | `/backstage` | `BACKSTAGE_BACKEND_SECRET` | Long random secret for Backstage backend tokens |
@@ -197,6 +200,7 @@ applications/
 ├── storage/longhorn/application.yaml
 ├── storage/{minio,minio-observability-access,minio-harbor-access}/application.yaml
 ├── platform/headlamp/application.yaml
+├── platform/argocd-auth/application.yaml
 ├── platform/{argo-rollouts,backstage}/application.yaml
 ├── platform/{harbor-database,harbor,opencost,openfga-database,openfga}/application.yaml
 ├── database/{cloudnative-pg,redis,redisinsight}/application.yaml
@@ -247,6 +251,7 @@ values/
 ├── security/infisical/values.yaml and resources/
 ├── storage/longhorn/values.yaml and resources/
 ├── platform/headlamp/values.yaml
+├── platform/argocd-auth/resources/{argocd-cm,argocd-rbac-cm,infisical-static-secret}.yaml
 ├── platform/argo-rollouts/values.yaml
 ├── platform/backstage/values.yaml and resources/
 ├── platform/{harbor,opencost,openfga}/values.yaml and resources/

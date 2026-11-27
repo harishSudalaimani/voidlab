@@ -6,16 +6,20 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Gateway API access for the Argo CD web interface
+  description: Argo CD authentication and Gateway API access
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
   destinations:
     - server: https://kubernetes.default.svc
       namespace: argocd
   namespaceResourceWhitelist:
+    - group: ""
+      kind: ConfigMap
     - group: cert-manager.io
       kind: Certificate
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
     - group: gateway.networking.k8s.io
       kind: BackendTLSPolicy
+    - group: secrets.infisical.com
+      kind: InfisicalStaticSecret
