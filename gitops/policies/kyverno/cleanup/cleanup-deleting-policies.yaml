@@ -1,0 +1,140 @@
+apiVersion: policies.kyverno.io/v1
+kind: DeletingPolicy
+metadata:
+  name: cleanup-completed-jobs
+  annotations:
+    argocd.argoproj.io/ignore-healthcheck: "true"
+    policies.kyverno.io/title: Clean up old completed Jobs
+    policies.kyverno.io/category: Resource Lifecycle
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/description: >-
+      Deletes completed or failed Jobs seven days after their terminal status.
+spec:
+  schedule: "17 3 * * *"
+  deletionPropagationPolicy: Background
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - argocd
+            - cnpg-system
+            - istio-system
+            - kube-node-lease
+            - kube-public
+            - kube-system
+            - kyverno
+            - longhorn-system
+    resourceRules:
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - "*"
+        resources:
+          - jobs
+        scope: Namespaced
+  conditions:
+    - name: terminal-job-older-than-seven-days
+      expression: >-
+        has(object.status.conditions) &&
+        object.status.conditions.exists(condition,
+          (condition.type == "Complete" || condition.type == "Failed") &&
+          condition.status == "True" &&
+          has(condition.lastTransitionTime) &&
+          time.now() - timestamp(condition.lastTransitionTime) > duration("168h"))
+---
+apiVersion: policies.kyverno.io/v1
+kind: DeletingPolicy
+metadata:
+  name: cleanup-terminal-pods
+  annotations:
+    argocd.argoproj.io/ignore-healthcheck: "true"
+    policies.kyverno.io/title: Clean up old terminal Pods
+    policies.kyverno.io/category: Resource Lifecycle
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/description: >-
+      Deletes Succeeded or Failed Pods older than seven days.
+spec:
+  schedule: "17 3 * * *"
+  deletionPropagationPolicy: Background
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - argocd
+            - cnpg-system
+            - istio-system
+            - kube-node-lease
+            - kube-public
+            - kube-system
+            - kyverno
+            - longhorn-system
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - "*"
+        resources:
+          - pods
+        scope: Namespaced
+  conditions:
+    - name: terminal-pod-older-than-seven-days
+      expression: >-
+        has(object.status.phase) &&
+        (object.status.phase == "Succeeded" || object.status.phase == "Failed") &&
+        time.now() - timestamp(object.metadata.creationTimestamp) > duration("168h")
+---
+apiVersion: policies.kyverno.io/v1
+kind: DeletingPolicy
+metadata:
+  name: cleanup-expired-cronjobs
+  annotations:
+    argocd.argoproj.io/ignore-healthcheck: "true"
+    policies.kyverno.io/title: Clean up explicitly expired CronJobs
+    policies.kyverno.io/category: Resource Lifecycle
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/description: >-
+      Deletes CronJobs only after their cleanup.voidlab.io/expire-at label has passed.
+spec:
+  schedule: "17 3 * * *"
+  deletionPropagationPolicy: Background
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - argocd
+            - cnpg-system
+            - istio-system
+            - kube-node-lease
+            - kube-public
+            - kube-system
+            - kyverno
+            - longhorn-system
+    resourceRules:
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - "*"
+        resources:
+          - cronjobs
+        scope: Namespaced
+  conditions:
+    - name: cronjob-expiry-label-has-passed
+      expression: >-
+        has(object.metadata.labels) &&
+        "cleanup.voidlab.io/expire-at" in object.metadata.labels &&
+        time.now() > timestamp(object.metadata.labels["cleanup.voidlab.io/expire-at"])

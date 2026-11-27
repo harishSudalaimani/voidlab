@@ -61,6 +61,10 @@ if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>
         firewall-cmd --permanent --zone="$zone" --remove-port="${port}/tcp" >/dev/null
       fi
     done
+    for protocol in tcp udp; do
+      rule="rule family=\"ipv4\" source address=\"${lan_cidr}\" destination address=\"${pod_cidr}\" port port=\"53\" protocol=\"${protocol}\" accept"
+      firewall-cmd --permanent --policy="$policy" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --policy="$policy" --add-rich-rule="$rule" >/dev/null
+    done
   fi
   rule="rule family=\"ipv4\" source address=\"${peer_ip}\" destination address=\"${local_ip}\" port port=\"8472\" protocol=\"udp\" accept"
   firewall-cmd --permanent --zone="$zone" --query-rich-rule="$rule" >/dev/null 2>&1 || firewall-cmd --permanent --zone="$zone" --add-rich-rule="$rule" >/dev/null
@@ -83,6 +87,8 @@ elif command -v ufw >/dev/null 2>&1 && ufw status | grep -q '^Status: active'; t
       ufw --force delete allow "${port}/tcp" >/dev/null 2>&1 || true
       ufw route allow proto tcp from "$lan_cidr" to "$pod_cidr" port "$port"
     done
+    ufw route allow proto tcp from "$lan_cidr" to "$pod_cidr" port 53
+    ufw route allow proto udp from "$lan_cidr" to "$pod_cidr" port 53
   fi
 fi
 

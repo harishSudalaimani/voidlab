@@ -1,0 +1,11 @@
+apiVersion: cilium.io/v2
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: technitium-dns
+spec:
+  blocks:
+    - cidr: 192.168.29.253/32
+  serviceSelector:
+    matchLabels:
+      io.kubernetes.service.namespace: dns
+      io.kubernetes.service.name: technitium-dns

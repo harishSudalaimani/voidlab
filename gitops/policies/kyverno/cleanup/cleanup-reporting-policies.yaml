@@ -1,0 +1,158 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: report-stale-completed-jobs
+  annotations:
+    policies.kyverno.io/title: Report stale completed Jobs
+    policies.kyverno.io/category: Resource Lifecycle
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/description: >-
+      Reports completed or failed Jobs once their terminal status is older than seven days.
+spec:
+  evaluation:
+    admission:
+      enabled: true
+    background:
+      enabled: true
+  failurePolicy: Ignore
+  validationActions:
+    - Audit
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - argocd
+            - cnpg-system
+            - istio-system
+            - kube-node-lease
+            - kube-public
+            - kube-system
+            - kyverno
+            - longhorn-system
+    resourceRules:
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - jobs
+        scope: Namespaced
+  validations:
+    - expression: >-
+        !has(object.status.conditions) ||
+        !object.status.conditions.exists(condition,
+          (condition.type == "Complete" || condition.type == "Failed") &&
+          condition.status == "True" &&
+          has(condition.lastTransitionTime) &&
+          time.now() - timestamp(condition.lastTransitionTime) > duration("168h"))
+      message: Job is completed or failed for more than seven days and is eligible for cleanup.
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: report-stale-terminal-pods
+  annotations:
+    policies.kyverno.io/title: Report stale terminal Pods
+    policies.kyverno.io/category: Resource Lifecycle
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/description: >-
+      Reports Succeeded or Failed Pods once they are older than seven days.
+spec:
+  evaluation:
+    admission:
+      enabled: true
+    background:
+      enabled: true
+  failurePolicy: Ignore
+  validationActions:
+    - Audit
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - argocd
+            - cnpg-system
+            - istio-system
+            - kube-node-lease
+            - kube-public
+            - kube-system
+            - kyverno
+            - longhorn-system
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pods
+        scope: Namespaced
+  validations:
+    - expression: >-
+        !has(object.status.phase) ||
+        !(object.status.phase == "Succeeded" || object.status.phase == "Failed") ||
+        time.now() - timestamp(object.metadata.creationTimestamp) <= duration("168h")
+      message: Terminal Pod is older than seven days and is eligible for cleanup.
+---
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: report-expired-cronjobs
+  annotations:
+    policies.kyverno.io/title: Report explicitly expired CronJobs
+    policies.kyverno.io/category: Resource Lifecycle
+    policies.kyverno.io/severity: low
+    policies.kyverno.io/description: >-
+      Reports CronJobs after their cleanup.voidlab.io/expire-at label has passed.
+spec:
+  evaluation:
+    admission:
+      enabled: true
+    background:
+      enabled: true
+  failurePolicy: Ignore
+  validationActions:
+    - Audit
+  matchConstraints:
+    matchPolicy: Equivalent
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: NotIn
+          values:
+            - argocd
+            - cnpg-system
+            - istio-system
+            - kube-node-lease
+            - kube-public
+            - kube-system
+            - kyverno
+            - longhorn-system
+    resourceRules:
+      - apiGroups:
+          - batch
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - cronjobs
+        scope: Namespaced
+  validations:
+    - expression: >-
+        !has(object.metadata.labels) ||
+        !("cleanup.voidlab.io/expire-at" in object.metadata.labels) ||
+        timestamp(object.metadata.labels["cleanup.voidlab.io/expire-at"]) >= time.now()
+      message: CronJob expiry date has passed and it is eligible for cleanup.

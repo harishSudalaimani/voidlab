@@ -20,6 +20,9 @@ spec:
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       ref: values
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/platform/opencost/resources
   destination:
     server: https://kubernetes.default.svc
     namespace: opencost

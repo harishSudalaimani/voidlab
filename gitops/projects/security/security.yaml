@@ -53,6 +53,10 @@ spec:
       kind: ClusterRoleBinding
     - group: kyverno.io
       kind: ClusterPolicy
+    - group: policies.kyverno.io
+      kind: DeletingPolicy
+    - group: policies.kyverno.io
+      kind: ValidatingPolicy
     - group: wgpolicyk8s.io
       kind: ClusterPolicyReport
     - group: admissionregistration.k8s.io

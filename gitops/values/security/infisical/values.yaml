@@ -2,6 +2,9 @@ infisical:
   rolloutOnEveryRender: false
   replicaCount: 1
   kubeSecretRef: infisical-secrets
+  extraEnv:
+    - name: SITE_URL
+      value: https://infisical.kiroku.life
   service:
     type: ClusterIP
   nodeSelector:

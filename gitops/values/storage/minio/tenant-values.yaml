@@ -39,6 +39,6 @@ tenant:
     # MinIO speaks HTTP inside the ambient mesh; ztunnel provides transport mTLS.
     requestAutoCert: false
 
-# Keep the S3 API and Console internal; use port-forward until a Gateway API
-# route is added deliberately.
+# Keep the S3 API internal. The Console UI is exposed through the shared
+# Gateway API route and advertises minio.kiroku.life for browser redirects.
   exposeServices: {}

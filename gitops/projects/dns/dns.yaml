@@ -16,6 +16,8 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: external-dns
     - server: https://kubernetes.default.svc
+      namespace: cloudflared
+    - server: https://kubernetes.default.svc
       namespace: kube-system
   namespaceResourceWhitelist:
     - group: "*"
@@ -27,6 +29,9 @@ spec:
     - group: ""
       kind: Namespace
       name: external-dns
+    - group: ""
+      kind: Namespace
+      name: cloudflared
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
       name: dnsendpoints.externaldns.k8s.io

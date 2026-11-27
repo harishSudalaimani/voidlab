@@ -1,0 +1,15 @@
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: technitium-dns
+spec:
+  serviceSelector:
+    matchLabels:
+      io.kubernetes.service.namespace: dns
+      io.kubernetes.service.name: technitium-dns
+  nodeSelector:
+    matchLabels:
+      kubernetes.io/hostname: cp
+  interfaces:
+    - ^enp8s0$
+  loadBalancerIPs: true

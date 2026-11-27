@@ -20,7 +20,7 @@ spec:
   http:
     httpEnabled: true
   hostname:
-    hostname: https://sso.kiroku.life
+    hostname: https://keycloak.kiroku.life
     strict: true
   proxy:
     headers: xforwarded
@@ -87,7 +87,7 @@ spec:
       namespace: istio-system
       sectionName: https
   hostnames:
-    - sso.kiroku.life
+    - keycloak.kiroku.life
   rules:
     - matches:
         - path:

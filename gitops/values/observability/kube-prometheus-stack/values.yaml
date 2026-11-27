@@ -3,6 +3,9 @@ grafana:
     existingSecret: observability-credentials
     userKey: admin-user
     passwordKey: admin-password
+  grafana.ini:
+    server:
+      root_url: https://grafana.kiroku.life
   nodeSelector:
     kubernetes.io/hostname: cp
   tolerations:

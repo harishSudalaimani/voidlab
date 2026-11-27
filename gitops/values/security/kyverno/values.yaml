@@ -6,8 +6,8 @@ global:
       operator: Exists
       effect: NoSchedule
 
-# Start with Kyverno's controllers and reports API. Policies are added
-# separately after their impact has been reviewed.
+# Install Kyverno's controllers and reports API. Cluster policies live under
+# gitops/policies/kyverno, alongside the other cluster policies.
 admissionController:
   replicas: 1
 backgroundController:

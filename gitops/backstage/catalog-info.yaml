@@ -46,7 +46,7 @@ kind: Component
 metadata:
   name: technitium-dns
   title: Technitium DNS
-  description: Internal authoritative DNS and recursive forwarding for cluster workloads
+  description: Split-horizon authoritative DNS for home clients and recursive forwarding for cluster workloads
   annotations:
     argocd/app-name: technitium
     backstage.io/kubernetes-id: technitium
@@ -59,6 +59,47 @@ spec:
   lifecycle: production
   owner: group:default/platform
   system: voidlab-platform
+  dependsOn:
+    - component:default/istio
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cloudflare-tunnel
+  title: Cloudflare Tunnel
+  description: Outbound-only tunnel that publishes the Istio Gateway through Cloudflare Access
+  annotations:
+    argocd/app-name: cloudflared
+    backstage.io/kubernetes-id: cloudflared
+  links:
+    - url: https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/
+      title: Cloudflare Tunnel documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/istio
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cloudflare-access
+  title: Cloudflare Access
+  description: Identity policy protecting public dashboard hostnames
+  links:
+    - url: https://one.dash.cloudflare.com/
+      title: Cloudflare Zero Trust dashboard
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/cloudflare-tunnel
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -110,8 +151,8 @@ metadata:
   title: Argo CD
   description: GitOps controller that reconciles the VoidLab applications
   links:
-    - url: https://localhost:8080
-      title: Argo CD UI (port-forward required)
+    - url: https://argocd.kiroku.life
+      title: Argo CD UI
       icon: dashboard
     - url: https://github.com/harishSudalaimani/voidlab
       title: VoidLab GitOps repository
@@ -131,7 +172,7 @@ metadata:
   annotations:
     argocd/app-name: keycloak
   links:
-    - url: https://sso.kiroku.life
+    - url: https://keycloak.kiroku.life
       title: Keycloak Admin Console
       icon: dashboard
 spec:
@@ -192,7 +233,7 @@ metadata:
   title: Keycloak Identity
   description: SSO provider for the Policy Reporter UI
   links:
-    - url: https://sso.kiroku.life/realms/voidlab
+    - url: https://keycloak.kiroku.life/realms/voidlab
       title: VoidLab realm
       icon: dashboard
 spec:
@@ -272,11 +313,11 @@ metadata:
   annotations:
     argocd/app-name: kiali
   links:
-    - url: http://localhost:20001
-      title: Kiali (port-forward required)
+    - url: https://kiali.kiroku.life
+      title: Kiali dashboard
       icon: dashboard
-    - url: https://github.com/harishSudalaimani/voidlab/blob/main/gitops/README.md
-      title: Port-forward instructions
+    - url: https://kiali.io/docs/
+      title: Kiali documentation
       icon: docs
 spec:
   type: service
@@ -293,8 +334,8 @@ metadata:
   annotations:
     argocd/app-name: longhorn
   links:
-    - url: http://localhost:8081
-      title: Longhorn UI (port-forward required)
+    - url: https://longhorn.kiroku.life
+      title: Longhorn UI
       icon: dashboard
     - url: https://longhorn.io/docs/
       title: Longhorn documentation
@@ -314,8 +355,8 @@ metadata:
   annotations:
     argocd/app-name: minio
   links:
-    - url: http://localhost:9001
-      title: MinIO Console (port-forward required)
+    - url: https://minio.kiroku.life
+      title: MinIO Console
       icon: dashboard
 spec:
   type: service
@@ -334,8 +375,8 @@ metadata:
   annotations:
     argocd/app-name: kube-prometheus-stack
   links:
-    - url: http://localhost:3000
-      title: Grafana (port-forward required)
+    - url: https://grafana.kiroku.life
+      title: Grafana
       icon: dashboard
 spec:
   type: service
@@ -356,8 +397,8 @@ metadata:
   annotations:
     argocd/app-name: kube-prometheus-stack
   links:
-    - url: http://localhost:9091
-      title: Prometheus (port-forward required)
+    - url: https://prometheus.kiroku.life
+      title: Prometheus
       icon: dashboard
 spec:
   type: service
@@ -374,8 +415,8 @@ metadata:
   annotations:
     argocd/app-name: kube-prometheus-stack
   links:
-    - url: http://localhost:9093
-      title: Alertmanager (port-forward required)
+    - url: https://alertmanager.kiroku.life
+      title: Alertmanager
       icon: dashboard
 spec:
   type: service
@@ -392,7 +433,7 @@ metadata:
   annotations:
     argocd/app-name: loki
   links:
-    - url: http://localhost:3000
+    - url: https://grafana.kiroku.life
       title: Explore logs in Grafana
       icon: dashboard
 spec:
@@ -413,7 +454,7 @@ metadata:
   annotations:
     argocd/app-name: tempo
   links:
-    - url: http://localhost:3000
+    - url: https://grafana.kiroku.life
       title: Explore traces in Grafana
       icon: dashboard
 spec:
@@ -455,8 +496,8 @@ metadata:
   annotations:
     argocd/app-name: redisinsight
   links:
-    - url: http://localhost:5540
-      title: RedisInsight (port-forward required)
+    - url: https://redisinsight.kiroku.life
+      title: RedisInsight
       icon: dashboard
 spec:
   type: service
@@ -475,7 +516,7 @@ metadata:
   annotations:
     argocd/app-name: redis
   links:
-    - url: http://localhost:5540
+    - url: https://redisinsight.kiroku.life
       title: Open RedisInsight
       icon: dashboard
 spec:
@@ -493,8 +534,8 @@ metadata:
   annotations:
     argocd/app-name: opencost
   links:
-    - url: http://localhost:9090
-      title: OpenCost (port-forward required)
+    - url: https://opencost.kiroku.life
+      title: OpenCost
       icon: dashboard
 spec:
   type: service
@@ -556,8 +597,8 @@ metadata:
   annotations:
     argocd/app-name: infisical
   links:
-    - url: http://localhost:8082
-      title: Infisical UI (port-forward required)
+    - url: https://infisical.kiroku.life
+      title: Infisical UI
       icon: dashboard
 spec:
   type: service
