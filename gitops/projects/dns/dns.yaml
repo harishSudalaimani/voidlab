@@ -27,6 +27,12 @@ spec:
     - group: ""
       kind: Namespace
       name: external-dns
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: dnsendpoints.externaldns.k8s.io
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      name: dnsrecords.externaldns.k8s.io
     - group: rbac.authorization.k8s.io
       kind: ClusterRole
     - group: rbac.authorization.k8s.io
