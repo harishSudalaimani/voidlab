@@ -15,8 +15,28 @@ spec:
       allowedRoutes:
         namespaces:
           from: All
+    - name: http-apex
+      hostname: kiroku.life
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
     - name: https
       hostname: "*.kiroku.life"
+      port: 443
+      protocol: HTTPS
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: wildcard-kiroku-life-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-apex
+      hostname: kiroku.life
       port: 443
       protocol: HTTPS
       tls:
@@ -42,6 +62,30 @@ spec:
       sectionName: http
   hostnames:
     - "*.kiroku.life"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirect-apex-http-to-https
+  namespace: istio-system
+  annotations:
+    external-dns.kubernetes.io/gateway-hostname-source: annotation-only
+spec:
+  parentRefs:
+    - name: public
+      sectionName: http-apex
+  hostnames:
+    - kiroku.life
   rules:
     - matches:
         - path:
