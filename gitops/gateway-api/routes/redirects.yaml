@@ -1,0 +1,47 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirect-http-to-https
+  namespace: istio-system
+  annotations:
+    external-dns.kubernetes.io/gateway-hostname-source: annotation-only
+spec:
+  parentRefs:
+    - name: public
+      sectionName: http
+  hostnames:
+    - "*.kiroku.life"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: redirect-apex-http-to-https
+  namespace: istio-system
+  annotations:
+    external-dns.kubernetes.io/gateway-hostname-source: annotation-only
+spec:
+  parentRefs:
+    - name: public
+      sectionName: http-apex
+  hostnames:
+    - kiroku.life
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301

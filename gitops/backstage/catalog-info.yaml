@@ -823,7 +823,7 @@ kind: Component
 metadata:
   name: istio-public-gateway
   title: Istio Public Gateway
-  description: Shared HTTPS Gateway API entry point for *.kiroku.life routes
+  description: Shared HTTPS Gateway API entry point for kiroku.life and *.kiroku.life routes
   annotations:
     argocd/app-name: istio-public-gateway
   links:
