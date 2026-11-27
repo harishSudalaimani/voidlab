@@ -14,6 +14,7 @@ spec:
     - https://opencost.github.io/opencost-helm-chart
     - https://openfga.github.io/helm-charts
     - https://argoproj.github.io/argo-helm
+    - https://oauth2-proxy.github.io/manifests
     - https://backstage.github.io/charts
   destinations:
     - server: https://kubernetes.default.svc
