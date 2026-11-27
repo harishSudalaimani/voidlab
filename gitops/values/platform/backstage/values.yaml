@@ -13,6 +13,29 @@ backstage:
       memory: 512Mi
     limits:
       memory: 1Gi
+  initContainers:
+    - name: wait-for-postgresql
+      image: ghcr.io/cloudnative-pg/postgresql:18.1
+      imagePullPolicy: IfNotPresent
+      command:
+        - /bin/sh
+        - -ec
+      args:
+        - |
+          until pg_isready --host=backstage-db-rw.backstage.svc.cluster.local --port=5432; do
+            echo "Waiting for Backstage PostgreSQL to accept connections"
+            sleep 2
+          done
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
   nodeSelector:
     kubernetes.io/hostname: cp
   tolerations:
