@@ -20,7 +20,14 @@ yarn install --immutable
 yarn tsc
 yarn build:backend
 docker build . -f packages/backend/Dockerfile \
-  -t ghcr.io/harishsudalaimani/voidlab-backstage:1.55.2-oidc1
+  -t harbor.kiroku.life/library/voidlab-backstage:1.55.2-oidc1
 ```
 
-Publish the image before updating the GitOps deployment to reference its tag. The deployment values are in `gitops/values/platform/backstage/values.yaml`.
+Log in from the home LAN with a Harbor robot that can push to the `library` project, then push the tag:
+
+```sh
+docker login harbor.kiroku.life -u '<push-robot-username>'
+docker push harbor.kiroku.life/library/voidlab-backstage:1.55.2-oidc1
+```
+
+The cluster uses a separate pull-only robot whose credentials are synchronized from Infisical. Publish the image before updating the GitOps deployment to reference its tag. The deployment values are in `gitops/values/platform/backstage/values.yaml`.

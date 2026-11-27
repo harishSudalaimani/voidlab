@@ -1,10 +1,12 @@
 backstage:
   replicas: 1
   image:
-    registry: ghcr.io
-    repository: harishsudalaimani/voidlab-backstage
+    registry: harbor.kiroku.life
+    repository: library/voidlab-backstage
     tag: 1.55.2-oidc1
     pullPolicy: IfNotPresent
+    pullSecrets:
+      - backstage-harbor-pull
   strategy:
     type: Recreate
   resources:
