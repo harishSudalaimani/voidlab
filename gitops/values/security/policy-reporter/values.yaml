@@ -28,6 +28,10 @@ plugin:
 
 ui:
   enabled: true
+  # Force the UI to reload its OIDC discovery document after changing from
+  # sso.kiroku.life to keycloak.kiroku.life. OIDC discovery is read at startup.
+  podAnnotations:
+    voidlab.kiroku.life/oidc-discovery-revision: keycloak-host
   clusters:
     - name: VoidLab
       host: http://policy-reporter.policy-reporter.svc.cluster.local:8080
