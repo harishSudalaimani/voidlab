@@ -37,6 +37,9 @@ spec:
   lifecycle: production
   owner: group:default/platform
   system: voidlab-platform
+  dependsOn:
+    - component:default/gateway-api
+    - component:default/istio
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -66,11 +69,18 @@ metadata:
   annotations:
     argocd/app-name: external-dns
     backstage.io/kubernetes-id: external-dns
+  links:
+    - url: https://kubernetes-sigs.github.io/external-dns/
+      title: ExternalDNS documentation
+      icon: docs
 spec:
   type: service
   lifecycle: production
   owner: group:default/platform
   system: voidlab-platform
+  dependsOn:
+    - component:default/technitium-dns
+    - component:default/gateway-api
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -81,6 +91,31 @@ metadata:
   annotations:
     argocd/app-name: coredns-forwarding
     backstage.io/kubernetes-id: coredns
+  links:
+    - url: https://coredns.io/manual/toc/
+      title: CoreDNS documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/technitium-dns
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: argocd
+  title: Argo CD
+  description: GitOps controller that reconciles the VoidLab applications
+  links:
+    - url: https://localhost:8080
+      title: Argo CD UI (port-forward required)
+      icon: dashboard
+    - url: https://github.com/harishSudalaimani/voidlab
+      title: VoidLab GitOps repository
+      icon: docs
 spec:
   type: service
   lifecycle: production
@@ -104,6 +139,9 @@ spec:
   lifecycle: production
   owner: group:default/platform
   system: voidlab-platform
+  dependsOn:
+    - component:default/keycloak-operator
+    - component:default/keycloak-database
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -143,6 +181,9 @@ spec:
   lifecycle: production
   owner: group:default/platform
   system: voidlab-platform
+  dependsOn:
+    - component:default/kyverno
+    - component:default/keycloak
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -159,6 +200,8 @@ spec:
   lifecycle: production
   owner: group:default/platform
   system: voidlab-platform
+  dependsOn:
+    - component:default/keycloak
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Component
@@ -177,3 +220,709 @@ spec:
   lifecycle: production
   owner: group:default/platform
   system: voidlab-platform
+  dependsOn:
+    - component:default/cloudnative-pg
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: headlamp
+  title: Headlamp
+  description: Kubernetes dashboard with the CloudNativePG plugin
+  annotations:
+    argocd/app-name: headlamp
+  links:
+    - url: https://headlamp.kiroku.life
+      title: Kubernetes Dashboard
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: harbor
+  title: Harbor
+  description: Container image and Helm chart registry backed by MinIO
+  annotations:
+    argocd/app-name: harbor
+  links:
+    - url: https://harbor.kiroku.life
+      title: Harbor Registry
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/minio
+    - component:default/harbor-database
+    - component:default/minio-harbor-access
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: kiali
+  title: Kiali
+  description: Istio ambient service mesh topology and health dashboard
+  annotations:
+    argocd/app-name: kiali
+  links:
+    - url: http://localhost:20001
+      title: Kiali (port-forward required)
+      icon: dashboard
+    - url: https://github.com/harishSudalaimani/voidlab/blob/main/gitops/README.md
+      title: Port-forward instructions
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: longhorn
+  title: Longhorn
+  description: Distributed block storage and volume management for the cluster
+  annotations:
+    argocd/app-name: longhorn
+  links:
+    - url: http://localhost:8081
+      title: Longhorn UI (port-forward required)
+      icon: dashboard
+    - url: https://longhorn.io/docs/
+      title: Longhorn documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: minio
+  title: MinIO
+  description: Object storage for Harbor, Loki, and Tempo
+  annotations:
+    argocd/app-name: minio
+  links:
+    - url: http://localhost:9001
+      title: MinIO Console (port-forward required)
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/longhorn
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: grafana
+  title: Grafana
+  description: Observability dashboards with Prometheus, Loki, and Tempo data sources
+  annotations:
+    argocd/app-name: kube-prometheus-stack
+  links:
+    - url: http://localhost:3000
+      title: Grafana (port-forward required)
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/prometheus
+    - component:default/loki
+    - component:default/tempo
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: prometheus
+  title: Prometheus
+  description: Metrics collection and query service for the cluster
+  annotations:
+    argocd/app-name: kube-prometheus-stack
+  links:
+    - url: http://localhost:9091
+      title: Prometheus (port-forward required)
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: alertmanager
+  title: Alertmanager
+  description: Alert routing and silencing for Prometheus alerts
+  annotations:
+    argocd/app-name: kube-prometheus-stack
+  links:
+    - url: http://localhost:9093
+      title: Alertmanager (port-forward required)
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: loki
+  title: Loki
+  description: Log aggregation backend queried from Grafana
+  annotations:
+    argocd/app-name: loki
+  links:
+    - url: http://localhost:3000
+      title: Explore logs in Grafana
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/minio
+    - component:default/minio-observability-access
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: tempo
+  title: Tempo
+  description: Distributed trace storage queried from Grafana
+  annotations:
+    argocd/app-name: tempo
+  links:
+    - url: http://localhost:3000
+      title: Explore traces in Grafana
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/minio
+    - component:default/minio-observability-access
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: opentelemetry-collector
+  title: OpenTelemetry Collector
+  description: OTLP gateway that sends logs to Loki and traces to Tempo
+  annotations:
+    argocd/app-name: opentelemetry-collector
+  links:
+    - url: https://opentelemetry.io/docs/collector/
+      title: Collector documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/loki
+    - component:default/tempo
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: redisinsight
+  title: RedisInsight
+  description: Redis administration and data browser for the standalone Redis service
+  annotations:
+    argocd/app-name: redisinsight
+  links:
+    - url: http://localhost:5540
+      title: RedisInsight (port-forward required)
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/redis
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: redis
+  title: Redis
+  description: Standalone in-cluster Redis service used by platform workloads
+  annotations:
+    argocd/app-name: redis
+  links:
+    - url: http://localhost:5540
+      title: Open RedisInsight
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: opencost
+  title: OpenCost
+  description: Kubernetes cost monitoring UI and API
+  annotations:
+    argocd/app-name: opencost
+  links:
+    - url: http://localhost:9090
+      title: OpenCost (port-forward required)
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/prometheus
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openfga
+  title: OpenFGA
+  description: Fine-grained authorization service; its development Playground is disabled
+  annotations:
+    argocd/app-name: openfga
+  links:
+    - url: https://openfga.dev/docs
+      title: OpenFGA documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/openfga-database
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cloudnative-pg
+  title: CloudNativePG
+  description: PostgreSQL operator and database platform for application services
+  annotations:
+    argocd/app-name: cloudnative-pg
+  links:
+    - url: https://headlamp.kiroku.life
+      title: Manage PostgreSQL clusters in Headlamp
+      icon: dashboard
+    - url: https://cloudnative-pg.io/documentation/
+      title: CloudNativePG documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/longhorn
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: infisical
+  title: Infisical
+  description: Secrets manager used by the GitOps workloads
+  annotations:
+    argocd/app-name: infisical
+  links:
+    - url: http://localhost:8082
+      title: Infisical UI (port-forward required)
+      icon: dashboard
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cert-manager
+  title: cert-manager
+  description: Issues and renews the wildcard TLS certificate used by the Istio Gateway
+  annotations:
+    argocd/app-name: cert-manager
+  links:
+    - url: https://cert-manager.io/docs/
+      title: cert-manager documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: istio
+  title: Istio Ambient and Gateway API
+  description: Ambient service mesh and shared HTTPS Gateway for the cluster
+  annotations:
+    argocd/app-name: istiod
+  links:
+    - url: https://istio.io/latest/docs/setup/additional-setup/gateway/
+      title: Shared public Gateway documentation
+      icon: docs
+    - url: https://github.com/harishSudalaimani/voidlab/blob/main/gitops/README.md
+      title: VoidLab mesh setup
+      icon: docs
+    - url: https://istio.io/latest/docs/ambient/
+      title: Istio Ambient documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: gateway-api
+  title: Kubernetes Gateway API
+  description: Gateway API CRDs used by Istio and Argo Rollouts traffic routing
+  annotations:
+    argocd/app-name: gateway-api-crds
+  links:
+    - url: https://gateway-api.sigs.k8s.io/
+      title: Gateway API documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: keycloak-operator
+  title: Keycloak Operator
+  description: Manages the Keycloak identity service
+  annotations:
+    argocd/app-name: keycloak-operator
+  links:
+    - url: https://www.keycloak.org/operator/installation
+      title: Operator documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: infisical-secrets-operator
+  title: Infisical Secrets Operator
+  description: Synchronizes Infisical secrets into Kubernetes Secrets for GitOps workloads
+  annotations:
+    argocd/app-name: infisical-secrets-operator
+  links:
+    - url: https://infisical.com/docs/integrations/platforms/kubernetes
+      title: Kubernetes integration documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/infisical
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: letsencrypt
+  title: Let's Encrypt Issuer
+  description: cert-manager ClusterIssuers and wildcard TLS certificate for the shared Gateway
+  annotations:
+    argocd/app-name: letsencrypt
+  links:
+    - url: https://letsencrypt.org/docs/
+      title: Let's Encrypt documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/cert-manager
+    - component:default/istio
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: networking-policies
+  title: Cilium Network Policies
+  description: GitOps-managed Cilium policies for the public Istio Gateway
+  annotations:
+    argocd/app-name: networking-policies
+  links:
+    - url: https://docs.cilium.io/en/stable/security/policy/
+      title: Cilium policy documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/cilium
+    - component:default/istio
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: cilium
+  title: Cilium
+  description: Cluster CNI and load-balancer IP announcement, managed by Pulumi
+  links:
+    - url: https://docs.cilium.io/
+      title: Cilium documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: istio-base
+  title: Istio Base
+  description: Istio base charts and cluster-wide defaults
+  annotations:
+    argocd/app-name: istio-base
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/gateway-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: istio-cni
+  title: Istio CNI
+  description: CNI plugin that configures pod networking for Istio Ambient
+  annotations:
+    argocd/app-name: istio-cni
+  links:
+    - url: https://istio.io/latest/docs/setup/additional-setup/cni/
+      title: Istio CNI documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/istio-base
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ztunnel
+  title: Istio ztunnel
+  description: Node-level secure tunnel proxy for Istio Ambient workloads
+  annotations:
+    argocd/app-name: ztunnel
+  links:
+    - url: https://istio.io/latest/docs/ambient/architecture/data-plane/
+      title: Ambient data plane documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/istio-base
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: istio-public-gateway
+  title: Istio Public Gateway
+  description: Shared HTTPS Gateway API entry point for *.kiroku.life routes
+  annotations:
+    argocd/app-name: istio-public-gateway
+  links:
+    - url: https://istio.io/latest/docs/tasks/traffic-management/ingress/gateway-api/
+      title: Istio Gateway API documentation
+      icon: docs
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/istio
+    - component:default/gateway-api
+    - component:default/letsencrypt
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: istio-gateway-placement
+  title: Istio Gateway Placement
+  description: Scheduling and node placement configuration for the shared Gateway
+  annotations:
+    argocd/app-name: istio-gateway-placement
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/istio-public-gateway
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: observability-credentials
+  title: Observability Credentials
+  description: Provisions MinIO credentials and syncs object storage access for Loki and Tempo
+  annotations:
+    argocd/app-name: observability-credentials
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/infisical
+    - component:default/minio
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: minio-observability-access
+  title: MinIO Observability Access
+  description: Creates restricted object storage access for Loki and Tempo
+  annotations:
+    argocd/app-name: minio-observability-access
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/minio
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: minio-harbor-access
+  title: MinIO Harbor Access
+  description: Creates the Harbor bucket and scoped storage credentials
+  annotations:
+    argocd/app-name: minio-harbor-access
+spec:
+  type: service
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/minio
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: keycloak-database
+  title: Keycloak Database
+  description: PostgreSQL cluster used by Keycloak
+  annotations:
+    argocd/app-name: keycloak-database
+  links:
+    - url: https://headlamp.kiroku.life
+      title: Manage database resources in Headlamp
+      icon: dashboard
+spec:
+  type: database
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/cloudnative-pg
+    - component:default/longhorn
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: harbor-database
+  title: Harbor Database
+  description: PostgreSQL cluster used by Harbor
+  annotations:
+    argocd/app-name: harbor-database
+  links:
+    - url: https://headlamp.kiroku.life
+      title: Manage database resources in Headlamp
+      icon: dashboard
+spec:
+  type: database
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/cloudnative-pg
+    - component:default/longhorn
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: openfga-database
+  title: OpenFGA Database
+  description: PostgreSQL cluster used by OpenFGA
+  annotations:
+    argocd/app-name: openfga-database
+  links:
+    - url: https://headlamp.kiroku.life
+      title: Manage database resources in Headlamp
+      icon: dashboard
+spec:
+  type: database
+  lifecycle: production
+  owner: group:default/platform
+  system: voidlab-platform
+  dependsOn:
+    - component:default/cloudnative-pg
+    - component:default/longhorn

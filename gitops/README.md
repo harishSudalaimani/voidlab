@@ -126,7 +126,24 @@ Keycloak uses upstream operator resources pinned to `26.8.2`, plus a single-inst
 
 Kyverno chart `3.10.0` installs the admission, background, cleanup, and reports controllers on `cp` with the control-plane toleration. It installs the Kyverno and WG Policy report CRDs, but no enforcement policies are bundled; add policies after reviewing their effects. Policy Reporter chart `3.11.2` installs its core service, Kyverno plugin, and UI, all pinned to `cp`. The UI is at `https://policy-reporter.kiroku.life` and uses Keycloak OIDC with PKCE. The UI presents policy reports and Kyverno policy details; Kyverno itself does not ship a separate dashboard.
 
-Backstage chart `2.11.0` is deployed with the pinned official image `ghcr.io/backstage/backstage:1.55.2`, a single-instance CloudNativePG database, and `cp` node placement plus control-plane toleration. Its Software Catalog loads `gitops/backstage/catalog-info.yaml` and lists the platform services with direct links to their interfaces. Backstage is available at `https://backstage.kiroku.life`. This catalog launchpad uses the generic Backstage image; custom frontend/backend plugin pages require building a tailored Backstage image.
+Backstage chart `2.11.0` is deployed with the pinned official image `ghcr.io/backstage/backstage:1.55.2`, a single-instance CloudNativePG database, and `cp` node placement plus control-plane toleration. Its Software Catalog loads `gitops/backstage/catalog-info.yaml`, which catalogs the GitOps-managed services and supporting components, links their dashboards, and records service dependencies. Backstage is available at `https://backstage.kiroku.life`. The current generic image provides the Software Catalog and dashboard launchpad; live Kubernetes and Argo CD plugin pages require a tailored Backstage image with those plugins installed and configured.
+
+### Backstage internal dashboard links
+
+The Software Catalog links to internal dashboards on `localhost`; run the matching command in a terminal on the same computer before opening the link:
+
+| Backstage link | Port-forward |
+| --- | --- |
+| Argo CD | `kubectl -n argocd port-forward svc/argocd-server 8080:443` |
+| Kiali | `kubectl -n istio-system port-forward svc/kiali 20001:20001` |
+| Longhorn | `kubectl -n longhorn-system port-forward svc/longhorn-frontend 8081:80` |
+| MinIO Console | `kubectl -n minio port-forward svc/minio-console 9001:9090` |
+| Infisical | `kubectl -n security port-forward svc/infisical-infisical-standalone-infisical 8082:8080` |
+| Grafana | `kubectl -n observability port-forward svc/kube-prometheus-stack-grafana 3000:80` |
+| Prometheus | `kubectl -n observability port-forward svc/kube-prometheus-stack-prometheus 9091:9090` |
+| Alertmanager | `kubectl -n observability port-forward svc/kube-prometheus-stack-alertmanager 9093:9093` |
+| RedisInsight | `kubectl -n database port-forward svc/redisinsight-ui 5540:5540` |
+| OpenCost | `kubectl -n opencost port-forward svc/opencost 9090:9090` |
 
 ### Argo Rollouts Gateway API smoke test
 
