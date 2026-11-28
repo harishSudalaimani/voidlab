@@ -44,4 +44,4 @@ catalog:
     - allow: [Component, Domain, Group, Location, Resource, System, User]
   locations:
     - type: url
-      target: https://raw.githubusercontent.com/harishSudalaimani/voidlab/main/gitops/backstage/catalog-info.yaml
+      target: https://raw.githubusercontent.com/harishSudalaimani/voidlab/main/gitops/values/platform/backstage/catalog-info.yaml
