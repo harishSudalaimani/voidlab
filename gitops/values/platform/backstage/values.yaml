@@ -3,7 +3,7 @@ backstage:
   image:
     registry: harbor.kiroku.life
     repository: library/voidlab-backstage
-    tag: 1.57.0-keycloak-sync1
+    tag: 1.57.0-keycloak-sync2
     pullPolicy: IfNotPresent
     pullSecrets:
       - backstage-harbor-pull
