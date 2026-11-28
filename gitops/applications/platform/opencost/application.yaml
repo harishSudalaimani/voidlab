@@ -20,6 +20,16 @@ spec:
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       ref: values
+    - repoURL: https://oauth2-proxy.github.io/manifests
+      chart: oauth2-proxy
+      targetRevision: 10.7.4
+      helm:
+        releaseName: opencost-auth-oauth2-proxy
+        valueFiles:
+          - $values/gitops/values/platform/opencost/oauth2-proxy-values.yaml
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/platform/opencost/resources
     - repoURL: https://github.com/harishSudalaimani/voidlab.git
       targetRevision: main
       path: gitops/gateway-api/routes/opencost

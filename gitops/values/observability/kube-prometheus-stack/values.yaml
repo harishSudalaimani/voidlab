@@ -6,6 +6,33 @@ grafana:
   grafana.ini:
     server:
       root_url: https://grafana.kiroku.life
+    auth:
+      disable_login_form: false
+    auth.generic_oauth:
+      enabled: true
+      name: Keycloak
+      allow_sign_up: true
+      auto_login: false
+      client_id: grafana
+      client_secret: "$__env{GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET}"
+      scopes: openid profile email
+      auth_url: https://keycloak.kiroku.life/realms/voidlab/protocol/openid-connect/auth
+      token_url: https://keycloak.kiroku.life/realms/voidlab/protocol/openid-connect/token
+      api_url: https://keycloak.kiroku.life/realms/voidlab/protocol/openid-connect/userinfo
+      use_pkce: true
+      use_refresh_token: true
+      validate_id_token: true
+      email_attribute_path: email
+      login_attribute_path: preferred_username
+      name_attribute_path: name
+      groups_attribute_path: groups
+      role_attribute_path: "contains(groups, 'argocd-admins') && 'GrafanaAdmin' || 'Viewer'"
+      allow_assign_grafana_admin: true
+  envValueFrom:
+    GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+      secretKeyRef:
+        name: grafana-oidc
+        key: client-secret
   nodeSelector:
     kubernetes.io/hostname: cp
   tolerations:

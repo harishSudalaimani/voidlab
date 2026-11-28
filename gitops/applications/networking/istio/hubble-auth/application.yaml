@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: hubble-auth
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: service-mesh
+  sources:
+    - repoURL: https://oauth2-proxy.github.io/manifests
+      chart: oauth2-proxy
+      targetRevision: 10.7.4
+      helm:
+        releaseName: hubble-auth-oauth2-proxy
+        valueFiles:
+          - $values/gitops/values/networking/istio/hubble-oauth2-proxy-values.yaml
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/values/networking/istio/hubble-resources
+    - repoURL: https://github.com/harishSudalaimani/voidlab.git
+      targetRevision: main
+      path: gitops/gateway-api/routes/hubble
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: -1
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true

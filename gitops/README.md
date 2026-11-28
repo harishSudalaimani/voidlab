@@ -2,11 +2,11 @@
 
 ## Current scope
 
-GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, standalone Redis, RedisInsight, Argo Rollouts with OAuth2 Proxy, Keycloak, Kyverno, Policy Reporter, Backstage, Technitium DNS, ExternalDNS, CoreDNS forwarding, and the Cloudflare Tunnel connector. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, `platform`, or `dns` project.
+GitOps deploys Cilium network policies, Istio ambient, Longhorn, Infisical, MinIO, cert-manager with Let's Encrypt DNS-01, Headlamp, the observability stack, Harbor, OpenCost, OpenFGA, CloudNativePG, standalone Redis, RedisInsight, Argo Rollouts, Keycloak, Kyverno, Policy Reporter, Backstage, Technitium DNS, ExternalDNS, CoreDNS forwarding, and the Cloudflare Tunnel connector. Keycloak SSO protects the Rollouts, OpenCost, Hubble, Kiali, and Longhorn dashboards through OAuth2 Proxy; Grafana, Harbor, and Technitium use native OIDC. Cilium itself remains installed and managed by Pulumi. Pulumi also installs Argo CD and creates the root `voidlab-applications` Application. That root Application reads the AppProject and child Application manifests from this directory, using Argo CD's built-in `default` project. Workload Applications use their dedicated `networking`, `service-mesh`, `storage`, `security`, `observability`, `database`, `platform`, or `dns` project.
 
 The `networking` AppProject allows Cilium network policies, LB IP pools, and L2 announcement policies. Manifests under `policies/cilium/network-policies/` are applied by Argo CD; Pulumi retains ownership of the Cilium installation. The public Istio Gateway uses `192.168.29.254/32`, while Technitium DNS uses a separate `192.168.29.253/32` pool. Each pool selects only its matching Service. Their L2 announcements are restricted to the control-plane node's `enp8s0` interface.
 
-Gateway API configuration is organized under `gateway-api/`. `gateway/public/` holds the Gateway listeners. Every `HTTPRoute` has a small Kustomize module in `routes/<module>/`, so the full route inventory is easy to review in one place. Each application keeps ownership of its own route by including that route module as an Argo CD source; the public Gateway Application owns the shared redirects and Hubble route. The top-level `routes/kustomization.yaml` is an audit/build inventory only and is not an Argo CD source.
+Gateway API configuration is organized under `gateway-api/`. `gateway/public/` holds the Gateway listeners. Every `HTTPRoute` has a small Kustomize module in `routes/<module>/`, so the full route inventory is easy to review in one place. Each application keeps ownership of its own route by including that route module as an Argo CD source; the public Gateway Application owns the shared redirects. The top-level `routes/kustomization.yaml` is an audit/build inventory only and is not an Argo CD source.
 
 Before syncing either VIP, keep the router DHCP range at `192.168.29.2–192.168.29.199` so it cannot lease `.253` or `.254`. Cilium's Pulumi Helm release enables `l2announcements.enabled=true` and already has `kubeProxyReplacement=true`. Cilium auto-detects devices because the node interfaces have different names; verify `enp8s0` is selected on `cp` before relying on the Gateway VIP. Apply the Cilium Pulumi update before the networking-policies Application syncs the announcement policy.
 
@@ -30,7 +30,7 @@ GUI routes use `HTTPRoute` hostnames, and ExternalDNS publishes private records 
 
 Argo CD is exposed at `https://argocd.kiroku.life` over its existing TLS service port. A cert-manager `Certificate` supplies the `argocd-server-tls` Secret, and Gateway API `BackendTLSPolicy` validates the upstream certificate against system roots. Argo CD hot-reloads this certificate when cert-manager renews it.
 
-Kiali uses the Prometheus service over HTTP inside ambient mTLS for graph metrics and metric-based health views. Its default token authentication remains enabled at `https://kiali.kiroku.life`. Kiali's operator-managed NetworkPolicy allows its application and metrics ports; the separate `policies/istio/kiali` policy also permits ambient HBONE on port `15008`, which Istio requires for ambient traffic. Headlamp chart `0.46.0` is available at `https://headlamp.kiroku.life`; it uses per-user bearer-token login and its own service account is restricted to the built-in `view` role. Do not enable shared service-account authentication for a public deployment.
+Kiali uses the Prometheus service over HTTP inside ambient mTLS for graph metrics and metric-based health views. OAuth2 Proxy fronts `https://kiali.kiroku.life` and restricts access to Keycloak group `argocd-admins`; the Gateway route targets the proxy. Kiali's own auth strategy is set to anonymous because the proxy handles login at the published route, so do not publish the Kiali Service directly. Kiali's operator-managed NetworkPolicy allows its application and metrics ports; the separate `policies/istio/kiali` policy also permits ambient HBONE on port `15008`, which Istio requires for ambient traffic. Hubble UI uses the same Keycloak group gate at `https://hubble.kiroku.life`. Headlamp chart `0.46.0` is available at `https://headlamp.kiroku.life`; it uses per-user bearer-token login and its own service account is restricted to the built-in `view` role. Do not enable shared service-account authentication for a public deployment.
 
 All Istio child Applications automatically sync. Their retry policy allows components to converge as prerequisite CRDs and controllers become available. The Cilium compatibility update must already be applied before `istio-cni` can work correctly.
 
@@ -87,7 +87,7 @@ Keep `MINIO_ACCESS_KEY` at 20 characters or fewer to satisfy MinIO's access-key 
 
 Create these buckets in MinIO before Loki or Tempo use them: `loki-chunks`, `loki-ruler`, and `tempo-traces`. Do not use MinIO root credentials for the stack. Once the four Infisical values and buckets are ready, Argo automatically syncs the credentials, MinIO access provisioner, kube-prometheus-stack, Loki, Tempo, the Collector, and Kiali. The chart Applications retry failed syncs while dependencies such as the Prometheus Operator ServiceMonitor CRD become available. Check the first service-account Job with `kubectl -n minio get jobs`; Loki and Tempo need that Job to complete successfully before MinIO accepts their credentials.
 
-Grafana is included in kube-prometheus-stack; there is no separate Grafana release. Its Prometheus, Loki, and Tempo data sources are provisioned automatically. Open Grafana at `https://grafana.kiroku.life` and sign in with the credentials from Infisical. Prometheus and Alertmanager are available at `https://prometheus.kiroku.life` and `https://alertmanager.kiroku.life`. The Collector accepts OTLP/gRPC on `opentelemetry-collector.observability.svc.cluster.local:4317` and OTLP/HTTP on port `4318`; Istio ambient mTLS encrypts in-mesh traffic. It sends logs to Loki and traces to Tempo inside the mesh and exposes received metrics for Prometheus to scrape. This gateway does not tail every pod's container log or instrument applications automatically; those require an agent or app-side instrumentation.
+Grafana is included in kube-prometheus-stack; there is no separate Grafana release. Its Prometheus, Loki, and Tempo data sources are provisioned automatically. Grafana supports Keycloak sign-in at `https://grafana.kiroku.life`; Keycloak members of `argocd-admins` receive Grafana server-admin rights and other realm users receive Viewer. The local Grafana admin login remains enabled for break-glass access. Prometheus and Alertmanager are available at `https://prometheus.kiroku.life` and `https://alertmanager.kiroku.life`. The Collector accepts OTLP/gRPC on `opentelemetry-collector.observability.svc.cluster.local:4317` and OTLP/HTTP on port `4318`; Istio ambient mTLS encrypts in-mesh traffic. It sends logs to Loki and traces to Tempo inside the mesh and exposes received metrics for Prometheus to scrape. This gateway does not tail every pod's container log or instrument applications automatically; those require an agent or app-side instrumentation.
 
 The chart versions are pinned in their Argo CD Applications: kube-prometheus-stack `93.10.0`, Loki `21.6.0`, Tempo `3.2.1`, and OpenTelemetry Collector `0.178.2`. These are single-node lab deployments, not highly available services. Loki and Tempo each use one core process on `cp`; their PVCs preserve local WAL/state while MinIO stores their long-term blocks.
 
@@ -95,13 +95,13 @@ The chart versions are pinned in their Argo CD Applications: kube-prometheus-sta
 
 The `database` AppProject installs the CloudNativePG operator in `cnpg-system` on `cp`, standalone Redis, and RedisInsight in the `database` namespace. The operator namespace is not ambient-enrolled so its Kubernetes admission webhook remains on its normal control-plane TLS path; the database namespace is ambient-enrolled for Istio mTLS. The Redis StatefulSet is pinned to `cp`, uses an 8 GiB Longhorn PVC, append-only persistence, and a password from Infisical. Its in-cluster endpoint is `redis.database.svc.cluster.local:6379`. It is a single instance with no failover or backup configuration, so configure and verify backups before relying on it for irreplaceable data. Redis uses `noeviction`; clients receive write errors when its 512 MiB data limit is full. RedisInsight is pinned to `cp`, stores its local data on Longhorn, and is preconfigured for the standalone Redis service. Its UI is at `https://redisinsight.kiroku.life`; it has no built-in UI login and is reachable only through the LAN-restricted Gateway. Redis remains bundled with Harbor and Infisical as well; their chart resources stay in their parent Applications' projects and are separate from this standalone instance.
 
-Longhorn's dashboard is available at `https://longhorn.kiroku.life`. MinIO's Console is available at `https://minio.kiroku.life`; the S3 API stays in-cluster only. The Console's `MINIO_BROWSER_REDIRECT_URL` is set to the Console hostname.
+Longhorn's dashboard is available at `https://longhorn.kiroku.life` behind OAuth2 Proxy and Keycloak group `argocd-admins`. MinIO's Console is available at `https://minio.kiroku.life`; the S3 API stays in-cluster only. The Console's `MINIO_BROWSER_REDIRECT_URL` is set to the Console hostname.
 
 The working Headlamp deployment includes the official CloudNativePG plugin. Open Headlamp at `https://headlamp.kiroku.life` and select the CloudNativePG section. Its service account receives read-only access to CloudNativePG custom resources. Headlamp users authenticate with their own Kubernetes credentials, so the actions available to each user follow their own Kubernetes RBAC.
 
-Harbor stores registry images and charts in the MinIO `harbor` bucket, using its bucket-scoped service account. Harbor's PostgreSQL credentials and chart secrets come from Infisical path `/harbor`. Harbor is reachable at `https://harbor.kiroku.life` through an Istio Gateway API `HTTPRoute`; the public Gateway terminates Let's Encrypt TLS and ambient mTLS protects in-cluster service traffic. Its database and MinIO endpoints use HTTP/PostgreSQL TLS disabled at the application layer because the Harbor namespace is enrolled in ambient mode. Harbor keeps Trivy and job logs on Longhorn PVCs.
+Harbor stores registry images and charts in the MinIO `harbor` bucket, using its bucket-scoped service account. Harbor's PostgreSQL credentials and chart secrets come from Infisical path `/harbor`. Harbor is reachable at `https://harbor.kiroku.life` through an Istio Gateway API `HTTPRoute`; configure Harbor's native OIDC provider in its admin UI after syncing, as detailed below. Keep the local Harbor admin login for break-glass access. The public Gateway terminates Let's Encrypt TLS and ambient mTLS protects in-cluster service traffic. Its database and MinIO endpoints use HTTP/PostgreSQL TLS disabled at the application layer because the Harbor namespace is enrolled in ambient mode. Harbor keeps Trivy and job logs on Longhorn PVCs.
 
-OpenCost queries `kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090` over HTTP inside ambient mTLS and registers a ServiceMonitor with the label selected by the existing Prometheus instance. Its UI/API is at `https://opencost.kiroku.life`. OpenCost has no built-in authentication, so this hostname relies on the Gateway remaining restricted to the LAN.
+OpenCost queries `kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090` over HTTP inside ambient mTLS and registers a ServiceMonitor with the label selected by the existing Prometheus instance. Its UI/API is at `https://opencost.kiroku.life` behind OAuth2 Proxy, restricted to Keycloak group `argocd-admins`.
 
 OpenFGA uses its PostgreSQL cluster, requires a pre-shared API key from Infisical path `/openfga`, and disables the development Playground. It stays internal with no public HTTPRoute. In-cluster clients use `openfga.openfga.svc.cluster.local:8080` for HTTP or port `8081` for gRPC; ambient mTLS encrypts service-to-service traffic. The OpenFGA chart also creates a ServiceMonitor for Prometheus.
 
@@ -123,6 +123,16 @@ Add these values to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94
 | `/harbor` | `HARBOR_MINIO_SECRET_KEY` | MinIO service-account secret key |
 | `/harbor` | `HARBOR_DATABASE_USERNAME` | Set to `harbor` |
 | `/harbor` | `HARBOR_DATABASE_PASSWORD` | PostgreSQL password for Harbor |
+| `/harbor` | `HARBOR_KEYCLOAK_CLIENT_SECRET` | Confidential secret for Harbor's `harbor` OIDC client |
+| `/grafana` | `GRAFANA_KEYCLOAK_CLIENT_SECRET` | Confidential secret for Grafana's `grafana` OIDC client |
+| `/opencost` | `OPENCOST_OIDC_CLIENT_SECRET` | Secret for the `opencost` OAuth2 Proxy client |
+| `/opencost` | `OPENCOST_OAUTH2_PROXY_COOKIE_SECRET` | Base64-encoded random 32-byte cookie secret; generate with `openssl rand -base64 32` |
+| `/hubble` | `HUBBLE_OIDC_CLIENT_SECRET` | Secret for the `hubble` OAuth2 Proxy client |
+| `/hubble` | `HUBBLE_OAUTH2_PROXY_COOKIE_SECRET` | Base64-encoded random 32-byte cookie secret; generate with `openssl rand -base64 32` |
+| `/kiali` | `KIALI_OIDC_CLIENT_SECRET` | Secret for the `kiali-ui` OAuth2 Proxy client |
+| `/kiali` | `KIALI_OAUTH2_PROXY_COOKIE_SECRET` | Base64-encoded random 32-byte cookie secret; generate with `openssl rand -base64 32` |
+| `/longhorn` | `LONGHORN_OIDC_CLIENT_SECRET` | Secret for the `longhorn` OAuth2 Proxy client |
+| `/longhorn` | `LONGHORN_OAUTH2_PROXY_COOKIE_SECRET` | Base64-encoded random 32-byte cookie secret; generate with `openssl rand -base64 32` |
 | `/openfga` | `OPENFGA_DATABASE_USERNAME` | Set to `openfga` |
 | `/openfga` | `OPENFGA_DATABASE_PASSWORD` | PostgreSQL password for OpenFGA |
 | `/openfga` | `OPENFGA_PRESHARED_KEYS` | Long random API key; multiple keys may be comma-separated for rotation |
@@ -138,6 +148,25 @@ CloudNativePG chart `0.29.1` installs operator `1.30.1`. Its Application in the 
 Argo Rollouts is installed from the `argo-rollouts` chart in the `platform` project. Its controller and read-only dashboard are pinned to `cp` and tolerate the control-plane taint. OAuth2 Proxy fronts the dashboard at `https://rollouts.kiroku.life`, authenticates with the Keycloak `voidlab` realm, and allows members of `argocd-admins`; the Gateway route targets the proxy rather than the dashboard Service. The proxy uses a confidential Keycloak client named `argo-rollouts`. Its client secret and OAuth2 Proxy cookie secret are read from Infisical `/argo-rollouts` as `ARGO_ROLLOUTS_OIDC_CLIENT_SECRET` and `ARGO_ROLLOUTS_OAUTH2_PROXY_COOKIE_SECRET`. The controller loads Gateway API traffic-router plugin `v0.11.0` from an init container and grants Gateway API provider RBAC only. The plugin's published provider table lists Istio `1.29.1` with plugin `0.11.0`; this cluster uses Istio `1.32.0` and Gateway API `1.6.1`, so that combination still needs an actual canary smoke test before using it for application releases. Rollouts and plugin support do not automatically convert existing Deployments to Rollout resources.
 
 Keycloak uses upstream operator resources pinned to `26.8.2`, plus a single-instance CloudNativePG database. The operator, database, and Keycloak server run on `cp`; the Keycloak CR uses required node affinity and a control-plane toleration. The Keycloak namespace is not ambient-enrolled, so management traffic stays on the normal Kubernetes path. Keycloak is reachable at `https://keycloak.kiroku.life`, with TLS terminated by the shared Gateway and X-Forwarded headers enabled. The operator generates a temporary admin credential in `keycloak-initial-admin`; change it and enable MFA before relying on the identity service. The `voidlab` realm import creates the Policy Reporter OIDC client. Keycloak realm imports are create-only: rotating that client's secret later also requires updating the client in Keycloak. Create the `argo-rollouts` confidential OIDC client manually with standard flow and client authentication enabled, direct access grants disabled, redirect URI `https://rollouts.kiroku.life/oauth2/callback`, and web origin `https://rollouts.kiroku.life`. Add an Audience mapper for `argo-rollouts` to the ID and access tokens, plus a Group Membership mapper with token claim `groups` in the ID token. Keep Full group path off so the `argocd-admins` group claim matches OAuth2 Proxy's allowed group. Store the generated client secret in Infisical under the key listed below.
+
+### Keycloak SSO for platform dashboards
+
+Create the confidential clients in the `voidlab` realm using Standard flow and client authentication, with Direct access grants disabled. Add a Group Membership mapper with claim `groups`, include it in the ID token and userinfo, and turn Full group path off. OAuth2 Proxy protects OpenCost, Hubble, Kiali, and Longhorn at the Gateway and permits only the `argocd-admins` group. Store each client secret and a unique base64-encoded 32-byte cookie secret in the Infisical path/key table below. Grafana uses native OIDC; `argocd-admins` maps to Grafana server-admin and other users map to Viewer. Its local admin login remains enabled.
+
+| Client ID | Redirect URI | Web origin |
+| --- | --- | --- |
+| `argo-rollouts` | `https://rollouts.kiroku.life/oauth2/callback` | `https://rollouts.kiroku.life` |
+| `opencost` | `https://opencost.kiroku.life/oauth2/callback` | `https://opencost.kiroku.life` |
+| `hubble` | `https://hubble.kiroku.life/oauth2/callback` | `https://hubble.kiroku.life` |
+| `kiali-ui` | `https://kiali.kiroku.life/oauth2/callback` | `https://kiali.kiroku.life` |
+| `longhorn` | `https://longhorn.kiroku.life/oauth2/callback` | `https://longhorn.kiroku.life` |
+| `grafana` | `https://grafana.kiroku.life/login/generic_oauth` | `https://grafana.kiroku.life` |
+| `technitium` | `https://dns.kiroku.life/sso/callback` | `https://dns.kiroku.life` |
+| `harbor` | `https://harbor.kiroku.life/c/oidc/callback` | `https://harbor.kiroku.life` |
+
+For Technitium, open Administration → SSO and enable OIDC using issuer `https://keycloak.kiroku.life/realms/voidlab`, client ID `technitium`, and Infisical secret `/dns/TECHNITIUM_KEYCLOAK_CLIENT_SECRET`. Register the callback shown by the UI if it differs from the URI above. Use `preferred_username` as the username claim and map `argocd-admins` to Technitium's Administrators group. Sign in at canonical host `https://dns.kiroku.life`.
+
+For Harbor, sign in as the local admin and open Administration → Configuration → Authentication. Harbor cannot switch to OIDC while local users other than `admin` exist, so remove any such users first. Select OIDC, use endpoint `https://keycloak.kiroku.life/realms/voidlab`, client ID `harbor`, and Infisical secret `/harbor/HARBOR_KEYCLOAK_CLIENT_SECRET`. Set scopes to `openid,profile,email,offline_access`, group claim to `groups`, admin group to `argocd-admins`, username claim to `preferred_username`, and enable automatic onboarding. Register the callback Harbor displays if it differs from the URI above. Harbor's OIDC group mapping grants system-admin only to the configured group; assign project membership separately. Keep the local `admin` login as a break-glass path at `/account/sign-in`.
 
 Kyverno chart `3.10.0` installs the admission, background, cleanup, and reports controllers on `cp` with the control-plane toleration. Cluster cleanup policies use the CEL-based `DeletingPolicy` API: completed or failed Jobs and terminal Pods are retained for seven days, while CronJobs are deleted only when explicitly marked with an expired `cleanup.voidlab.io/expire-at` RFC3339 label. The policies exclude Kubernetes and controller namespaces. Companion Audit `ValidatingPolicy` resources report current cleanup candidates to Policy Reporter. Kyverno emits Kubernetes Events for actual deletions; those events are not PolicyReports, so the Policy Reporter UI shows candidates and policy results rather than deletion history. Policy Reporter chart `3.11.2` installs its core service, Kyverno plugin, and UI, all pinned to `cp`. The UI is at `https://policy-reporter.kiroku.life` and uses Keycloak OIDC with PKCE. The UI presents policy reports and Kyverno policy details; Kyverno itself does not ship a separate dashboard.
 
@@ -187,6 +216,7 @@ Add these values to the `voidlab` Infisical project (`60e9131c-3eef-403a-b2b1-94
 | `/backstage` | `BACKSTAGE_KEYCLOAK_CATALOG_CLIENT_SECRET` | Client-credentials secret for the read-only Keycloak catalog sync client |
 | `/backstage` | `BACKSTAGE_AUTH_SESSION_SECRET` | Random base64-encoded 32-byte secret for Backstage OIDC sessions |
 | `/dns` | `TECHNITIUM_ADMIN_PASSWORD` | Strong initial password for the Technitium administrator account |
+| `/dns` | `TECHNITIUM_KEYCLOAK_CLIENT_SECRET` | Confidential secret for Technitium's `technitium` OIDC client |
 | `/external-dns` | `TECHNITIUM_API_TOKEN` | Technitium API token for the dedicated DNS automation user; create it in Technitium after its first start |
 | `/cloudflare-tunnel` | `CLOUDFLARE_TUNNEL_TOKEN` | Connector token for the remotely managed Cloudflare Tunnel |
 
@@ -203,7 +233,7 @@ Keep each component in the existing project/application/values layout:
 ```text
 applications/
 ├── networking/policies/application.yaml
-├── networking/istio/{gateway-api,base,istiod,cni,ztunnel,gateway-placement,kiali,public-gateway}/application.yaml
+├── networking/istio/{gateway-api,base,istiod,cni,ztunnel,gateway-placement,kiali,hubble-auth,public-gateway}/application.yaml
 ├── dns/{technitium,external-dns,coredns,cloudflared}/application.yaml
 ├── security/{cert-manager,letsencrypt}/application.yaml
 ├── security/infisical/application.yaml
@@ -252,7 +282,7 @@ projects/
 └── dns/dns.yaml
 
 values/
-├── networking/istio/*.yaml and resources/gatewayclass-defaults.yaml
+├── networking/istio/*.yaml, OAuth2 Proxy values/resources, and resources/gatewayclass-defaults.yaml
 ├── dns/{technitium,external-dns,coredns,cloudflared}/
 ├── security/cert-manager/cert-manager-values.yaml
 ├── security/letsencrypt/resources/acme.yaml
@@ -261,12 +291,13 @@ values/
 ├── storage/minio/operator-values.yaml, tenant-values.yaml, and resources/
 ├── storage/minio/{observability-access,harbor-access}/resources/
 ├── security/infisical/values.yaml and resources/
-├── storage/longhorn/values.yaml and resources/
+├── storage/longhorn/{values,oauth2-proxy-values}.yaml and resources/
 ├── platform/headlamp/values.yaml
 ├── platform/argocd-auth/resources/{argocd-cm,argocd-rbac-cm,infisical-static-secret}.yaml
 ├── platform/argo-rollouts/{values,oauth2-proxy-values}.yaml and resources/
 ├── platform/backstage/values.yaml and resources/
-├── platform/{harbor,opencost,openfga}/values.yaml and resources/
+├── platform/{harbor,openfga}/values.yaml and resources/
+├── platform/opencost/{values,oauth2-proxy-values}.yaml and resources/
 ├── platform/{harbor-database,openfga-database}/resources/
 ├── database/cloudnative-pg/values.yaml
 ├── database/redis/resources/{infisical-static-secret,service,statefulset}.yaml

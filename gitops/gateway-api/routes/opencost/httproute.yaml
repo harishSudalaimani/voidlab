@@ -16,5 +16,5 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: opencost
-          port: 9090
+        - name: opencost-auth-oauth2-proxy
+          port: 4180

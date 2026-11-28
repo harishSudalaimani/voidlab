@@ -1,0 +1,56 @@
+config:
+  clientID: kiali-ui
+  existingSecret: kiali-oauth2-proxy
+  requiredSecretKeys:
+    - client-id
+    - client-secret
+    - cookie-secret
+
+extraArgs:
+  provider: keycloak-oidc
+  oidc-issuer-url: https://keycloak.kiroku.life/realms/voidlab
+  redirect-url: https://kiali.kiroku.life/oauth2/callback
+  upstream: http://kiali.istio-system.svc.cluster.local:20001/
+  http-address: 0.0.0.0:4180
+  email-domain: "*"
+  allowed-group: argocd-admins
+  oidc-groups-claim: groups
+  scope: "openid email profile"
+  reverse-proxy: "true"
+  proxy-websockets: "true"
+  skip-provider-button: "true"
+  cookie-secure: "true"
+  cookie-samesite: lax
+  cookie-expire: 8h
+  whitelist-domain: .kiroku.life
+
+service:
+  type: ClusterIP
+  portNumber: 4180
+  targetPort: http
+  appProtocol: http
+
+serviceAccount:
+  enabled: true
+  automountServiceAccountToken: false
+
+metrics:
+  enabled: false
+
+replicaCount: 1
+nodeSelector:
+  kubernetes.io/hostname: cp
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+podDisruptionBudget:
+  enabled: false

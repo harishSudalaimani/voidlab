@@ -6,12 +6,13 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
 spec:
-  description: Istio ambient mesh, Gateway API, and Kiali
+  description: Istio ambient mesh, Gateway API, Kiali, and Hubble authentication
   sourceRepos:
     - https://github.com/harishSudalaimani/voidlab.git
     - https://github.com/kubernetes-sigs/gateway-api
     - https://blob.istio.io/istio-release/charts
     - https://kiali.org/helm-charts
+    - https://oauth2-proxy.github.io/manifests
   destinations:
     - server: https://kubernetes.default.svc
       namespace: istio-system

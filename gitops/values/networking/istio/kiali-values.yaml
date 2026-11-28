@@ -11,6 +11,9 @@ cr:
   name: kiali
   namespace: istio-system
   spec:
+    auth:
+      # OAuth2 Proxy enforces the Keycloak login at the only published route.
+      strategy: anonymous
     deployment:
       cluster_wide_access: true
       pod_labels:

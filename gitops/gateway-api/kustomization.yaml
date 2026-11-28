@@ -3,4 +3,3 @@ kind: Kustomization
 resources:
   - gateway/public/gateway.yaml
   - routes/shared
-  - routes/hubble
