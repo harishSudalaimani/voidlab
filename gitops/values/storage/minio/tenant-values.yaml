@@ -19,7 +19,7 @@ tenant:
       servers: 1
       volumesPerServer: 1
       size: 1Ti
-      storageClassName: longhorn-minio
+      storageClassName: longhorn-minio-single
       # The Chainguard image runs as UID/GID 65532; grant that identity access
       # to the Longhorn volume.
       securityContext:

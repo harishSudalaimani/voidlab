@@ -1,0 +1,13 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+# The CP disk is the only disk that can hold this MinIO volume. Keep one
+# Longhorn replica until the cluster has capacity for a second copy.
+metadata:
+  name: longhorn-minio-single
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+parameters:
+  numberOfReplicas: "1"
+  fsType: ext4
