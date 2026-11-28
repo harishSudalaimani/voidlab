@@ -1,4 +1,6 @@
 replicaCount: 2
+nodeSelector:
+  kubernetes.io/hostname: cp
 
 datastore:
   engine: postgres

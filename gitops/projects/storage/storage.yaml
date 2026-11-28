@@ -27,9 +27,6 @@ spec:
     - group: ""
       kind: Node
       name: cp
-    - group: ""
-      kind: Node
-      name: worker
     - group: apiextensions.k8s.io
       kind: CustomResourceDefinition
     - group: rbac.authorization.k8s.io

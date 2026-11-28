@@ -15,7 +15,7 @@ tenant:
 
   pools:
     - name: pool-0
-      # A single-node tenant suits this two-node lab. It is not distributed MinIO.
+      # A single-node tenant suits the single-node cluster. It is not distributed MinIO.
       servers: 1
       volumesPerServer: 1
       size: 1Ti

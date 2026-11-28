@@ -1,14 +1,14 @@
 defaultSettings:
   createDefaultDiskLabeledNodes: true
   defaultDataPath: /var/lib/longhorn/
-  defaultReplicaCount: 2
+  defaultReplicaCount: 1
   storageMinimalAvailablePercentage: 15
   taintToleration: node-role.kubernetes.io/control-plane:NoSchedule
   deletingConfirmationFlag: true
 
 persistence:
   defaultClass: true
-  defaultClassReplicaCount: 2
+  defaultClassReplicaCount: 1
 
 preUpgradeChecker:
   jobEnabled: false

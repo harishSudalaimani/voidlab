@@ -29,7 +29,6 @@ type serverConfig struct {
 type server struct {
 	name       string
 	role       string
-	roleOutput pulumi.StringOutput
 	address    pulumi.StringOutput
 	sshAddress string
 	sshUser    string
@@ -84,10 +83,8 @@ func main() {
 			}
 			address := requireMatchingAddress(spec.Name, spec.Address,
 				k8Stack.GetStringOutput(pulumi.String("nodeIP_"+strings.ReplaceAll(spec.Name, "-", "_"))))
-			role := requireMatchingRole(spec.Name, spec.Role,
-				k8Stack.GetStringOutput(pulumi.String("nodeRole_"+strings.ReplaceAll(spec.Name, "-", "_"))))
 			servers = append(servers, server{
-				name: spec.Name, role: spec.Role, roleOutput: role, address: address, sshAddress: sshAddress, sshUser: spec.SSHUser,
+				name: spec.Name, role: spec.Role, address: address, sshAddress: sshAddress, sshUser: spec.SSHUser,
 				privateKey: privateKey, hostKey: pulumi.String(hostKey),
 			})
 		}
@@ -98,8 +95,7 @@ func main() {
 		}
 		changes := make([]*remote.Command, 0, len(servers))
 		for i := range servers {
-			peer := servers[1-i]
-			command, err := configureServer(ctx, servers[i], peer, podCIDR, pulumi.String(lanPrefix.String()), script)
+			command, err := configureServer(ctx, servers[i], podCIDR, pulumi.String(lanPrefix.String()), script)
 			if err != nil {
 				return fmt.Errorf("register network configuration for %s: %w", servers[i].name, err)
 			}
@@ -117,19 +113,19 @@ func main() {
 }
 
 func validateServers(servers []serverConfig, lanPrefix netip.Prefix) error {
-	if len(servers) == 0 {
-		return fmt.Errorf("no servers are configured; set voidlab-network:servers[0] and [1] with the commands in README.md")
-	}
-	if len(servers) != 2 {
-		return fmt.Errorf("servers must contain exactly the two Kubernetes servers")
+	if len(servers) != 1 {
+		return fmt.Errorf("single-node network config requires exactly one control-plane server")
 	}
 	seenNames, seenAddresses := map[string]bool{}, map[string]bool{}
 	for _, current := range servers {
+		if current.Name != "cp" {
+			return fmt.Errorf("single-node network server must be named cp; got %q", current.Name)
+		}
 		if current.Name == "" || current.SSHUser == "" || current.SSHPrivateKeyPath == "" {
 			return fmt.Errorf("each server must set name, role, sshUser, and sshPrivateKeyPath")
 		}
-		if current.Role != "control-plane" && current.Role != "worker" {
-			return fmt.Errorf("server %s role must be control-plane or worker", current.Name)
+		if current.Role != "control-plane" {
+			return fmt.Errorf("server %s role must be control-plane in this single-node cluster", current.Name)
 		}
 		if seenNames[current.Name] {
 			return fmt.Errorf("server name %q is configured more than once", current.Name)
@@ -166,16 +162,7 @@ func requireMatchingAddress(name, expected string, actual pulumi.StringOutput) p
 	}).(pulumi.StringOutput)
 }
 
-func requireMatchingRole(name, expected string, actual pulumi.StringOutput) pulumi.StringOutput {
-	return actual.ApplyT(func(value string) (string, error) {
-		if value != expected {
-			return "", fmt.Errorf("Kubernetes stack role for %s is %q, network config says %q", name, value, expected)
-		}
-		return value, nil
-	}).(pulumi.StringOutput)
-}
-
-func configureServer(ctx *pulumi.Context, current, peer server, podCIDR pulumi.StringOutput, lanCIDR pulumi.StringInput, script string) (*remote.Command, error) {
+func configureServer(ctx *pulumi.Context, current server, podCIDR pulumi.StringOutput, lanCIDR pulumi.StringInput, script string) (*remote.Command, error) {
 	return remote.NewCommand(ctx, "configure-network-"+current.name, &remote.CommandArgs{
 		Connection: &remote.ConnectionArgs{
 			Host: pulumi.String(current.sshAddress), User: pulumi.String(current.sshUser),
@@ -183,9 +170,7 @@ func configureServer(ctx *pulumi.Context, current, peer server, podCIDR pulumi.S
 		},
 		Create: pulumi.Sprintf("sudo -n bash -s -- %s", shellQuoteInputs([]pulumi.StringInput{
 			current.address,
-			peer.address,
 			pulumi.String(current.role),
-			peer.roleOutput,
 			podCIDR,
 			lanCIDR,
 		})),

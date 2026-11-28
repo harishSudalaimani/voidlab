@@ -11,10 +11,12 @@ data:
       replicas: 2
       template:
         spec:
+          nodeSelector:
+            kubernetes.io/hostname: cp
           topologySpreadConstraints:
             - maxSkew: 1
               topologyKey: kubernetes.io/hostname
-              whenUnsatisfiable: DoNotSchedule
+              whenUnsatisfiable: ScheduleAnyway
               labelSelector:
                 matchLabels:
                   gateway.networking.k8s.io/gateway-name: public

@@ -42,11 +42,9 @@ type node struct {
 }
 
 type clusterConfig struct {
-	controlPlane        node
-	workers             []node
-	podCIDR             string
-	allowOneCPU         bool
-	joinTokenGeneration string
+	controlPlane node
+	podCIDR      string
+	allowOneCPU  bool
 }
 
 func main() {
@@ -61,9 +59,8 @@ func main() {
 		}
 
 		cluster := clusterConfig{
-			podCIDR:             configString(cfg, "podCIDR", defaultPodCIDR),
-			allowOneCPU:         cfg.GetBool("allowSingleCPUControlPlane"),
-			joinTokenGeneration: configString(cfg, "joinTokenGeneration", "1"),
+			podCIDR:     configString(cfg, "podCIDR", defaultPodCIDR),
+			allowOneCPU: cfg.GetBool("allowSingleCPUControlPlane"),
 		}
 		for _, server := range servers {
 			sshAddress := server.SSHAddress
@@ -86,8 +83,6 @@ func main() {
 			}
 			if current.role == "control-plane" {
 				cluster.controlPlane = current
-			} else {
-				cluster.workers = append(cluster.workers, current)
 			}
 		}
 		allNodes := cluster.nodes()
@@ -102,16 +97,12 @@ func main() {
 		}
 		preflights := make([]pulumi.Resource, 0, len(allNodes))
 		for _, current := range allNodes {
-			peer := allNodes[1]
-			if current.name == allNodes[1].name {
-				peer = allNodes[0]
-			}
 			allowOneCPU := "false"
 			if current.role == "control-plane" && cluster.allowOneCPU {
 				allowOneCPU = "true"
 			}
 			check, err := runScript(ctx, "preflight-"+current.name, current, preflightScript,
-				[]pulumi.StringInput{pulumi.String(current.name), pulumi.String(current.role), pulumi.String(allowOneCPU), peer.address}, nil, false)
+				[]pulumi.StringInput{pulumi.String(current.name), pulumi.String(current.role), pulumi.String(allowOneCPU)}, nil, false)
 			if err != nil {
 				return fmt.Errorf("register %s preflight: %w", current.name, err)
 			}
@@ -136,23 +127,24 @@ func main() {
 		if err != nil {
 			return err
 		}
-		initArgs := []pulumi.StringInput{cluster.controlPlane.address, pulumi.String(cluster.podCIDR), pulumi.String("false"), pulumi.String(cluster.joinTokenGeneration)}
+		initArgs := []pulumi.StringInput{cluster.controlPlane.address, pulumi.String(cluster.podCIDR), pulumi.String("false")}
 		if cluster.allowOneCPU {
 			initArgs[2] = pulumi.String("true")
 		}
 		controlPlaneInit, err := runScript(ctx, "init-control-plane", cluster.controlPlane, initScript,
-			initArgs, setupResources, true)
+			initArgs, setupResources, false)
 		if err != nil {
 			return fmt.Errorf("register kubeadm init: %w", err)
 		}
 
-		joinResources := make([]pulumi.Resource, 0, len(cluster.workers))
-		for _, worker := range cluster.workers {
-			join, err := registerWorkerJoin(ctx, worker, controlPlaneInit.Stdout, []pulumi.Resource{controlPlaneInit})
-			if err != nil {
-				return fmt.Errorf("register %s join: %w", worker.name, err)
-			}
-			joinResources = append(joinResources, join)
+		singleNodeScheduling, err := remote.NewCommand(ctx, "enable-control-plane-scheduling", &remote.CommandArgs{
+			Connection: connection(cluster.controlPlane),
+			Create:     pulumi.String("sudo -n kubectl --kubeconfig=/etc/kubernetes/admin.conf taint node cp node-role.kubernetes.io/control-plane:NoSchedule- || true"),
+			Triggers:   pulumi.Array{pulumi.String("single-node-schedulable-v1")},
+			Logging:    remote.LoggingNone,
+		}, pulumi.DependsOn([]pulumi.Resource{controlPlaneInit}))
+		if err != nil {
+			return fmt.Errorf("register single-node scheduling configuration: %w", err)
 		}
 
 		readyScript, err := readScript("wait-for-nodes.sh")
@@ -160,7 +152,7 @@ func main() {
 			return err
 		}
 		registration, err := runScript(ctx, "confirm-nodes-registered", cluster.controlPlane, readyScript,
-			[]pulumi.StringInput{pulumi.String(strconv.Itoa(len(allNodes)))}, joinResources, false)
+			[]pulumi.StringInput{pulumi.String(strconv.Itoa(len(allNodes)))}, []pulumi.Resource{singleNodeScheduling}, false)
 		if err != nil {
 			return fmt.Errorf("register node-registration check: %w", err)
 		}
@@ -170,7 +162,7 @@ func main() {
 			return err
 		}
 		kubeconfig, err := runScript(ctx, "export-kubeconfig", cluster.controlPlane, kubeconfigScript,
-			[]pulumi.StringInput{cluster.controlPlane.address, pulumi.String(cluster.joinTokenGeneration)}, []pulumi.Resource{registration}, true)
+			[]pulumi.StringInput{cluster.controlPlane.address}, []pulumi.Resource{registration}, true)
 		if err != nil {
 			return fmt.Errorf("register kubeconfig export: %w", err)
 		}
@@ -198,19 +190,22 @@ func main() {
 }
 
 func (c clusterConfig) nodes() []node {
-	return append([]node{c.controlPlane}, c.workers...)
+	return []node{c.controlPlane}
 }
 
 func validateServers(servers []serverConfig) error {
 	if len(servers) == 0 {
-		return fmt.Errorf("no servers are configured; set voidlab-kubernetes:servers[0] and [1] with the commands in README.md")
+		return fmt.Errorf("no servers are configured; add the control-plane server to voidlab-kubernetes:servers")
 	}
-	if len(servers) != 2 {
-		return fmt.Errorf("servers must contain exactly two entries: one control-plane and one worker")
+	if len(servers) != 1 {
+		return fmt.Errorf("single-node cluster config requires exactly one control-plane server")
 	}
 	seenNames, seenAddresses := map[string]bool{}, map[string]bool{}
-	controlPlanes, workers := 0, 0
+	controlPlanes := 0
 	for _, server := range servers {
+		if server.Name != "cp" {
+			return fmt.Errorf("single-node cluster server must be named cp; got %q", server.Name)
+		}
 		if server.Name == "" || server.SSHUser == "" || server.SSHPrivateKeyPath == "" {
 			return fmt.Errorf("each server must set name, sshUser, and sshPrivateKeyPath")
 		}
@@ -236,14 +231,12 @@ func validateServers(servers []serverConfig) error {
 		switch server.Role {
 		case "control-plane":
 			controlPlanes++
-		case "worker":
-			workers++
 		default:
-			return fmt.Errorf("server %s role must be control-plane or worker", server.Name)
+			return fmt.Errorf("server %s role must be control-plane for this single-node cluster", server.Name)
 		}
 	}
-	if controlPlanes != 1 || workers != 1 {
-		return fmt.Errorf("configure exactly one control-plane and one worker; found %d control-plane and %d worker", controlPlanes, workers)
+	if controlPlanes != 1 {
+		return fmt.Errorf("configure exactly one control-plane; found %d", controlPlanes)
 	}
 	return nil
 }
@@ -263,16 +256,6 @@ func runScript(ctx *pulumi.Context, name string, target node, script string, arg
 	return remote.NewCommand(ctx, name, &remote.CommandArgs{
 		Connection: connection(target), Create: command, Stdin: pulumi.String(script), Logging: remote.LoggingNone,
 	}, options...)
-}
-
-func registerWorkerJoin(ctx *pulumi.Context, worker node, joinCommand pulumi.StringOutput, dependencies []pulumi.Resource) (*remote.Command, error) {
-	create := joinCommand.ApplyT(func(join string) string {
-		join = strings.TrimSpace(join)
-		return "sudo -n bash -lc " + shellQuote("if test -s /etc/kubernetes/kubelet.conf; then echo already-joined; else "+join+"; fi")
-	}).(pulumi.StringOutput)
-	return remote.NewCommand(ctx, "join-"+worker.name, &remote.CommandArgs{
-		Connection: connection(worker), Create: create, AddPreviousOutputInEnv: pulumi.Bool(false), Logging: remote.LoggingNone,
-	}, pulumi.DependsOn(dependencies))
 }
 
 func connection(target node) *remote.ConnectionArgs {

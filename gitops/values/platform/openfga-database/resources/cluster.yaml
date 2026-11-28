@@ -18,7 +18,9 @@ spec:
   affinity:
     enablePodAntiAffinity: true
     topologyKey: kubernetes.io/hostname
-    podAntiAffinityType: required
+    podAntiAffinityType: preferred
+    nodeSelector:
+      kubernetes.io/hostname: cp
     tolerations:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists

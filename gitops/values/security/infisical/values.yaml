@@ -7,10 +7,12 @@ infisical:
       value: https://infisical.kiroku.life
   service:
     type: ClusterIP
+  nodeSelector:
+    kubernetes.io/hostname: cp
   topologySpreadConstraints:
     - maxSkew: 1
       topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: DoNotSchedule
+      whenUnsatisfiable: ScheduleAnyway
       labelSelector:
         matchLabels:
           app.kubernetes.io/name: infisical

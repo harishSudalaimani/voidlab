@@ -1,16 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-exec 3>&1
 exec 1>&2
 
 control_plane_ip="$1"
 pod_cidr="$2"
 allow_single_cpu="$3"
-join_token_generation="$4"
-# This value is a deliberate Pulumi input so an operator can request a fresh
-# short-lived join token after a failed or delayed worker join.
-: "$join_token_generation"
 
 if [[ ! -s /etc/kubernetes/admin.conf ]]; then
   kubernetes_version="$(kubeadm version -o short)"
@@ -31,10 +26,3 @@ if [[ ! -s /etc/kubernetes/admin.conf ]]; then
   fi
   kubeadm init "${init_args[@]}"
 fi
-
-join_command="$(kubeadm token create --print-join-command)"
-if [[ "$join_command" != kubeadm\ join\ * ]]; then
-  echo "kubeadm did not return a join command" >&2
-  exit 1
-fi
-printf '%s\n' "$join_command" >&3

@@ -7,8 +7,3 @@ config:
       address: 192.168.29.81
       sshUser: dark
       sshPrivateKeyPath: ~/.ssh/dark
-    - name: worker
-      role: worker
-      address: 192.168.29.52
-      sshUser: void
-      sshPrivateKeyPath: ~/.ssh/voidlab

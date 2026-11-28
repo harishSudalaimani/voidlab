@@ -1,5 +1,4 @@
 config:
-  voidlab-kubernetes:joinTokenGeneration: "1"
   voidlab-kubernetes:podCIDR: 10.244.0.0/16
   voidlab-kubernetes:servers:
     - name: cp
@@ -7,8 +6,3 @@ config:
       address: 192.168.29.81
       sshUser: dark
       sshPrivateKeyPath: ~/.ssh/dark
-    - name: worker
-      role: worker
-      address: 192.168.29.52
-      sshUser: void
-      sshPrivateKeyPath: ~/.ssh/voidlab

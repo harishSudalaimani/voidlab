@@ -1,5 +1,5 @@
 name: voidlab-network
 runtime: go
-description: VoidLab direct networking and peer firewall rules for two Kubernetes servers
+description: VoidLab single-node Kubernetes host firewall configuration
 backend:
   url: https://api.pulumi.com

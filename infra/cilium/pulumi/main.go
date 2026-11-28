@@ -61,8 +61,7 @@ func main() {
 			// Istio ambient chains its CNI plugin after Cilium. Keep Cilium from
 			// deleting the chained config and bypass pod-namespace socket LB so
 			// ambient redirection can see the original service address.
-			// Roll agents when the ConfigMap changes so these settings take effect;
-			// update one node at a time on this two-node cluster.
+			// Roll the single Cilium agent when its ConfigMap changes.
 			"rollOutCiliumPods": pulumi.Bool(true),
 			"updateStrategy": pulumi.Map{
 				"type": pulumi.String("RollingUpdate"),
@@ -91,7 +90,7 @@ func main() {
 			"routingMode":    routingMode,
 			"tunnelProtocol": pulumi.String("vxlan"),
 			"operator": pulumi.Map{
-				"replicas": pulumi.Int(1),
+				"replicas": pulumi.Int(2),
 				"nodeSelector": pulumi.Map{
 					"kubernetes.io/hostname": pulumi.String("cp"),
 				},
@@ -103,14 +102,16 @@ func main() {
 			"hubble": pulumi.Map{
 				"enabled": pulumi.Bool(true),
 				"relay": pulumi.Map{
-					"enabled": pulumi.Bool(true),
+					"enabled":  pulumi.Bool(true),
+					"replicas": pulumi.Int(2),
 					"nodeSelector": pulumi.Map{
 						"kubernetes.io/hostname": pulumi.String("cp"),
 					},
 					"tolerations": systemComponentTolerations(),
 				},
 				"ui": pulumi.Map{
-					"enabled": pulumi.Bool(true),
+					"enabled":  pulumi.Bool(true),
+					"replicas": pulumi.Int(2),
 					"nodeSelector": pulumi.Map{
 						"kubernetes.io/hostname": pulumi.String("cp"),
 					},
