@@ -35,11 +35,23 @@ auth:
         prompt: auto
         signIn:
           resolvers:
-            - resolver: emailLocalPartMatchingUserEntityName
-              allowedDomains:
-                - harish8.com
+            - resolver: emailMatchingUserEntityProfileEmail
 
 catalog:
+  providers:
+    keycloakOrg:
+      production:
+        baseUrl: https://keycloak.kiroku.life
+        loginRealm: voidlab
+        realm: voidlab
+        clientId: backstage-catalog-sync
+        clientSecret: ${BACKSTAGE_KEYCLOAK_CATALOG_CLIENT_SECRET}
+        userQuerySize: 100
+        groupQuerySize: 100
+        maxConcurrency: 4
+        schedule:
+          frequency: { minutes: 5 }
+          timeout: { minutes: 2 }
   rules:
     - allow: [Component, Domain, Group, Location, Resource, System, User]
   locations:

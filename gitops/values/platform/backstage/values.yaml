@@ -3,7 +3,7 @@ backstage:
   image:
     registry: harbor.kiroku.life
     repository: library/voidlab-backstage
-    tag: 1.55.2-oidc2
+    tag: 1.57.0-keycloak-sync1
     pullPolicy: IfNotPresent
     pullSecrets:
       - backstage-harbor-pull
@@ -70,6 +70,11 @@ backstage:
         secretKeyRef:
           name: backstage-auth-secrets
           key: auth-session-secret
+    - name: BACKSTAGE_KEYCLOAK_CATALOG_CLIENT_SECRET
+      valueFrom:
+        secretKeyRef:
+          name: backstage-auth-secrets
+          key: keycloak-catalog-client-secret
   appConfig:
     app:
       title: VoidLab Developer Portal
@@ -111,10 +116,22 @@ backstage:
             prompt: auto
             signIn:
               resolvers:
-                - resolver: emailLocalPartMatchingUserEntityName
-                  allowedDomains:
-                    - harish8.com
+                - resolver: emailMatchingUserEntityProfileEmail
     catalog:
+      providers:
+        keycloakOrg:
+          production:
+            baseUrl: https://keycloak.kiroku.life
+            loginRealm: voidlab
+            realm: voidlab
+            clientId: backstage-catalog-sync
+            clientSecret: ${BACKSTAGE_KEYCLOAK_CATALOG_CLIENT_SECRET}
+            userQuerySize: 100
+            groupQuerySize: 100
+            maxConcurrency: 4
+            schedule:
+              frequency: { minutes: 5 }
+              timeout: { minutes: 2 }
       rules:
         - allow:
             - Component

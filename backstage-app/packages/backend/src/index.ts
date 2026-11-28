@@ -30,6 +30,10 @@ backend.add(import('@backstage/plugin-auth-backend-module-oidc-provider'));
 // catalog plugin
 backend.add(import('@backstage/plugin-catalog-backend'));
 backend.add(
+  import('@backstage-community/plugin-catalog-backend-module-keycloak'),
+);
+backend.add(import('./modules/catalog/keycloakGroupFilter'));
+backend.add(
   import('@backstage/plugin-catalog-backend-module-scaffolder-entity-model'),
 );
 

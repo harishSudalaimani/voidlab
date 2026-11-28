@@ -11,18 +11,6 @@ spec:
   children: []
 ---
 apiVersion: backstage.io/v1alpha1
-kind: User
-metadata:
-  name: contact
-  title: Harish Messi
-spec:
-  profile:
-    displayName: Harish Messi
-    email: contact@harish8.com
-  memberOf:
-    - platform
----
-apiVersion: backstage.io/v1alpha1
 kind: System
 metadata:
   name: voidlab-platform
