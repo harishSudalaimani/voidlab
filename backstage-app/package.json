@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": "20 || 22"
+    "node": "^24.15.0 || ^26.13.0"
   },
   "scripts": {
     "start": "backstage-cli repo start",
@@ -29,7 +29,7 @@
     ]
   },
   "devDependencies": {
-    "@backstage/cli": "^0.36.6",
+    "@backstage/cli": "^0.36.8",
     "@backstage/e2e-test-utils": "^0.1.2",
     "@playwright/test": "^1.32.3",
     "node-gyp": "^10.0.0",
