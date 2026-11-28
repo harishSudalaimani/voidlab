@@ -18,6 +18,7 @@ metadata:
 spec:
   profile:
     displayName: Harish Messi
+    email: contact@harish8.com
   memberOf:
     - platform
 ---
