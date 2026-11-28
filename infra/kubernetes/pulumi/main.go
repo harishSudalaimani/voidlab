@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/pulumi/pulumi-command/sdk/go/command/remote"
@@ -167,12 +166,12 @@ func main() {
 			return fmt.Errorf("register single-node scheduling configuration: %w", err)
 		}
 
-		readyScript, err := readScript("wait-for-nodes.sh")
+		readyScript, err := readScript("wait-for-control-plane.sh")
 		if err != nil {
 			return err
 		}
-		registration, err := runScript(ctx, "confirm-nodes-registered", cluster.controlPlane, readyScript,
-			[]pulumi.StringInput{pulumi.String(strconv.Itoa(len(allNodes)))}, []pulumi.Resource{singleNodeScheduling}, false)
+		registration, err := runScript(ctx, "confirm-control-plane-registered", cluster.controlPlane, readyScript,
+			nil, []pulumi.Resource{singleNodeScheduling}, false)
 		if err != nil {
 			return fmt.Errorf("register node-registration check: %w", err)
 		}

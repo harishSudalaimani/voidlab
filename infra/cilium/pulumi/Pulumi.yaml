@@ -1,5 +1,5 @@
 name: voidlab-cilium
 runtime: go
-description: VoidLab Cilium CNI and Hubble on the two-server Kubernetes cluster
+description: VoidLab Cilium CNI and Hubble on the single-node Kubernetes cluster
 backend:
   url: https://api.pulumi.com

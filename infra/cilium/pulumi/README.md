@@ -13,7 +13,7 @@ pulumi preview --stack snharish85-gmail-com-org/voidlab-cilium/cilium
 pulumi up --stack snharish85-gmail-com-org/voidlab-cilium/cilium
 ```
 
-The Cilium chart uses Kubernetes PodCIDRs, kube-proxy replacement, L2 announcements, Envoy, Hubble Relay, and Hubble UI. L2 announcements are enabled for the public Istio Gateway VIP; its GitOps policy restricts announcements to `cp` on `enp8s0`. Keep automatic device detection and confirm the `cp` agent selects `enp8s0`. The Istio ambient compatibility values keep CNI chaining enabled (`cni.exclusive=false`), limit socket load-balancing to the host namespace (`socketLB.hostNamespaceOnly=true`), and leave BPF masquerading disabled. The Cilium operator, Hubble Relay, and Hubble UI each have two replicas on `cp` and tolerate the control-plane and initial `NotReady` taints so they can start during CNI bootstrap. Cilium and Envoy each run as a single-node DaemonSet.
+The Cilium chart uses Kubernetes PodCIDRs, kube-proxy replacement, L2 announcements, Envoy, Hubble Relay, and Hubble UI. L2 announcements are enabled for the public Istio Gateway VIP; its GitOps policy restricts announcements to `cp` on `enp8s0`. Keep automatic device detection and confirm the `cp` agent selects `enp8s0`. The Istio ambient compatibility values keep CNI chaining enabled (`cni.exclusive=false`), limit socket load-balancing to the host namespace (`socketLB.hostNamespaceOnly=true`), and leave BPF masquerading disabled. One Cilium operator runs on `cp` because the operator replicas bind the same host ports. Hubble Relay and Hubble UI each run two replicas on `cp` and tolerate the control-plane and initial `NotReady` taints so they can start during CNI bootstrap. Cilium and Envoy each run as a single-node DaemonSet.
 
 Verify with:
 
