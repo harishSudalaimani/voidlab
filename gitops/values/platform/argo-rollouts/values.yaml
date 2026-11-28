@@ -68,9 +68,7 @@ providerRBAC:
 dashboard:
   enabled: true
   readonly: true
-  replicas: 1
-  nodeSelector:
-    kubernetes.io/hostname: cp
+  replicas: 2
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists

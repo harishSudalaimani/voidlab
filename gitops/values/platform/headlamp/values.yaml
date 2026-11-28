@@ -1,4 +1,4 @@
-replicaCount: 1
+replicaCount: 2
 
 config:
   inCluster: true
@@ -77,8 +77,6 @@ clusterRoleBinding:
   create: true
   clusterRoleName: view
 
-nodeSelector:
-  kubernetes.io/hostname: cp
 tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Exists

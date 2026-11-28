@@ -4,7 +4,7 @@ metadata:
   name: harbor-db
   namespace: harbor
 spec:
-  instances: 1
+  instances: 2
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1
   bootstrap:
     initdb:
@@ -16,8 +16,9 @@ spec:
     storageClass: longhorn
     size: 16Gi
   affinity:
-    nodeSelector:
-      kubernetes.io/hostname: cp
+    enablePodAntiAffinity: true
+    topologyKey: kubernetes.io/hostname
+    podAntiAffinityType: required
     tolerations:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists

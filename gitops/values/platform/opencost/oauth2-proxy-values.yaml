@@ -37,9 +37,16 @@ serviceAccount:
 metrics:
   enabled: false
 
-replicaCount: 1
-nodeSelector:
-  kubernetes.io/hostname: cp
+replicaCount: 2
+podLabels:
+  voidlab.io/ha-group: opencost-oauth2-proxy
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        voidlab.io/ha-group: opencost-oauth2-proxy
 tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Exists
@@ -53,4 +60,6 @@ resources:
     memory: 256Mi
 
 podDisruptionBudget:
-  enabled: false
+  enabled: true
+  minAvailable: 1
+  maxUnavailable: null

@@ -18,5 +18,13 @@ opencost:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
       effect: NoSchedule
-  nodeSelector:
-    kubernetes.io/hostname: cp
+  exporter:
+    replicas: 2
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: opencost
+          app.kubernetes.io/instance: opencost

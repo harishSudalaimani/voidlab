@@ -1,9 +1,15 @@
 crds:
   create: true
 
-replicaCount: 1
-nodeSelector:
-  kubernetes.io/hostname: cp
+replicaCount: 2
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: cloudnative-pg
+        app.kubernetes.io/instance: cloudnative-pg
 tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Exists

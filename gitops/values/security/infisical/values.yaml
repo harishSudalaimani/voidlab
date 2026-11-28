@@ -1,14 +1,20 @@
 infisical:
   rolloutOnEveryRender: false
-  replicaCount: 1
+  replicaCount: 2
   kubeSecretRef: infisical-secrets
   extraEnv:
     - name: SITE_URL
       value: https://infisical.kiroku.life
   service:
     type: ClusterIP
-  nodeSelector:
-    kubernetes.io/hostname: cp
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          app.kubernetes.io/name: infisical
+          app.kubernetes.io/instance: infisical
   tolerations:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists

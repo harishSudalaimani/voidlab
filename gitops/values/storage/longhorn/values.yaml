@@ -49,7 +49,7 @@ longhornDriver:
       effect: NoSchedule
 
 longhornUI:
-  replicas: 1
+  replicas: 2
   nodeSelector:
     kubernetes.io/hostname: cp
   tolerations:

@@ -18,8 +18,7 @@ cr:
       cluster_wide_access: true
       pod_labels:
         istio.io/dataplane-mode: ambient
-      node_selector:
-        kubernetes.io/hostname: cp
+      replicas: 2
       tolerations:
         - key: node-role.kubernetes.io/control-plane
           operator: Exists
