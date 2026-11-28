@@ -1,5 +1,7 @@
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
+# Legacy class retained for existing claims. Its parameters are immutable;
+# the MinIO tenant now creates new claims with longhorn-minio-single.
 metadata:
   name: longhorn-minio
 provisioner: driver.longhorn.io

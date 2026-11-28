@@ -22,7 +22,7 @@ global:
       operator: Exists
       effect: NoSchedule
 
-# Longhorn manager must run on both storage nodes.
+# The manager runs on the node tagged for Longhorn storage; cp is the only node.
 longhornManager:
   nodeSelector:
     storage.voidlab.io/longhorn: "true"

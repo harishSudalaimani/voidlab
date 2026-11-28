@@ -90,7 +90,9 @@ func main() {
 			"routingMode":    routingMode,
 			"tunnelProtocol": pulumi.String("vxlan"),
 			"operator": pulumi.Map{
-				"replicas": pulumi.Int(2),
+				// Both operator replicas bind the same host ports (9234 and
+				// 9963), so they cannot share cp. This cluster has one node.
+				"replicas": pulumi.Int(1),
 				"nodeSelector": pulumi.Map{
 					"kubernetes.io/hostname": pulumi.String("cp"),
 				},

@@ -1,6 +1,6 @@
 # VoidLab Kubernetes bootstrap
 
-This Pulumi project installs Kubernetes on the single physical Fedora 45 server `cp` (`192.168.29.81`, 8 CPUs/29 GiB RAM). Pulumi connects using the existing `dark` SSH account and key, sets the persistent hostname to `cp`, and uses kubeadm to initialize a single-node cluster. Kubernetes reports the machine's CPU and memory capacity directly; this project adds no node-wide CPU or RAM limits. Containerd image data is stored on the `/data/vms` SSD instead of the 15 GiB root filesystem. Bootstrap removes the control-plane `NoSchedule` taint so application pods can run on this only node.
+This Pulumi project installs Kubernetes on the single physical Fedora 45 server `cp` (`192.168.29.81`, 8 CPUs/29 GiB RAM). Pulumi connects using the existing `dark` SSH account and key, sets the persistent hostname to `cp`, and uses kubeadm to initialize a single-node cluster. The kubelet pod ceiling is set to 200 to accommodate the consolidated workloads; CPU and memory remain bounded by the host's actual capacity and each pod's requests and limits. Containerd image data is stored on the `/data/vms` SSD instead of the 15 GiB root filesystem. Bootstrap removes the control-plane `NoSchedule` taint so application pods can run on this only node.
 
 ## Required server configuration
 
@@ -45,4 +45,4 @@ kubectl get nodes -o wide
 
 ## Reruns
 
-Pulumi removing a remote command resource does not undo installed packages, reset kubeadm, or remove a Kubernetes Node. Before retiring any former worker, back up data, confirm every workload and Longhorn volume replica is on `cp`, then drain and delete the worker Node from Kubernetes and remove its Longhorn Node resource. Only then run `sudo kubeadm reset -f` on the retired server. This stack now expects one control-plane server and does not join workers. The Kubernetes stack owns bootstrap; the network stack manages the host firewall; Cilium owns the CNI; Argo CD owns GitOps bootstrap.
+This stack expects exactly one control-plane server named `cp`. Removing a remote command from Pulumi state does not uninstall packages, reset kubeadm, or remove Kubernetes or Longhorn node resources. Complete workload and Longhorn volume cleanup before resetting or repurposing any retired host. The Kubernetes stack owns bootstrap; the network stack manages the host firewall; Cilium owns the CNI; Argo CD owns GitOps bootstrap.

@@ -12,6 +12,9 @@
 !infra/network/pulumi/
 !infra/network/pulumi/scripts/
 !infra/network/pulumi/scripts/**
+!infra/kubernetes/pulumi/
+!infra/kubernetes/pulumi/scripts/
+!infra/kubernetes/pulumi/scripts/configure-kubelet-pod-capacity.sh
 /infra/pulumi/voidlab
 /infra/pulumi/voidlab.exe
 

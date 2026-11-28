@@ -25,8 +25,15 @@ spec:
   proxy:
     headers: xforwarded
   scheduling:
-    nodeSelector:
-      kubernetes.io/hostname: cp
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: In
+                  values:
+                    - cp
     tolerations:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists

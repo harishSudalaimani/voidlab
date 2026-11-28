@@ -19,6 +19,8 @@ import (
 const (
 	defaultPodCIDR  = "10.244.0.0/16"
 	kubernetesMinor = "1.37"
+	// The default /24 node CIDR has enough IPv4 addresses for 200 pods with headroom.
+	kubeletMaxPods  = "200"
 )
 
 type serverConfig struct {
@@ -137,12 +139,30 @@ func main() {
 			return fmt.Errorf("register kubeadm init: %w", err)
 		}
 
+		podCapacityScript, err := readScript("configure-kubelet-pod-capacity.sh")
+		if err != nil {
+			return err
+		}
+		podCapacity, err := remote.NewCommand(ctx, "configure-control-plane-pod-capacity", &remote.CommandArgs{
+			Connection: connection(cluster.controlPlane),
+			Create:     pulumi.String("sudo -n bash -s -- " + kubeletMaxPods),
+			Stdin:      pulumi.String(podCapacityScript),
+			Triggers: pulumi.Array{
+				pulumi.String("kubelet-max-pods-" + kubeletMaxPods + "-v1"),
+				pulumi.String(podCapacityScript),
+			},
+			Logging: remote.LoggingNone,
+		}, pulumi.DependsOn([]pulumi.Resource{controlPlaneInit}))
+		if err != nil {
+			return fmt.Errorf("register control-plane pod-capacity configuration: %w", err)
+		}
+
 		singleNodeScheduling, err := remote.NewCommand(ctx, "enable-control-plane-scheduling", &remote.CommandArgs{
 			Connection: connection(cluster.controlPlane),
 			Create:     pulumi.String("sudo -n kubectl --kubeconfig=/etc/kubernetes/admin.conf taint node cp node-role.kubernetes.io/control-plane:NoSchedule- || true"),
 			Triggers:   pulumi.Array{pulumi.String("single-node-schedulable-v1")},
 			Logging:    remote.LoggingNone,
-		}, pulumi.DependsOn([]pulumi.Resource{controlPlaneInit}))
+		}, pulumi.DependsOn([]pulumi.Resource{podCapacity}))
 		if err != nil {
 			return fmt.Errorf("register single-node scheduling configuration: %w", err)
 		}
